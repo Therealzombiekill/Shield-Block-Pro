@@ -259,6 +259,17 @@
     }
   });
 
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'GLOBAL_PAUSE') {
+      adActive = false;
+      unmuteVideo();
+      hideToast();
+    }
+    if (msg.type === 'GLOBAL_RESUME') {
+      domTick();
+    }
+  });
+
   domTick();
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'twitch', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}

@@ -207,6 +207,14 @@
     }
   });
 
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'GLOBAL_PAUSE' && adActive) {
+      adActive = false; skipAttempts = 0;
+      muteAudio(wasMuted); hideOverlay();
+    }
+    if (msg.type === 'GLOBAL_RESUME') { tick(); }
+  });
+
   // Cleanup on navigation — prevents observer accumulation on SPA route changes
   window.addEventListener('beforeunload', () => {
     _spotObserver.disconnect();

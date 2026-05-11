@@ -204,6 +204,17 @@
       window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
     }
   });
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'GLOBAL_PAUSE') {
+      // Restore audio if we had muted for an ad
+      if (_muted) {
+        const vid = document.querySelector('video');
+        if (vid && _origVol !== null) { vid.muted = false; vid.volume = _origVol; }
+        _muted = false; _origVol = null;
+      }
+    }
+    if (msg.type === 'GLOBAL_RESUME') { tick(); }
+  });
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'youtube', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
   console.warn('[SB:youtube] script error:', e?.message ?? e);

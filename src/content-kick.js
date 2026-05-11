@@ -108,6 +108,15 @@
     }
   });
 
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'GLOBAL_PAUSE' && adActive) {
+      adActive = false;
+      const video = document.querySelector('video');
+      if (video) video.muted = wasMuted;
+    }
+    if (msg.type === 'GLOBAL_RESUME') { tick(); }
+  });
+
   window.addEventListener('beforeunload', () => {
     _obs.disconnect(); clearInterval(_int); clearTimeout(_deb);
   }, { once: true });

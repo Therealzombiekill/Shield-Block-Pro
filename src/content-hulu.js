@@ -151,6 +151,13 @@
     }
   });
 
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'GLOBAL_PAUSE' && adActive) {
+      adActive = false; restoreAfterAd();
+    }
+    if (msg.type === 'GLOBAL_RESUME') { tick(); }
+  });
+
   // Cleanup on page unload — prevents memory leak on SPA navigation
   window.addEventListener('beforeunload', () => {
     _huluObserver.disconnect();

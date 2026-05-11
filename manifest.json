@@ -184,6 +184,17 @@
     },
     {
       "matches": [
+        "*://kick.com/*",
+        "*://www.kick.com/*"
+      ],
+      "js": [
+        "src/browser-compat.js",
+        "src/content-kick.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
         "*://www.youtube.com/*",
         "*://youtube.com/*",
         "*://music.youtube.com/*"

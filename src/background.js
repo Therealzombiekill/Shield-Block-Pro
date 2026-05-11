@@ -143,9 +143,9 @@ const FILTER_LISTS = [
   { name: 'Anti-Adblock Killer',    url: 'https://raw.githubusercontent.com/reek/anti-adblock-killer/master/anti-adblock-killer-filters.txt',                           key: 'anti_adblock',  max:  100, start: 18400 },
   // Regional lists
   { name: 'EasyList Polish',          url: 'https://easylist-downloads.adblockplus.org/easylistpolish.txt',                                                                    key: 'easylist_pl',   max:   80, start: 19000 },
-  { name: 'EasyList Brazil',          url: 'https://raw.githubusercontent.com/easylist/easylistbrazil/master/easylistbrazilportuguese.txt',                                    key: 'easylist_br',   max:   80, start: 19200 },
+  { name: 'uBlock Unbreak',            url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt',                                              key: 'ublock_unbr',   max:   80, start: 19200 },
   { name: 'EasyList Korean',          url: 'https://raw.githubusercontent.com/yous/YousList/master/youslist.txt',                                                              key: 'easylist_kr',   max:   80, start: 19400 },
-  { name: 'EasyList Turkish',         url: 'https://raw.githubusercontent.com/baris-zan/Turkish-Ad-Hosts/main/hosts',                                                          key: 'easylist_tr',   max:   80, start: 19600 },
+  { name: 'AdGuard Turkish',           url: adGuardUrl(9),                                                                                                                  key: 'adguard_tr',    max:   80, start: 19600 },
   { name: 'ChinaList',               url: 'https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjxlist.txt',                                                            key: 'chinalist',     max:   80, start: 19800 },
   // Anti-cryptomining
   { name: 'NoCoin',                   url: 'https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt',                                               key: 'nocoin',        max:   80, start: 19900 },
@@ -159,7 +159,7 @@ const FILTER_LISTS = [
   { name: 'ABP Indonesian',         url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                   key: 'abp_id',       max:  25, start: 20150 },
   { name: 'Hebrew List',            url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt', key: 'hebrew_il',    max:  25, start: 20175 },
   { name: 'ABPVN Vietnamese',       url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',    key: 'abp_vn',       max:  25, start: 20200 },
-  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Dandelion%20Sprout%27s%20Nordic%20Filters.txt', key: 'nordic', max: 25, start: 20225 },
+  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NordicFiltersABP-Inclusion.txt',                key: 'nordic', max: 25, start: 20225 },
 ];
 
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
@@ -186,6 +186,7 @@ const DEFAULT_SETTINGS = {
   privacy: true, tracking: true,
   spotify: true,
   hulu: true,
+  kick: true,
   youtube: true,
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking

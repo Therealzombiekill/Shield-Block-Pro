@@ -15,7 +15,12 @@
 (async () => {
   if (!location.href.startsWith('http')) return;
 
-    // If SW is waking up when this fires, sendMessage throws and the IIFE crashes
+  // ── Log helper ────────────────────────────────────────────────────────────────
+  function _sbLog(level, message, data) {
+    chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'paywall', level, message, data: data ?? {} }).catch(() => {});
+  }
+
+  // If SW is waking up when this fires, sendMessage throws and the IIFE crashes
   // silently — no ad blocking runs at all. Retry once after 300ms.
   let settings;
   try {
@@ -23,7 +28,7 @@
   } catch (_) {
     await new Promise(r => setTimeout(r, 300));
     try { settings = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }); }
-    catch (_) { settings = null; }
+    catch (e) { _sbLog('error', `GET_SETTINGS failed: ${e?.message ?? e}`); settings = null; }
   }
   if (!settings?.paywall) return; // opt-in only
   if (settings?.globalPause) return;
@@ -31,6 +36,8 @@
   const host = location.hostname.replace(/^www\./, '');
   const _wl  = settings?.whitelist ?? [];
   if (_wl.some(d => host === d || host.endsWith('.' + d))) return;
+
+  _sbLog('info', `Init — ${host}`);
 
   // ── Known paywall overlay selectors ───────────────────────────────────────
   const PAYWALL_SELECTORS = [
@@ -77,7 +84,11 @@
     '.paywall-content', '.subscriber-only',
   ].join(',');
 
+  let _unlockLogThrottle = 0;
   function unlockContent() {
+    let removedOverlays = 0;
+    const clearedStyles = [];
+
     // 1. Remove overlay elements
     try {
       document.querySelectorAll(PAYWALL_SELECTORS).forEach(el => {
@@ -90,6 +101,7 @@
                           el.className?.toString().includes('wall');
         if (isOverlay || !el.textContent?.trim() || el.textContent.trim().length < 200) {
           el.remove();
+          removedOverlays++;
         }
       });
     } catch (_) {}
@@ -103,14 +115,15 @@
         const hasMaxH   = cs.maxHeight && cs.maxHeight !== 'none' && parseInt(cs.maxHeight) < 1200;
         const hasOverH  = cs.overflow === 'hidden' || cs.overflowY === 'hidden';
 
-        if (hasBlur)  { el.style.filter = 'none'; el.style.webkitFilter = 'none'; }
-        if (hasMask)  { el.style.webkitMaskImage = 'none'; el.style.maskImage = 'none'; }
-        if (hasMaxH)  { el.style.maxHeight = 'none'; }
-        if (hasOverH) { el.style.overflow = 'visible'; }
+        if (hasBlur)  { el.style.filter = 'none'; el.style.webkitFilter = 'none'; clearedStyles.push('blur'); }
+        if (hasMask)  { el.style.webkitMaskImage = 'none'; el.style.maskImage = 'none'; clearedStyles.push('mask'); }
+        if (hasMaxH)  { el.style.maxHeight = 'none'; clearedStyles.push(`maxHeight(was ${cs.maxHeight})`); }
+        if (hasOverH) { el.style.overflow = 'visible'; clearedStyles.push('overflow:hidden'); }
       });
     } catch (_) {}
 
     // 3. Restore scroll locks
+    let restoredScroll = false;
     try {
       if (document.fullscreenElement) return;
       const activeDialog = document.querySelector('[role="dialog"]:not([aria-hidden="true"])');
@@ -120,14 +133,27 @@
         const cs = window.getComputedStyle(el);
         if (cs.overflow === 'hidden' || cs.overflowY === 'hidden') {
           el.style.overflow = ''; el.style.overflowY = '';
+          restoredScroll = true;
         }
         if (cs.position === 'fixed' && parseFloat(cs.top) < 0) {
           const top = Math.abs(parseFloat(cs.top));
           el.style.position = ''; el.style.top = '';
           window.scrollTo(0, top);
+          restoredScroll = true;
         }
       }
     } catch (_) {}
+
+    // Log results (throttled to once per 5s to avoid flooding on repeated MO triggers)
+    const now = Date.now();
+    if ((removedOverlays > 0 || clearedStyles.length > 0 || restoredScroll) && now - _unlockLogThrottle > 5000) {
+      _unlockLogThrottle = now;
+      const parts = [];
+      if (removedOverlays > 0) parts.push(`${removedOverlays} overlay(s) removed`);
+      if (clearedStyles.length > 0) parts.push(`styles cleared: ${[...new Set(clearedStyles)].join(', ')}`);
+      if (restoredScroll) parts.push('scroll lock removed');
+      _sbLog('info', `Paywall unlocked — ${parts.join('; ')}`, { host });
+    }
   }
 
   // Run immediately and after DOM loads
@@ -143,4 +169,7 @@
     _pwDeb = setTimeout(unlockContent, 400);
   }).observe(document.documentElement, { childList: true, subtree: true });
 
-})().catch(e => console.warn('[SB:paywall] script error:', e?.message ?? e));
+})().catch(e => {
+  try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'paywall', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
+  console.warn('[SB:paywall] script error:', e?.message ?? e);
+});

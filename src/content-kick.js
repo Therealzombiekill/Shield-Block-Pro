@@ -6,19 +6,26 @@
  */
 
 (async () => {
+  // ── Log helper ────────────────────────────────────────────────────────────────
+  function _sbLog(level, message, data) {
+    chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'kick', level, message, data: data ?? {} }).catch(() => {});
+  }
+
   let settings;
   try {
     settings = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
   } catch (_) {
     await new Promise(r => setTimeout(r, 300));
     try { settings = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }); }
-    catch (_) { settings = null; }
+    catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   if (settings?.globalPause) return;
   if (!settings?.kick) return;
   const _wl = settings?.whitelist ?? [];
   const _host = location.hostname.replace(/^www\./, '');
   if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
+
+  _sbLog('info', `Init — ${_host}`);
 
   const AD_SELECTORS = [
     '[data-ad-slot]',
@@ -54,6 +61,7 @@
 
   let adActive = false;
   let wasMuted = false;
+  let _adStartTime = 0;
 
   function tick() {
     const hasAd = isAdPlaying();
@@ -61,13 +69,17 @@
 
     if (hasAd && !adActive) {
       adActive = true;
+      _adStartTime = Date.now();
       const video = document.querySelector('video');
       if (video) { wasMuted = video.muted; video.muted = true; }
-      chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'general' }).catch(() => {});
+      chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'kick' }).catch(() => {});
+      _sbLog('info', 'Ad start — video muted (SSAI stream)', { channel: location.pathname.replace('/', '') });
     } else if (!hasAd && adActive) {
+      const dur = `${((Date.now() - _adStartTime) / 1000).toFixed(1)}s`;
       adActive = false;
       const video = document.querySelector('video');
       if (video) video.muted = wasMuted;
+      _sbLog('info', `Ad end — audio restored, duration ${dur}`);
     }
   }
 
@@ -81,4 +93,7 @@
   }, { once: true });
 
   tick();
-})().catch(e => console.warn('[SB:kick] script error:', e?.message ?? e));
+})().catch(e => {
+  try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'kick', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
+  console.warn('[SB:kick] script error:', e?.message ?? e);
+});

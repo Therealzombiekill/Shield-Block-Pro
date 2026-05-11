@@ -8,6 +8,11 @@
  */
 
 (async () => {
+  // ── Log helper ────────────────────────────────────────────────────────────────
+  function _sbLog(level, message, data) {
+    chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'twitch', level, message, data: data ?? {} }).catch(() => {});
+  }
+
   // If SW is waking up when this fires, sendMessage throws and the IIFE crashes
   // silently — no ad blocking runs at all. Retry once after 300ms.
   let settings;
@@ -16,7 +21,7 @@
   } catch (_) {
     await new Promise(r => setTimeout(r, 300));
     try { settings = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }); }
-    catch (_) { settings = null; }
+    catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   const _wl = settings?.whitelist ?? [];
   if (settings?.globalPause) return; // global pause active — skip all processing
@@ -29,6 +34,8 @@
 
   const _hostname = location.hostname.replace(/^www\./, '');
   if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+
+  _sbLog('info', `Init — ${_hostname}`);
 
   let adActive          = false;
   let wasMuted          = false;
@@ -112,14 +119,17 @@
     muteVideo();
     showToast();
     sendTwitchStat();
+    _sbLog('info', 'Ad start (source: HLS worker)', { channel: location.pathname.replace('/', '') });
   });
 
   document.addEventListener('_sb_twitch_ad_end', () => {
     if (!adActive) return;
+    const dur = adStartTime ? `${((Date.now() - adStartTime) / 1000).toFixed(1)}s` : '?';
     adActive = false;
     adStartedByWorker = false;
     unmuteVideo();
     hideToast();
+    _sbLog('info', `Ad end (HLS worker) — duration ${dur}`);
   });
 
   // ── Remove Twitch's native ad UI elements ─────────────────────────────────────
@@ -153,13 +163,13 @@
   }
 
   function removeAdUI() {
-    let removed = false;
+    let removed = 0;
     for (const sel of REMOVE_SELECTORS) {
       try {
-        document.querySelectorAll(sel).forEach(el => { el.remove(); removed = true; });
-      } catch (_e) { console.warn('[SB:twitch]', _e?.message ?? _e); }
+        document.querySelectorAll(sel).forEach(el => { el.remove(); removed++; });
+      } catch (_e) { _sbLog('warn', `removeAdUI selector error: ${_e?.message ?? _e}`); }
     }
-    if (removed) sendTwitchStat();
+    if (removed > 0) { sendTwitchStat(); _sbLog('info', `Removed ${removed} Twitch ad UI element(s)`); }
   }
 
   // ── DOM-level ad detection (fallback when worker injection fails) ─────────────
@@ -198,12 +208,15 @@
       // causing (Date.now() - 0 > 90000) to always be true → safety timeout fired instantly
       muteVideo();
       showToast();
+      _sbLog('warn', 'Ad start (source: DOM fallback — HLS worker may not have injected)', { channel: location.pathname.replace('/', '') });
     } else if (!hasAd && adActive && !adStartedByWorker) {
       // DOM says ad is gone AND this wasn't started by a worker event
       // (worker events use _sb_twitch_ad_end to recover, DOM-detected ones recover here)
+      const dur = adStartTime ? `${((Date.now() - adStartTime) / 1000).toFixed(1)}s` : '?';
       adActive = false;
       unmuteVideo();
       hideToast();
+      _sbLog('info', `Ad end (DOM fallback) — duration ${dur}`);
     }
   }
 
@@ -214,6 +227,7 @@
       adActive = false;
       unmuteVideo();
       hideToast();
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s (ad state may be stuck)');
     }
   }, 5000);
 
@@ -244,6 +258,7 @@
         _frozenTicks = 0;
         _lastFixAt   = Date.now();
         // Pause + play — resets the HLS segment fetch loop
+        _sbLog('warn', `Stream frozen at ${pos.toFixed(2)}s — triggering pause+play recovery`);
         video.pause();
         setTimeout(() => { try { video.play(); } catch(_) {} }, 150);
       }
@@ -275,4 +290,7 @@
   });
 
   domTick();
-})().catch(e => console.warn('[SB:twitch] script error:', e?.message ?? e));
+})().catch(e => {
+  try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'twitch', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
+  console.warn('[SB:twitch] script error:', e?.message ?? e);
+});

@@ -9,6 +9,11 @@
  */
 
 (async () => {
+  // ── Log helper ────────────────────────────────────────────────────────────────
+  function _sbLog(level, message, data) {
+    chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'spotify', level, message, data: data ?? {} }).catch(() => {});
+  }
+
   // If SW is waking up when this fires, sendMessage throws and the IIFE crashes
   // silently — no ad blocking runs at all. Retry once after 300ms.
   let settings;
@@ -17,13 +22,15 @@
   } catch (_) {
     await new Promise(r => setTimeout(r, 300));
     try { settings = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }); }
-    catch (_) { settings = null; }
+    catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   const _wl = settings?.whitelist ?? [];
   if (settings?.globalPause) return; // global pause active — skip all processing
   if (!settings?.spotify) return;
   const _hostname = location.hostname.replace(/^www\./, '');
   if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+
+  _sbLog('info', 'Init — open.spotify.com');
 
 
   // ── Ad detection ─────────────────────────────────────────────────────────────
@@ -146,14 +153,16 @@
       const audio = getAudio();
       wasMuted = audio?.muted ?? false;
       muteAudio(true);
-      if (!skipToNext()) showOverlay();
+      const skipped = skipToNext();
+      if (!skipped) showOverlay();
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'spotify' }).catch(() => {});
+      _sbLog('info', skipped ? 'Ad detected — skipped to next track' : 'Ad detected — audio muted (skip unavailable)');
 
     } else if (hasAd && adActive) {
       muteAudio(true);
       if (skipAttempts < 4) {
         skipAttempts++;
-        skipToNext();
+        if (skipToNext()) _sbLog('info', `Ad: skip attempt ${skipAttempts} succeeded`);
       }
 
     } else if (!hasAd && adActive) {
@@ -161,6 +170,7 @@
       skipAttempts = 0;
       muteAudio(wasMuted);
       hideOverlay();
+      _sbLog('info', 'Ad ended — audio restored');
     }
   }
 
@@ -182,4 +192,7 @@
     clearTimeout(debounce);
   }, { once: true });
 
-})().catch(e => console.warn('[SB:spotify] script error:', e?.message ?? e));
+})().catch(e => {
+  try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'spotify', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
+  console.warn('[SB:spotify] script error:', e?.message ?? e);
+});

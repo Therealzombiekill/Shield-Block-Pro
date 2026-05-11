@@ -8,6 +8,11 @@
  */
 
 (async () => {
+  // ── Log helper ────────────────────────────────────────────────────────────────
+  function _sbLog(level, message, data) {
+    chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'youtube', level, message, data: data ?? {} }).catch(() => {});
+  }
+
   // If SW is waking up when this fires, sendMessage throws and the IIFE crashes
   // silently — no ad blocking runs at all. Retry once after 300ms.
   let settings;
@@ -16,7 +21,7 @@
   } catch (_) {
     await new Promise(r => setTimeout(r, 300));
     try { settings = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }); }
-    catch (_) { settings = null; }
+    catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   const _wl = settings?.whitelist ?? [];
   if (settings?.globalPause) return; // global pause active — skip all processing
@@ -31,6 +36,15 @@
 
   const _host = location.hostname.replace(/^www\./, '');
   if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
+
+  _sbLog('info', `Init — ${_host}`, { ytMusic: _host.includes('music.') });
+
+  // ── Relay log messages from inject-youtube.js (MAIN world) ───────────────────
+  // inject-youtube.js cannot call chrome APIs; it postMessages here and we relay.
+  window.addEventListener('message', e => {
+    if (e.source !== window || e.data?.type !== 'SB_YT_LOG') return;
+    _sbLog(e.data.level ?? 'info', e.data.message, e.data.data);
+  });
 
   // ── Ad detection ──────────────────────────────────────────────────────────────
   function isAdPlaying() {
@@ -53,6 +67,7 @@
       if (_muted) {
         const vid = document.querySelector('video');
         if (vid && _origVol !== null) { vid.muted = false; vid.volume = _origVol; }
+        _sbLog('info', 'Ad cleared — audio restored');
         _muted = false;
         _origVol = null;
       }
@@ -63,7 +78,7 @@
     const skip = document.querySelector(
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
-    if (skip) { skip.click(); return; }
+    if (skip) { skip.click(); _sbLog('info', 'Ad: clicked skip button'); return; }
 
     // 2. Seek past short ads.
     // Guard: only seek if .ad-showing is on the player — this class is set
@@ -73,11 +88,17 @@
     const playerHasAdClass = !!document.querySelector('.ad-showing');
     if (vid && playerHasAdClass && isFinite(vid.duration) && vid.duration > 0 && vid.duration < 120) {
       vid.currentTime = vid.duration;
+      _sbLog('info', `Ad: seeked past (${vid.duration.toFixed(1)}s)`);
       return;
     }
 
     // 3. Mute unskippable long ads as last resort
-    if (vid && !_muted) { _origVol = vid.volume; vid.muted = true; _muted = true; }
+    if (vid && !_muted) {
+      _origVol = vid.volume;
+      vid.muted = true;
+      _muted = true;
+      _sbLog('warn', 'Ad: unskippable — video muted');
+    }
   }
 
   // ── Remove ad overlay and promoted elements ────────────────────────────────────
@@ -111,9 +132,15 @@
     '.ytmusic-player-bar[ad-playing]',
   ];
 
+  let _overlayLogThrottle = 0;
   function removeOverlays() {
+    let removed = 0;
     for (const sel of OVERLAY_SELS) {
-      document.querySelectorAll(sel).forEach(el => { try { el.remove(); } catch (_) {} });
+      document.querySelectorAll(sel).forEach(el => { try { el.remove(); removed++; } catch (_) {} });
+    }
+    if (removed > 0 && Date.now() - _overlayLogThrottle > 5000) {
+      _overlayLogThrottle = Date.now();
+      _sbLog('info', `Removed ${removed} ad overlay element(s)`);
     }
   }
 
@@ -121,13 +148,21 @@
   // YTM audio ads: the `ad-playing` attribute appears on the player bar.
   // We mute the audio element during the ad. Seeking to end was removed —
   // it's unreliable and the YTM audio element duration resets unpredictably.
+  let _ytmAdActive = false;
   function handleYTMusicAd() {
     if (!location.hostname.includes('music.youtube.com')) return;
     const playerBar = document.querySelector('ytmusic-player-bar');
-    if (!playerBar?.hasAttribute('ad-playing')) return;
-    // Mute the audio element — simple, stable, no seek risk
+    if (!playerBar?.hasAttribute('ad-playing')) {
+      if (_ytmAdActive) { _ytmAdActive = false; _sbLog('info', 'YT Music audio ad cleared'); }
+      return;
+    }
     const audio = document.querySelector('audio');
-    try { if (audio && !audio.muted) audio.muted = true; } catch (_) {}
+    try {
+      if (audio && !audio.muted) {
+        audio.muted = true;
+        if (!_ytmAdActive) { _ytmAdActive = true; _sbLog('warn', 'YT Music audio ad — muted'); }
+      }
+    } catch (_) {}
   }
 
   // ── Main loop ─────────────────────────────────────────────────────────────────
@@ -141,7 +176,7 @@
     const skip = document.querySelector(
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
-    if (skip) skip.click();
+    if (skip) { skip.click(); _sbLog('info', 'Ad: MutationObserver skip button clicked'); }
   }).observe(document.documentElement, { childList: true, subtree: true });
 
   // Stat — count each ad encounter once
@@ -153,4 +188,7 @@
     }
     _wasAd = ad;
   }, 1000);
-})().catch(e => console.warn('[SB:youtube] script error:', e?.message ?? e));
+})().catch(e => {
+  try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'youtube', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
+  console.warn('[SB:youtube] script error:', e?.message ?? e);
+});

@@ -181,12 +181,12 @@ const FILTER_LISTS = [
   for (let i = 0; i < ranges.length; i++) {
     for (let j = i + 1; j < ranges.length; j++) {
       if (ranges[i][0] <= ranges[j][1] && ranges[j][0] <= ranges[i][1]) {
-        console.error('[SB] ⚠️ ID range overlap:', ranges[i][2], 'vs', ranges[j][2]);
+        logEvent('system', 'error', `Rule ID range overlap: ${ranges[i][2]} overlaps ${ranges[j][2]}`);
       }
     }
   }
   const total = FILTER_LISTS.reduce((s, l) => s + l.max, 0);
-  if (total > MAX_DYNAMIC_RULES) console.error('[SB] ⚠️ Total max rules', total, '> limit', MAX_DYNAMIC_RULES);
+  if (total > MAX_DYNAMIC_RULES) logEvent('system', 'error', `Total dynamic rules ${total} exceeds browser limit ${MAX_DYNAMIC_RULES} — some rules will be silently dropped`);
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
@@ -442,6 +442,15 @@ async function _restoreLog() {
 }
 
 function logEvent(source, level, message, data = {}) {
+  // Capture abbreviated call-site stack for error-level events so the log
+  // shows where the problem originated without flooding the entry.
+  if (level === 'error') {
+    try {
+      const frames = new Error().stack?.split('\n').slice(2, 4)
+        .map(s => s.replace(/\s+at\s+/, '').trim());
+      if (frames?.length) data = { ...data, _stack: frames.join(' → ') };
+    } catch (_) {}
+  }
   const entry = { source, level, message, data, ts: Date.now() };
   _eventLog.push(entry);
   if (_eventLog.length > EVENT_MAX) _eventLog.shift();
@@ -1134,8 +1143,7 @@ async function syncFilterLists(force = false) {
         if (result.status === 'rejected') {
           const failMsg = result.reason?.message ?? 'Unknown error';
           const failedEntry = staleLists[results.indexOf(result)];
-          console.warn('[SB] Filter fetch failed:', failedEntry?.list?.name, failMsg);
-          logEvent('filter-sync', 'warn', `Fetch failed: ${failedEntry?.list?.name ?? '?'} — ${failMsg}`);
+          logEvent('filter-sync', 'error', `Fetch failed: ${failedEntry?.list?.name ?? '?'} — ${failMsg}`);
           _lastSyncError = failMsg;
           syncFailureCount++;
           const failKey = failedEntry?.list?.key ?? 'unknown';
@@ -1167,7 +1175,7 @@ async function syncFilterLists(force = false) {
           await chrome.storage.local.set({
             [`fm_${val.list.key}`]: { at: Date.now(), count: cached.length },
           });
-          console.log(`[SB] ${val.list.name}: unchanged (304) — ${cached.length} rules reused`);
+          logEvent('filter-sync', 'info', `${val.list.name}: unchanged (304) — ${cached.length} rules reused`);
           _syncListStatus[val.list.key] = { status: '304', ruleCount: cached.length };
           continue;
         }
@@ -1200,10 +1208,10 @@ async function syncFilterLists(force = false) {
           };
           if (val.etag) updates[`fe_${val.list.key}`] = val.etag;
           await chrome.storage.local.set(updates);
-          console.log(`[SB] ${val.list.name}: fetched ${rules.length} rules`);
+          logEvent('filter-sync', 'info', `${val.list.name}: fetched ${rules.length} rules`);
           _syncListStatus[val.list.key] = { status: 'ok', ruleCount: rules.length };
         } catch (e) {
-          console.warn('[SB] Filter parse failed:', val.list.name, e.message);
+          logEvent('filter-sync', 'error', `Parse failed: ${val.list.name} — ${e.message}`);
           _syncListStatus[val.list.key] = { status: 'error', error: 'parse: ' + e.message };
           syncFailureCount++;
         }
@@ -1249,12 +1257,12 @@ async function syncFilterLists(force = false) {
           removeRuleIds: removeIds,
           addRules: firstBatch,
         });
-      } catch (e) { console.warn('[SB] Rule swap failed:', e.message); }
+      } catch (e) { logEvent('filter-sync', 'error', `DNR rule swap failed: ${e.message}`); }
       // Remaining batches are add-only (old rules already removed)
       for (let i = 500; i < deduped.length; i += 500) {
         try {
           await chrome.declarativeNetRequest.updateDynamicRules({ addRules: deduped.slice(i, i + 500) });
-        } catch (e) { console.warn('[SB] Rule batch failed at', i, e.message); }
+        } catch (e) { logEvent('filter-sync', 'error', `DNR batch failed at offset ${i}: ${e.message}`); }
       }
     }
 

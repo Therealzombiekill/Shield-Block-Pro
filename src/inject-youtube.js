@@ -27,15 +27,24 @@
     if (e.data?.type === 'SB_YOUTUBE_ENABLE')  _disabled = false;
   });
 
+  // ── Log relay → content-youtube.js (ISOLATED) ────────────────────────────────
+  // MAIN world cannot call chrome.runtime APIs. We postMessage and the ISOLATED
+  // content script relays the entry to the background via LOG_EVENT.
+  function _sbLog(level, message, data) {
+    try { window.postMessage({ type: 'SB_YT_LOG', level, message, data: data ?? {} }, '*'); } catch (_) {}
+  }
+
   // ── Strip ad data from an InnerTube player response ───────────────────────────
   function stripAds(obj) {
     if (!obj || typeof obj !== 'object') return;
-    if (Array.isArray(obj.adPlacements))  obj.adPlacements = [];
-    if (Array.isArray(obj.playerAds))     obj.playerAds = [];
-    if (Array.isArray(obj.adSlots))       obj.adSlots = [];
-    if (obj.auxiliaryUi)                  delete obj.auxiliaryUi;
+    let stripped = false;
+    if (Array.isArray(obj.adPlacements)  && obj.adPlacements.length)  { obj.adPlacements = [];  stripped = true; }
+    if (Array.isArray(obj.playerAds)     && obj.playerAds.length)     { obj.playerAds = [];     stripped = true; }
+    if (Array.isArray(obj.adSlots)       && obj.adSlots.length)       { obj.adSlots = [];       stripped = true; }
+    if (obj.auxiliaryUi)                                               { delete obj.auxiliaryUi; stripped = true; }
     // Some responses nest ad data inside playerResponse
     if (obj.playerResponse)               stripAds(obj.playerResponse);
+    return stripped;
   }
 
   // ── 1. ytInitialPlayerResponse — first page load ─────────────────────────────
@@ -44,7 +53,13 @@
   let _ytInitial;
   Object.defineProperty(window, 'ytInitialPlayerResponse', {
     get() { return _ytInitial; },
-    set(v) { if (!_disabled) stripAds(v); _ytInitial = v; },
+    set(v) {
+      if (!_disabled) {
+        const stripped = stripAds(v);
+        if (stripped) _sbLog('info', 'InnerTube ytInitial: stripped ad placements');
+      }
+      _ytInitial = v;
+    },
     configurable: true,
   });
 
@@ -57,14 +72,17 @@
       const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url ?? '');
       if (url.includes('/youtubei/') && url.includes('/player')) {
         const json = await res.clone().json();
-        stripAds(json);
+        const stripped = stripAds(json);
+        if (stripped) _sbLog('info', 'InnerTube fetch: stripped ad placements', { path: url.split('?')[0].split('/').slice(-3).join('/') });
         return new Response(JSON.stringify(json), {
           status:     res.status,
           statusText: res.statusText,
           headers:    res.headers,
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      _sbLog('warn', `InnerTube fetch hook error: ${e?.message ?? e}`);
+    }
     return res;
   };
   try { window.fetch.toString = () => _origFetch.toString(); } catch (_) {}

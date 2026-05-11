@@ -62,8 +62,10 @@
   let adActive = false;
   let wasMuted = false;
   let _adStartTime = 0;
+  let _globalPaused = false;
 
   function tick() {
+    if (_globalPaused) return;
     const hasAd = isAdPlaying();
     removeAdUI();
 
@@ -109,12 +111,15 @@
   });
 
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'GLOBAL_PAUSE' && adActive) {
-      adActive = false;
-      const video = document.querySelector('video');
-      if (video) video.muted = wasMuted;
+    if (msg.type === 'GLOBAL_PAUSE') {
+      _globalPaused = true;
+      if (adActive) {
+        adActive = false;
+        const video = document.querySelector('video');
+        if (video) video.muted = wasMuted;
+      }
     }
-    if (msg.type === 'GLOBAL_RESUME') { tick(); }
+    if (msg.type === 'GLOBAL_RESUME') { _globalPaused = false; tick(); }
   });
 
   window.addEventListener('beforeunload', () => {

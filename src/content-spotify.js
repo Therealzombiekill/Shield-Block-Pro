@@ -143,8 +143,10 @@
   let skipAttempts = 0;
   let wasMuted = false;
   let _adStartTime = 0;
+  let _globalPaused = false;
 
   function tick() {
+    if (_globalPaused) return;
     const hasAd = isAdPlaying();
     removeSpotifyAdUI();
 
@@ -208,11 +210,11 @@
   });
 
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'GLOBAL_PAUSE' && adActive) {
-      adActive = false; skipAttempts = 0;
-      muteAudio(wasMuted); hideOverlay();
+    if (msg.type === 'GLOBAL_PAUSE') {
+      _globalPaused = true;
+      if (adActive) { adActive = false; skipAttempts = 0; muteAudio(wasMuted); hideOverlay(); }
     }
-    if (msg.type === 'GLOBAL_RESUME') { tick(); }
+    if (msg.type === 'GLOBAL_RESUME') { _globalPaused = false; tick(); }
   });
 
   // Cleanup on navigation — prevents observer accumulation on SPA route changes

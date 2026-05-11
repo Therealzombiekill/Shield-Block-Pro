@@ -76,6 +76,7 @@
 
   let adActive = false;
   let wasMuted = false;
+  let _globalPaused = false;
 
   function handleAdStart() {
     const video = document.querySelector('video');
@@ -107,6 +108,7 @@
 
   let _adStartTime = 0;
   function tick() {
+    if (_globalPaused) return;
     const hasAd = isAdPlaying();
     if (hasAd && !adActive) {
       adActive = true;
@@ -152,10 +154,11 @@
   });
 
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'GLOBAL_PAUSE' && adActive) {
-      adActive = false; restoreAfterAd();
+    if (msg.type === 'GLOBAL_PAUSE') {
+      _globalPaused = true;
+      if (adActive) { adActive = false; restoreAfterAd(); }
     }
-    if (msg.type === 'GLOBAL_RESUME') { tick(); }
+    if (msg.type === 'GLOBAL_RESUME') { _globalPaused = false; tick(); }
   });
 
   // Cleanup on page unload — prevents memory leak on SPA navigation

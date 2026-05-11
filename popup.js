@@ -133,6 +133,11 @@ async function refreshStats() {
     const n = page.total ?? 0;
     if (n > 0) {
       const parts = [];
+      if (page.youtube > 0) parts.push(`${fmt(page.youtube)} yt`);
+      if (page.twitch  > 0) parts.push(`${fmt(page.twitch)} tw`);
+      if (page.spotify > 0) parts.push(`${fmt(page.spotify)} sp`);
+      if (page.hulu    > 0) parts.push(`${fmt(page.hulu)} hl`);
+      if (page.kick    > 0) parts.push(`${fmt(page.kick)} kk`);
       if (page.amazon  > 0) parts.push(`${fmt(page.amazon)} amz`);
       if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
       if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);

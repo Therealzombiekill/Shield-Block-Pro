@@ -169,6 +169,13 @@
     _pwDeb = setTimeout(unlockContent, 400);
   });
   _pwObserver.observe(document.documentElement, { childList: true, subtree: true });
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.paywall === false) {
+      _pwObserver.disconnect();
+      clearTimeout(_pwDeb);
+    }
+  });
+
   window.addEventListener('beforeunload', () => {
     _pwObserver.disconnect();
     clearTimeout(_pwDeb);

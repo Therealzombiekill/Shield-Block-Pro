@@ -1762,7 +1762,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'GET_PAGE_STATS': {
         try {
           const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-          if (!tab?.id) { sendResponse({ total:0, network:0, dom:0, amazon:0, social:0, cookies:0, general:0 }); break; }
+          if (!tab?.id) { sendResponse({ total:0, network:0, dom:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, social:0, cookies:0, general:0 }); break; }
           const isWebPage = tab.url?.startsWith('http://') || tab.url?.startsWith('https://');
           if (!_navCounted.has(tab.id) && isWebPage) {
             await countNetworkBlocks(tab.id, tab.url);
@@ -1772,6 +1772,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             total:   ps.total   ?? 0,
             network: ps.network ?? 0,
             dom:     ps.dom     ?? 0,
+            youtube: ps.youtube ?? 0,
+            twitch:  ps.twitch  ?? 0,
+            spotify: ps.spotify ?? 0,
+            hulu:    ps.hulu    ?? 0,
+            kick:    ps.kick    ?? 0,
             amazon:  ps.amazon  ?? 0,
             social:  ps.social  ?? 0,
             cookies: ps.cookies ?? 0,

@@ -455,13 +455,13 @@
       if (!key) return;
       try { localStorage.removeItem(key); } catch(_) {}
       // Also intercept future writes
-      const _orig = localStorage.setItem.bind(localStorage);
+      const _origSet = Storage.prototype.setItem; // unbound — .call(this,...) works correctly
       const re = typeof key === 'string' && key.startsWith('/') && key.lastIndexOf('/') > 0
         ? toRe(key) : new RegExp('^' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$');
       try {
         Storage.prototype.setItem = function(k, v) {
           if (this === localStorage && re && re.test(k)) return;
-          _orig.call(this, k, v);
+          _origSet.call(this, k, v);
         };
       } catch(_) {}
     },

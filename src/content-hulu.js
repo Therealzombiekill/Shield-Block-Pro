@@ -133,6 +133,24 @@
   });
   const _huluInterval = setInterval(tick, 1000);
 
+  // Safety timeout: force-unmute if stuck in ad state for > 90s
+  setInterval(() => {
+    if (adActive && Date.now() - _adStartTime > 90000) {
+      adActive = false;
+      restoreAfterAd();
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+    }
+  }, 5000);
+
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.hulu === false) {
+      _huluObserver.disconnect();
+      clearInterval(_huluInterval);
+      clearTimeout(_huluDebounce);
+      if (adActive) restoreAfterAd();
+    }
+  });
+
   // Cleanup on page unload — prevents memory leak on SPA navigation
   window.addEventListener('beforeunload', () => {
     _huluObserver.disconnect();

@@ -88,6 +88,26 @@
   _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
   const _int = setInterval(tick, 1000);
 
+  // Safety timeout: force-unmute if stuck in ad state for > 90s
+  setInterval(() => {
+    if (adActive && Date.now() - _adStartTime > 90000) {
+      adActive = false;
+      const video = document.querySelector('video');
+      if (video) video.muted = wasMuted;
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+    }
+  }, 5000);
+
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.kick === false) {
+      _obs.disconnect();
+      clearInterval(_int);
+      clearTimeout(_deb);
+      const video = document.querySelector('video');
+      if (video && adActive) video.muted = wasMuted;
+    }
+  });
+
   window.addEventListener('beforeunload', () => {
     _obs.disconnect(); clearInterval(_int); clearTimeout(_deb);
   }, { once: true });

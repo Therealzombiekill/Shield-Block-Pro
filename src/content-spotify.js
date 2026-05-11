@@ -142,6 +142,7 @@
   let adActive = false;
   let skipAttempts = 0;
   let wasMuted = false;
+  let _adStartTime = 0;
 
   function tick() {
     const hasAd = isAdPlaying();
@@ -150,6 +151,7 @@
     if (hasAd && !adActive) {
       adActive = true;
       skipAttempts = 0;
+      _adStartTime = Date.now();
       const audio = getAudio();
       wasMuted = audio?.muted ?? false;
       muteAudio(true);
@@ -184,6 +186,26 @@
 
   const _spotInterval = setInterval(tick, 1000);
   tick();
+
+  // Safety timeout: force-unmute if stuck in ad state for > 90s
+  setInterval(() => {
+    if (adActive && Date.now() - _adStartTime > 90000) {
+      adActive = false;
+      skipAttempts = 0;
+      muteAudio(wasMuted);
+      hideOverlay();
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+    }
+  }, 5000);
+
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.spotify === false) {
+      _spotObserver.disconnect();
+      clearInterval(_spotInterval);
+      clearTimeout(debounce);
+      if (adActive) { muteAudio(wasMuted); hideOverlay(); }
+    }
+  });
 
   // Cleanup on navigation — prevents observer accumulation on SPA route changes
   window.addEventListener('beforeunload', () => {

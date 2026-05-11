@@ -510,11 +510,14 @@ async function _retryFailedLists() {
     }
     const { list, limit, text } = result.value;
     try {
-      const { rules } = parseFilterList(text, list.start, limit);
+      const { rules, cosmetics, domainCosmetics, scriptletRules } = parseFilterList(text, list.start, limit);
       newRules.push(...rules);
       await chrome.storage.local.set({
         [`fr_${list.key}`]: rules,
         [`fm_${list.key}`]: { at: Date.now(), count: rules.length },
+        [`fc_${list.key}`]: cosmetics,
+        [`fd_${list.key}`]: domainCosmetics,
+        [`fs_${list.key}`]: scriptletRules,
       });
       logEvent('filter-sync', 'info', `Retry OK: ${list.name} — ${rules.length} rules`);
     } catch (e) { logEvent('filter-sync', 'warn', `Retry parse failed: ${list.name}`); }
@@ -2513,6 +2516,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   await chrome.storage.local.set({ licenseValid: true });
 
   chrome.alarms.create('filterSync', { periodInMinutes: 720 });
+  chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   setupContextMenus();
 
   // Init all feature engines on install/update
@@ -2629,6 +2633,8 @@ chrome.runtime.onStartup.addListener(async () => {
 
   const existing = await chrome.alarms.get('filterSync');
   if (!existing) chrome.alarms.create('filterSync', { periodInMinutes: 720 });
+  const sbAlarm = await chrome.alarms.get('safeBrowsingRefresh');
+  if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const _curVer = chrome.runtime.getManifest().version;
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');

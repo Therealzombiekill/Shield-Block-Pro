@@ -611,11 +611,15 @@ async function countNetworkBlocks(tabId, url) {
     });
     if (count === 0) return;
 
-    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
+    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
     ps.total   = (ps.total   | 0) + count;
     ps.network = (ps.network | 0) + count;
     const cat = url?.includes('twitch.tv')  ? 'twitch'
+              : url?.includes('youtube.com') ? 'youtube'
               : url?.includes('amazon.')     ? 'amazon'
+              : url?.includes('spotify.com') ? 'spotify'
+              : url?.includes('hulu.com')    ? 'hulu'
+              : url?.includes('kick.com')    ? 'kick'
               : 'general';
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);

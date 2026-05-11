@@ -73,11 +73,17 @@
       if (url.includes('/youtubei/') && url.includes('/player')) {
         const json = await res.clone().json();
         const stripped = stripAds(json);
-        if (stripped) _sbLog('info', 'InnerTube fetch: stripped ad placements', { path: url.split('?')[0].split('/').slice(-3).join('/') });
+        if (!stripped) return res; // nothing to strip — return original to avoid re-serialization overhead
+        _sbLog('info', 'InnerTube fetch: stripped ad placements', { path: url.split('?')[0].split('/').slice(-3).join('/') });
+        // Return a new response with cleaned JSON; strip Content-Encoding so the
+        // browser doesn't attempt to re-decompress the already-decoded string body.
+        const newHeaders = new Headers(res.headers);
+        newHeaders.delete('content-encoding');
+        newHeaders.delete('content-length');
         return new Response(JSON.stringify(json), {
           status:     res.status,
           statusText: res.statusText,
-          headers:    res.headers,
+          headers:    newHeaders,
         });
       }
     } catch (e) {

@@ -402,6 +402,33 @@ async function refreshWhitelist() {
   updateStatusPill(domain, whitelist); // full list — paused sites correctly show as PAUSED
 }
 
+// ── Manual whitelist add ───────────────────────────────────────────────────────
+async function addDomainToWhitelist(raw) {
+  let domain = raw.trim().toLowerCase()
+    .replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0];
+  if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return false;
+  const { whitelist: wl = [] } = await chrome.storage.local.get('whitelist');
+  if (wl.includes(domain)) return true;
+  wl.push(domain);
+  await chrome.storage.local.set({ whitelist: wl });
+  await msg('WHITELIST_UPDATED', { whitelist: wl });
+  await refreshWhitelist();
+  return true;
+}
+
+$('wl-add-btn')?.addEventListener('click', async () => {
+  const input = $('wl-add-input');
+  if (!input) return;
+  const ok = await addDomainToWhitelist(input.value);
+  if (ok) { input.value = ''; input.focus(); }
+  else input.style.borderColor = 'var(--danger, #e55)';
+  setTimeout(() => { if (input) input.style.borderColor = ''; }, 1200);
+});
+
+$('wl-add-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('wl-add-btn')?.click();
+});
+
 // ── Boot ──────────────────────────────────────────────────────────────
 const _intervals = [];
 

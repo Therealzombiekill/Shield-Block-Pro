@@ -1,0 +1,242 @@
+{
+  "version": "1.0",
+  "updated": "2025-05-10",
+  "categories": [
+    {
+      "id": "ads",
+      "label": "Advertising",
+      "color": "#f87171",
+      "lists": [
+        {
+          "name": "EasyList (German)",
+          "url": "https://easylist.to/easylistgermany/easylistgermany.txt",
+          "langs": [
+            "de"
+          ],
+          "desc": "German language ads"
+        },
+        {
+          "name": "EasyList (Italian)",
+          "url": "https://easylist-downloads.adblockplus.org/easylistitaly.txt",
+          "langs": [
+            "it"
+          ],
+          "desc": "Italian language ads"
+        },
+        {
+          "name": "EasyList (Spanish)",
+          "url": "https://easylist-downloads.adblockplus.org/easylistspanish.txt",
+          "langs": [
+            "es"
+          ],
+          "desc": "Spanish language ads"
+        },
+        {
+          "name": "EasyList (Dutch)",
+          "url": "https://easylist-downloads.adblockplus.org/easylistdutch.txt",
+          "langs": [
+            "nl"
+          ],
+          "desc": "Dutch language ads"
+        },
+        {
+          "name": "EasyList (Chinese)",
+          "url": "https://raw.githubusercontent.com/cjxlist/cjxlist/HEAD/cjx-annoyance.txt",
+          "langs": [
+            "zh"
+          ],
+          "desc": "Chinese ads and annoyances"
+        },
+        {
+          "name": "I don't care about cookies",
+          "url": "https://www.i-dont-care-about-cookies.eu/abp/",
+          "langs": [],
+          "desc": "Cookie consent notices (alternative)"
+        },
+        {
+          "name": "Fanboy Annoyances",
+          "url": "https://easylist.to/easylist/fanboy-annoyance.txt",
+          "langs": [],
+          "desc": "Annoyances, social widgets, notifications"
+        },
+        {
+          "name": "Fanboy Ultimate",
+          "url": "https://fanboy.co.nz/fanboy-ultimate.txt",
+          "langs": [],
+          "desc": "Combine EasyList + Annoyances"
+        }
+      ]
+    },
+    {
+      "id": "privacy",
+      "label": "Privacy",
+      "color": "#a78bfa",
+      "lists": [
+        {
+          "name": "DuckDuckGo Tracker Radar",
+          "url": "https://raw.githubusercontent.com/nicehash/NiceHashQuickMiner/HEAD/duckduckgo-privacy-essentials.txt",
+          "langs": [],
+          "desc": "DuckDuckGo's tracker block list"
+        },
+        {
+          "name": "Legitimate Interests",
+          "url": "https://easylist-downloads.adblockplus.org/fanboy-leaddinglist.txt",
+          "langs": [],
+          "desc": "Block 'legitimate interest' GDPR loophole trackers"
+        },
+        {
+          "name": "Hagezi Pro",
+          "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt",
+          "langs": [],
+          "desc": "Comprehensive privacy protection"
+        },
+        {
+          "name": "1Hosts (Lite)",
+          "url": "https://o0.pages.dev/Lite/adblock.txt",
+          "langs": [],
+          "desc": "Lightweight DNS-style privacy list"
+        },
+        {
+          "name": "Steven Black Hosts",
+          "url": "https://raw.githubusercontent.com/StevenBlack/hosts/HEAD/hosts",
+          "langs": [],
+          "desc": "Hosts file format \u2014 ads + malware"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "label": "Security",
+      "color": "#f59e0b",
+      "lists": [
+        {
+          "name": "Malware Domain List",
+          "url": "https://www.malwaredomainlist.com/hostslist/hosts.txt",
+          "langs": [],
+          "desc": "Known malware distribution domains"
+        },
+        {
+          "name": "Phishing Army",
+          "url": "https://phishing.army/download/phishing_army_blocklist_extended.txt",
+          "langs": [],
+          "desc": "Phishing site list"
+        },
+        {
+          "name": "NoTrack Malware",
+          "url": "https://gitlab.com/quidsup/notrack-blocklists/raw/master/notrack-malware.txt",
+          "langs": [],
+          "desc": "Malware and telemetry domains"
+        },
+        {
+          "name": "URLhaus Abuse",
+          "url": "https://urlhaus.abuse.ch/downloads/hostfile/",
+          "langs": [],
+          "desc": "Active malware distribution (safe-browsing uses this)"
+        }
+      ]
+    },
+    {
+      "id": "annoyances",
+      "label": "Annoyances",
+      "color": "#34d399",
+      "lists": [
+        {
+          "name": "Bypass Paywalls Clean",
+          "url": "https://raw.githubusercontent.com/bpc-clone/bpc_updates/main/bypass-paywalls-clean-filter.txt",
+          "langs": [],
+          "desc": "Soft paywall bypass filters"
+        },
+        {
+          "name": "Anti-Adblock Killer",
+          "url": "https://raw.githubusercontent.com/reek/anti-adblock-killer/HEAD/anti-adblock-killer-filters.txt",
+          "langs": [],
+          "desc": "Fight anti-adblock scripts"
+        },
+        {
+          "name": "Web Annoyances Ultralist",
+          "url": "https://raw.githubusercontent.com/yourduskquibbles/webannoyances/HEAD/ultralist.txt",
+          "langs": [],
+          "desc": "Chat widgets, sticky bars, popups"
+        },
+        {
+          "name": "Adblock Warning Removal",
+          "url": "https://easylist-downloads.adblockplus.org/adblock_warning_removal_list.txt",
+          "langs": [],
+          "desc": "Remove 'please disable your adblocker' messages"
+        }
+      ]
+    },
+    {
+      "id": "regional",
+      "label": "Regional",
+      "color": "#60a5fa",
+      "lists": [
+        {
+          "name": "RU AdList",
+          "url": "https://easylist-downloads.adblockplus.org/advblock.txt",
+          "langs": [
+            "ru"
+          ],
+          "desc": "Russian ads"
+        },
+        {
+          "name": "Abp Japanese",
+          "url": "https://raw.githubusercontent.com/k2jp/abp-japanese-filters/HEAD/abpjf.txt",
+          "langs": [
+            "ja"
+          ],
+          "desc": "Japanese ads"
+        },
+        {
+          "name": "Korean (YousList)",
+          "url": "https://raw.githubusercontent.com/yous/YousList/HEAD/youslist.txt",
+          "langs": [
+            "ko"
+          ],
+          "desc": "Korean ads"
+        },
+        {
+          "name": "Polish (Oficjalne)",
+          "url": "https://raw.githubusercontent.com/MajkiIT/polish-ads-filter/HEAD/polish-adblock-filters/adblock.txt",
+          "langs": [
+            "pl"
+          ],
+          "desc": "Polish ads"
+        },
+        {
+          "name": "Czech/Slovak",
+          "url": "https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/HEAD/filters.txt",
+          "langs": [
+            "cs",
+            "sk"
+          ],
+          "desc": "Czech and Slovak ads"
+        },
+        {
+          "name": "Israeli (EasyList Hebrew)",
+          "url": "https://raw.githubusercontent.com/easylist/EasyListHebrew/HEAD/EasyListHebrew.txt",
+          "langs": [
+            "he"
+          ],
+          "desc": "Hebrew language ads"
+        },
+        {
+          "name": "ABPVN (Vietnamese)",
+          "url": "https://raw.githubusercontent.com/abpvn/abpvn/HEAD/filter/src/abpvn.txt",
+          "langs": [
+            "vi"
+          ],
+          "desc": "Vietnamese ads"
+        },
+        {
+          "name": "Turkish (Turkish-filters)",
+          "url": "https://raw.githubusercontent.com/baris-zan/Turkish-Ad-Hosts/main/hosts",
+          "langs": [
+            "tr"
+          ],
+          "desc": "Turkish ads"
+        }
+      ]
+    }
+  ]
+}

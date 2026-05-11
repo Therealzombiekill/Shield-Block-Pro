@@ -1,0 +1,171 @@
+/* ShieldBlock Pro — Cosmetic CSS v3.0 — injected at document_start */
+/* Applied before page renders — elements in this list never flash visible */
+
+/* ── Google / DFP ─────────────────────────────────────────────────────────── */
+.adsbygoogle, ins.adsbygoogle,
+[data-ad-slot], [data-ad-client], [data-ad-format],
+[id^="div-gpt-ad"], [id^="google_ads_iframe"],
+[id^="google_ads"], [data-google-query-id],
+.gads, #gads,
+
+/* ── Generic ad IDs / classes ─────────────────────────────────────────────── */
+#ad, #ads, #ad-container, #ad-wrapper, #ad-banner,
+#ad-top, #ad-bottom, #adbox, #adFrame, #adsense,
+#dfp-ad, #google-ads, #header-ad, #footer-ad,
+#leaderboard-ad, #sidebar-ad, #rectangle-ad,
+.ad-banner, .ad-slot, .ad-unit, .ad-block,
+.ad-container, .ad-wrapper, .ad-holder, .ad-frame,
+.advertisement, .advertising, .advertorial,
+.banner-ad, .display-ad, .native-ad, .dfp-ad,
+[class*="ad-unit"], [class*="ad-slot"], [class*="ad-banner"],
+[id*="ad-unit"], [id*="ad-slot"], [id*="ad-banner"],
+
+/* ── Taboola ──────────────────────────────────────────────────────────────── */
+.taboola, .taboola-widget, [id^="taboola-"],
+#taboola-above, #taboola-below, #taboola-stream,
+.trc_rbox_outer, [id*="taboola"],
+
+/* ── Outbrain ─────────────────────────────────────────────────────────────── */
+.outbrain, .ob-widget, [id^="outbrain-"],
+#outbrain, #outbrain-module, [class*="outbrain"],
+
+/* ── Zergnet / Gravity ────────────────────────────────────────────────────── */
+.zergnet, [id*="zergnet"], [class*="zergnet"],
+
+/* ── Ezoic ────────────────────────────────────────────────────────────────── */
+[data-ezoic-ad-id], .ezoic-ad, [class*="ezoic-ad"],
+[id*="ezoic"], [class*="ezoic"],
+#ezoic-pub-ad-placeholder, .ezoic-adpicker-ad,
+
+/* ── Mediavine ────────────────────────────────────────────────────────────── */
+[class*="mediavine"], [id*="mediavine"],
+.mv-ad-box, .mvp-widget-ad, [data-publisher-id*="mediavine"],
+
+/* ── Raptive / AdThrive ───────────────────────────────────────────────────── */
+[class*="adthrive"], [id*="adthrive"],
+[class*="raptive"], [id*="raptive"],
+.adthrive-ad, .raptive-ad,
+
+/* ── Carbon Ads ───────────────────────────────────────────────────────────── */
+#carbonads, .carbon-wrap, .carbon-block,
+[id^="carbon-"], [class*="carbon-ad"],
+
+/* ── MediaNet ─────────────────────────────────────────────────────────────── */
+[id*="media_net"], [class*="mediaNET"],
+[id^="mn-"], [class*="media-net"],
+
+/* ── Teads ────────────────────────────────────────────────────────────────── */
+[class*="teads"], [id*="teads"], #teads-element,
+
+/* ── MGID ─────────────────────────────────────────────────────────────────── */
+[class*="mgid"], [id*="mgid"], .mgwidget,
+
+/* ── Nativo ───────────────────────────────────────────────────────────────── */
+[class*="nativo"], [id*="nativo"],
+
+/* ── TripleLift ───────────────────────────────────────────────────────────── */
+[class*="triplelift"], [id*="triplelift"],
+
+/* ── AdRoll ───────────────────────────────────────────────────────────────── */
+[class*="adroll"], [id*="adroll"],
+
+/* ── Primis / VideoIntelligence ───────────────────────────────────────────── */
+[id*="primis"], [class*="primis"],
+
+/* ── Revcontent ───────────────────────────────────────────────────────────── */
+[id*="revcontent"], [class*="revcontent"],
+
+/* ── Sharethrough ─────────────────────────────────────────────────────────── */
+[id*="sharethrough"], [class*="sharethrough"],
+
+/* ── Setupad ──────────────────────────────────────────────────────────────── */
+[class*="setupad"], [id*="setupad"],
+
+/* ── Adzerk / Kevel ───────────────────────────────────────────────────────── */
+[data-adzerk], [class*="adzerk"],
+
+/* ── AdNgin ───────────────────────────────────────────────────────────────── */
+[class*="adngin"],
+
+/* ── FreeWheel ────────────────────────────────────────────────────────────── */
+[id*="freewheel"], [class*="freewheel"], .fwplaylist,
+
+/* ── AMP ads ──────────────────────────────────────────────────────────────── */
+amp-ad, amp-embed, amp-sticky-ad,
+
+/* ── Admiral ──────────────────────────────────────────────────────────────── */
+[class*="admiral-adblock"],
+
+/* ── Undertone ────────────────────────────────────────────────────────────── */
+[class*="undertone"], [id*="undertone"],
+
+/* ── Bidtellect ───────────────────────────────────────────────────────────── */
+[class*="bidtellect"],
+
+/* ── Criteo ───────────────────────────────────────────────────────────────── */
+[class*="criteo"], [id*="criteo"],
+
+/* ── Index Exchange ───────────────────────────────────────────────────────── */
+[class*="ix-slot"],
+
+/* ── Sponsored / native content labels ────────────────────────────────────── */
+.sponsored-content, .sponsored-post, .sponsored-link, .sponsored-widget,
+[class*="sponsored-content"], [class*="sponsored-post"],
+
+/* ── Sticky / anchor ads ──────────────────────────────────────────────────── */
+[class*="sticky-ad"], [id*="sticky-ad"],
+[class*="anchor-ad"], [id*="anchor-ad"],
+[class*="sticky-banner"], [class*="floating-ad"],
+[class*="bottom-sticky"], [class*="top-sticky"],
+
+/* ── Amazon ads ───────────────────────────────────────────────────────────── */
+[data-component-type="sp-sponsored-result"],
+.puis-sponsored-label-text, .a-sponsored-label,
+.amAdDiv, #videoAds, #amasBottom,
+[data-csa-c-type="ad"], [data-ad-details],
+[id*="sponsored-products-shelf"],
+[cel_widget_id*="MAIN-SPONSORED"],
+
+/* ── Newsletter / email popups ─────────────────────────────────────────────── */
+#klaviyo-popup-dialog, .klaviyo-close-form, [data-klaviyo-popup],
+.privy-popup, #privy-container,
+[class*="optinmonster"], [id*="optinmonster"],
+#sumo_container, .sumome-react-wysiwyg,
+.sleeknote-overlay, #sleeknote-shadow,
+[class*="drip-form"],
+.ju-target-preview, #justuno-overlay,
+.pum-overlay, .pum-container,
+[class*="newsletter-popup"], [id*="newsletter-popup"],
+[class*="email-popup"], [id*="email-popup"],
+[class*="subscribe-popup"], [id*="subscribe-popup"],
+[class*="exit-intent"], [class*="exit-popup"],
+[class*="mailchimp-popup"], [id*="mc-embed"],
+[class*="beehiiv-popup"] {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ── Anti-adblock walls — hide the overlay but not the content ────────────── */
+[class*="adblock-wall"], [id*="adblock-wall"],
+[class*="adblock-overlay"], [id*="adblock-overlay"],
+[class*="adblock-notice"], [id*="adblock-notice"],
+[class*="adblock-modal"], [id*="adblock-modal"],
+[class*="anti-adblock"], [id*="anti-adblock"],
+[class*="adblocker-wall"], [id*="adblocker-wall"],
+[class*="whitelist-modal"],
+#adblock-message, .adblock-message,
+.ablock-notification, #ablock-notification {
+  display: none !important;
+}
+
+/* ── Restore scrolling locked by anti-adblock walls ──────────────────────── */
+body:has([class*="adblock-wall"]),
+body:has([id*="adblock-wall"]),
+body:has(#adblock-message) {
+  overflow: auto !important;
+  height: auto !important;
+}

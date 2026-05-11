@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ShieldBlock Pro</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090f;--s1:#0e0e18;--s2:#141420;--s3:#1a1a28;
+  --border:#1e1e2e;--border2:#28283c;
+  --accent:#7c6aff;--accent2:#a78bfa;--glow:rgba(124,106,255,.15);
+  --green:#00d97e;--red:#ff4d6d;--yellow:#f5c542;
+  --amzn:#f0a500;--social:#ec4899;--cookie:#34d399;
+  --text:#e2e2f0;--sub:#9090b0;--muted:#5a5a78;--faint:#30304a;
+  --mono:'JetBrains Mono','Fira Code','Consolas',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+html{width:360px}
+body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
+  font-family:var(--sans);font-size:13px;overflow-x:hidden}
+
+/* ── App wrapper ────────────────────────────────────────────────────── */
+#app{display:none;flex-direction:column;min-height:480px}
+#app.ready{display:flex}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.hdr{
+  padding:11px 14px 10px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--s1);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.hdr-left{display:flex;align-items:center;gap:8px}
+.logo-icon{
+  width:28px;height:28px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 14px var(--glow);flex-shrink:0;
+}
+.logo-name{
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  letter-spacing:.04em;color:var(--text);
+}
+.logo-name em{color:var(--accent2);font-style:normal}
+.pill{
+  display:flex;align-items:center;gap:4px;
+  padding:3px 9px;border-radius:20px;
+  font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.06em;
+}
+.pill-on {background:rgba(0,217,126,.08);border:1px solid rgba(0,217,126,.2);color:var(--green)}
+.pill-off{background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.2);color:var(--red)}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ── Nav ─────────────────────────────────────────────────────────────── */
+.nav{
+  display:flex;background:var(--s1);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.nb{
+  flex:1;padding:9px 4px;background:none;border:none;
+  color:var(--muted);font-family:var(--mono);font-size:9px;font-weight:700;
+  letter-spacing:.07em;cursor:pointer;text-transform:uppercase;
+  transition:color .15s;position:relative;
+}
+.nb.active{color:var(--accent2)}
+.nb.active::after{
+  content:'';position:absolute;bottom:0;left:15%;right:15%;
+  height:2px;background:var(--accent2);border-radius:2px;
+}
+
+/* ── Panels ──────────────────────────────────────────────────────────── */
+.panel{display:none;flex:1;overflow-y:auto;max-height:400px}
+.panel.active{display:block}
+
+/* ── Stats panel ─────────────────────────────────────────────────────── */
+.hero{
+  padding:18px 16px 14px;background:var(--s1);
+  border-bottom:1px solid var(--border);
+}
+.hero-count-row{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
+.hero-num{
+  font-family:var(--mono);font-size:42px;font-weight:700;
+  color:#fff;letter-spacing:-.04em;line-height:1;
+  transition:color .3s;
+}
+.hero-num.flash{color:var(--accent2)}
+.hero-label{font-size:11px;color:var(--muted);line-height:1.5}
+.hero-label strong{display:block;font-family:var(--mono);font-size:9px;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:2px;font-weight:500}
+
+.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.sc{
+  background:var(--s2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 6px 7px;text-align:center;transition:border-color .15s;
+}
+.sc:hover{border-color:var(--border2)}
+.sc-n{display:block;font-family:var(--mono);font-size:14px;font-weight:700;line-height:1}
+.sc-l{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.05em;margin-top:3px}
+.sc.az .sc-n{color:var(--amzn)}
+.sc.sc .sc-n{color:var(--social)}
+.sc.ck .sc-n{color:var(--cookie)}
+.sc.wb .sc-n{color:var(--accent2)}
+.sc.yt .sc-n{color:#ff4444}
+
+/* Page + lifetime rows */
+.info-rows{border-top:1px solid var(--border)}
+.info-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px;border-bottom:1px solid var(--border);
+}
+.info-row:last-child{border-bottom:none}
+.info-label{font-size:11px;color:var(--muted)}
+.info-val{font-family:var(--mono);font-size:11px;color:var(--text)}
+.info-val.green{color:var(--green);font-weight:600}
+
+/* Filter bar */
+.fbar{
+  padding:7px 14px;display:flex;align-items:center;
+  justify-content:space-between;border-top:1px solid var(--border);
+  background:var(--s1);
+}
+.fbar-left{display:flex;align-items:center;gap:6px}
+.fdot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.fdot.syncing{background:var(--yellow);animation:pulse .8s ease-in-out infinite}
+/* Static amber dot for partial sync failures — distinct from .syncing spinner */
+.fdot.warn{background:#f59e0b;animation:none}
+.ftext{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.ftext strong{color:var(--text)}
+.ghost{
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  font-family:var(--mono);font-size:10px;padding:3px 6px;border-radius:4px;
+  transition:color .15s,background .15s;
+}
+.ghost:hover{color:var(--accent2);background:var(--s2)}
+/* Active pause state — amber tint so it's obvious blocking is suspended */
+.ghost.paused{
+  color:#f59e0b;
+  background:rgba(245,158,11,.12);
+  border:1px solid rgba(245,158,11,.35) !important;
+}
+.ghost.paused:hover{background:rgba(245,158,11,.2)}
+
+
+/* ── Blockers panel ──────────────────────────────────────────────────── */
+.blockers{padding:10px 14px 14px}
+.sec-hd{
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  color:var(--faint);text-transform:uppercase;letter-spacing:.12em;
+  margin:10px 0 6px;
+}
+.sec-hd:first-child{margin-top:2px}
+.tr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 10px;background:var(--s1);border:1px solid var(--border);
+  border-radius:8px;margin-bottom:4px;cursor:pointer;
+  transition:border-color .12s,background .12s;
+}
+.tr:hover{background:var(--s2);border-color:var(--border2)}
+.tr-info{display:flex;align-items:center;gap:9px}
+.ti{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0}
+.ttxt strong{display:block;font-size:12px;font-weight:500;color:#ccc}
+.ttxt span{font-size:10px;color:var(--muted)}
+/* Toggle switch */
+.sw{position:relative;width:34px;height:18px;flex-shrink:0}
+.sw input{display:none}
+.sw-t{position:absolute;inset:0;border-radius:18px;background:var(--faint);cursor:pointer;transition:background .2s}
+.sw-k{position:absolute;top:3px;left:3px;width:12px;height:12px;background:var(--muted);border-radius:50%;transition:transform .18s,background .18s}
+.sw input:checked+.sw-t{background:var(--accent)}
+.sw input:checked+.sw-t .sw-k{transform:translateX(16px);background:#fff}
+
+/* ── Whitelist panel ─────────────────────────────────────────────────── */
+.wl-wrap{padding:12px 14px}
+.site-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:9px;
+  padding:11px 13px;margin-bottom:10px;
+}
+.site-url{
+  font-family:var(--mono);font-size:11px;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:7px;
+}
+.site-row{display:flex;align-items:center;justify-content:space-between}
+.site-lbl{font-size:12px;color:var(--muted)}
+.sw.lg{transform:scale(1.2);transform-origin:right center}
+.wl-hd{
+  font-family:var(--mono);font-size:9px;font-weight:700;color:var(--faint);
+  text-transform:uppercase;letter-spacing:.1em;margin:0 0 6px;
+}
+.wl-empty{
+  text-align:center;color:var(--muted);font-size:11px;padding:14px;
+  border:1px dashed var(--border);border-radius:7px;
+}
+.wl-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7px 10px;background:var(--s1);border:1px solid var(--border);
+  border-radius:6px;margin-bottom:4px;
+}
+.wl-dom{font-family:var(--mono);font-size:11px;color:var(--text)}
+.wl-rm{
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:15px;line-height:1;padding:0 2px;transition:color .12s;
+}
+.wl-rm:hover{color:var(--red)}
+
+/* ── Support panel ───────────────────────────────────────────────────── */
+.sup{padding:14px;display:flex;flex-direction:column;gap:10px}
+.sup-card{
+  background:var(--s2);border:1px solid var(--border2);border-radius:10px;
+  padding:14px;
+}
+.sup-label{
+  font-family:var(--mono);font-size:9px;color:var(--accent2);
+  letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;
+}
+.sup-card p{font-size:12px;color:var(--sub);line-height:1.65}
+.sup-card p+p{margin-top:5px}
+.tip-btn{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:13px;background:linear-gradient(135deg,#003087,#0070ba);
+  border-radius:10px;text-decoration:none;
+  box-shadow:0 2px 16px rgba(0,112,186,.25);transition:opacity .15s;
+}
+.tip-btn:hover{opacity:.9}
+.dev-btn{
+  display:flex;align-items:center;gap:8px;padding:10px 12px;
+  background:rgba(124,106,255,.1);border:1px solid rgba(124,106,255,.22);
+  border-radius:8px;text-decoration:none;transition:border-color .15s;
+}
+.dev-btn:hover{border-color:rgba(124,106,255,.4)}
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+.ftr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px 10px;border-top:1px solid var(--border);
+  background:var(--s1);flex-shrink:0;
+}
+.ftr-l{display:flex;align-items:center;gap:6px}
+.ver{font-family:var(--mono);font-size:9px;color:var(--faint)}
+.ftr-badge{
+  padding:2px 6px;border-radius:4px;
+  background:rgba(124,106,255,.1);border:1px solid rgba(124,106,255,.18);
+  font-family:var(--mono);font-size:9px;font-weight:700;color:var(--accent2);
+}
+.log-row{padding:6px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.log-row:hover{background:var(--s1)}
+.log-dom{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.log-ts{color:var(--faint);font-size:9px;flex-shrink:0}
+.log-ftag{background:var(--s2);border:1px solid var(--border);border-radius:4px;
+color:var(--muted);font-family:var(--mono);font-size:9px;cursor:pointer;padding:2px 6px;
+transition:all .12s}
+.log-ftag.active{background:rgba(124,106,255,.12);border-color:var(--accent);color:var(--accent2)}
+.log-src{padding:2px 5px;border-radius:3px;font-size:8px;font-weight:700;
+letter-spacing:.05em;margin-right:4px;flex-shrink:0}
+.src-network{background:rgba(124,106,255,.15);color:var(--accent2)}
+.src-general{background:rgba(79,195,247,.12);color:#4fc3f7}
+.src-cookies{background:rgba(52,211,153,.12);color:var(--cookie)}
+.src-social{background:rgba(236,72,153,.12);color:var(--social)}
+.src-amazon{background:rgba(240,165,0,.12);color:var(--amzn)}
+.src-picker,.src-report{background:rgba(0,217,126,.1);color:var(--green)}
+.src-scriptlet{background:rgba(255,77,109,.1);color:var(--red)}
+.log-empty{text-align:center;color:var(--muted);padding:24px;font-size:11px;font-family:var(--sans)}
+textarea:focus{border-color:var(--accent)!important}
+#spark-chart { image-rendering: pixelated; }
+.pause-active { color: var(--yellow) !important; border-color: var(--yellow) !important; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="logo-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6L12 2z"
+                stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M9 12l2 2 4-4" stroke="white" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="logo-name">SHIELD<em>BLOCK</em></span>
+    </div>
+    <div id="hdr-status" class="pill pill-on"><div class="dot"></div>ACTIVE</div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <button class="nb active" data-panel="stats">Stats</button>
+    <button class="nb" data-panel="blockers">Blockers</button>
+    <button class="nb" data-panel="whitelist">Whitelist</button>
+    <button class="nb" data-panel="filters">Filters</button>
+    <button class="nb" data-panel="log">Log</button>
+    <button class="nb" data-panel="support">Support</button>
+  </div>
+
+  <!-- ── STATS PANEL ──────────────────────────────────────────────── -->
+  <div class="panel active" id="panel-stats">
+
+    <div class="hero">
+      <div class="hero-count-row">
+        <span class="hero-num" id="stat-total">0</span>
+        <span class="hero-label"><strong>Session</strong>ads blocked</span>
+      </div>
+      <div class="stat-grid">
+        <div class="sc yt">
+          <span class="sc-n" id="s-yt">0</span>
+          <span class="sc-l">YouTube</span>
+        </div>
+        <div class="sc az">
+          <span class="sc-n" id="s-az">0</span>
+          <span class="sc-l">Amazon</span>
+        </div>
+        <div class="sc sc">
+          <span class="sc-n" id="s-sc">0</span>
+          <span class="sc-l">Social</span>
+        </div>
+        <div class="sc ck">
+          <span class="sc-n" id="s-ck">0</span>
+          <span class="sc-l">Cookies</span>
+        </div>
+        <div class="sc wb">
+          <span class="sc-n" id="s-wb">0</span>
+          <span class="sc-l">Web</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-rows">
+      <div class="info-row">
+        <span class="info-label">This page</span>
+        <span class="info-val green" id="stat-page">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Lifetime total</span>
+        <span class="info-val" id="stat-lifetime">0</span>
+      </div>
+    </div>
+        <!-- ── Per-page blocked requests ──────────────────────────────────────── -->
+    <div style="border-top:1px solid var(--border);padding:6px 16px 6px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Blocked on this page</div>
+      <div id="page-log-list" style="font-family:var(--mono);font-size:9px;max-height:80px;overflow-y:auto;color:var(--muted)">—</div>
+    </div>
+
+    <!-- ── Top blocked domains ───────────────────────────────────────────── -->
+    <div style="border-top:1px solid var(--border);padding:10px 16px 6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Top blocked this session</span>
+        <span id="sb-indicator" title="Safe browsing status" style="font-size:9px;display:none">🛡 Safe Browsing</span>
+      </div>
+      
+    </div>
+
+    <!-- 7-day chart -->
+    <div style="padding:6px 16px 4px;border-top:1px solid var(--border)">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">7-day activity</div>
+      <canvas id="spark-chart" height="36" style="width:100%;display:block;border-radius:4px"></canvas>
+    </div>
+
+    <div class="fbar">
+      <div class="fbar-left">
+        <div class="fdot" id="fdot"></div>
+        <span class="ftext" id="ftext"><strong>—</strong> rules active</span>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="ghost" id="pause-btn" title="Pause blocking on this site">⏸ pause</button>
+        <select id="pause-dur" title="Pause duration" style="font-size:10px;height:22px;padding:0 2px;border:1px solid var(--border2);border-radius:4px;background:var(--bg2);color:var(--text);cursor:pointer">
+          <option value="30">30m</option>
+          <option value="60">1h</option>
+          <option value="180">3h</option>
+          <option value="480">8h</option>
+        </select>
+        <button class="ghost" id="pause-all-btn" title="Pause ALL blocking for 30 minutes">⏸ all</button>
+        <button class="ghost" id="pick-btn" title="Hide an element by clicking it">⊕ pick</button>
+        <button class="ghost" id="sync-btn">↺ sync</button>
+        <button class="ghost" id="reset-btn">↺ reset</button>
+      </div>
+
+      <!-- ── Domain filtering matrix ──────────────────────────────────── -->
+      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">3rd-party blocking</span>
+          <button class="ghost" id="matrix-clear" style="font-size:9px;padding:1px 5px" title="Reset all matrix rules for this site">↺ reset</button>
+        </div>
+        <div id="matrix-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:3px"></div>
+        <div id="matrix-status" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;min-height:12px"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── BLOCKERS PANEL ────────────────────────────────────────────── -->
+  <div class="panel" id="panel-blockers">
+    <div class="blockers">
+
+      <div class="sec-hd" style="margin-top:12px">Network & Web</div>
+
+      <label class="tr" for="t-az">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(240,165,0,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0a500"><path d="M.045 18c.072-.116.187-.124.348-.022 3.636 2.11 7.594 3.17 11.87 3.17 2.852 0 5.668-.534 8.447-1.595.315-.14.39-.1.494.124.102.167.066.334-.12.496-2.7 1.861-5.937 2.797-9.713 2.797-2.997 0-5.805-.668-8.426-2.003z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Amazon</strong><span>Sponsored products removed</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-az" data-s="amazon" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-wb">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(124,106,255,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1 17.9c-4-.5-7-3.9-7-7.9 0-.6.1-1.2.2-1.8L9 15v1c0 1.1.9 2 2 2v1.9zm6.9-2.5c-.3-.8-1-1.4-1.9-1.4h-1v-3c0-.6-.4-1-1-1H8V8h2c.6 0 1-.5 1-1V5h2c1.1 0 2-.9 2-2v-.4c2.9 1.2 5 4.1 5 7.4 0 2.1-.8 4-2.1 5.4z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Network Block</strong><span id="rules-desc">EasyList + 12 filter lists</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-wb" data-s="general" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-sm">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(236,72,153,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ec4899"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Social Media</strong><span>FB · Instagram · Reddit · X · TikTok</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-sm" data-s="social" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+<label class="tr" for="t-ck">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(52,211,153,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#34d399"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Cookie Banners</strong><span>Auto-reject GDPR · 60+ CMPs</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-ck" data-s="cookies" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-pr">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(0,217,126,.07)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#00d97e"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93-2.67-1.14-5-4.43-5-7.93V7.18L12 5z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Anti-Fingerprint</strong><span>Canvas · WebGL · AudioContext</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-pr" data-s="privacy" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-tr">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(245,197,66,.08)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#f5c542"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+          </div>
+          <div class="ttxt"><strong>URL Tracker Removal</strong><span>Strip UTM, fbclid, ttclid, 40+ params</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-tr" data-s="tracking" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-cos">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(124,106,255,.08)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M2 6h20v2H2zm2 5h16v2H4zm3 5h10v2H7z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Cosmetic Hiding</strong><span>CSS element removal &amp; domain rules</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-cos" data-s="cosmetic" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <div class="sec-hd">Platforms</div>
+
+      <label class="tr" for="t-yt">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(255,0,0,.08)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
+          </div>
+          <div class="ttxt"><strong>YouTube</strong><span>Skip &amp; mute ads · remove overlays</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-yt" data-s="youtube" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-tw">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(145,71,255,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#9147ff"><path d="M11.6 4.7h1.7v5.1h-1.7zm4.7 0H18v5.1h-1.7zM6 0L1.7 4.3v15.4h5.1V24l4.3-4.3h3.4l8.2-8.2V0H6zm14.6 11.1l-3.4 3.5H13.8l-3 3v-3H6.9V1.7h13.7v9.4z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Twitch</strong><span>Stream ad mute + swap</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-tw" data-s="twitch" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-sp">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(29,185,84,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#1db954"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 14.36c-.2.32-.62.43-.94.24-2.57-1.57-5.8-1.93-9.61-1.06-.37.09-.73-.14-.82-.51-.09-.37.14-.73.51-.82 4.17-.96 7.74-.55 10.63 1.22.33.2.44.62.23.93zm1.24-2.76c-.25.41-.77.53-1.18.29-2.94-1.81-7.43-2.33-10.91-1.28-.46.14-.94-.12-1.08-.57-.13-.46.12-.95.57-1.08 3.98-1.2 8.93-.62 12.32 1.46.41.25.53.77.28 1.18zm.1-2.88c-3.53-2.1-9.33-2.29-12.7-1.27-.54.16-1.1-.14-1.27-.68-.16-.54.14-1.1.68-1.27 3.87-1.17 10.3-.95 14.36 1.47.49.29.65.92.36 1.41-.29.49-.92.65-1.43.34z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Spotify</strong><span>Ad mute + skip</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-sp" data-s="spotify" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <div class="sec-hd">Privacy & Advanced</div>
+
+      <label class="tr" for="t-sb">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(248,113,113,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#f87171"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 14l-3-3 1.41-1.41L11 12.17l4.59-4.58L17 9l-6 6z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Safe Browsing</strong><span>Block malware &amp; phishing URLs</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-sb" data-s="safeBrowsing" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-dnt">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(52,211,153,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#34d399"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+          </div>
+          <div class="ttxt"><strong>DNT + Sec-GPC Headers</strong><span>Signal opt-out to every site (legally binding in CA)</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-dnt" data-s="privacyHeaders" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-https">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(52,211,153,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#34d399"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm1 13H11V11h2v3zm0-5H11V7h2v2z"/></svg>
+          </div>
+          <div class="ttxt"><strong>HTTPS Upgrading</strong><span>Upgrade http:// links to https://</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-https" data-s="httpsUpgrade" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-tz">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(167,139,250,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Timezone Spoofing</strong><span>Report UTC timezone to all sites (opt-in)</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-tz" data-s="timezoneSpoof"><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+      <label class="tr" for="t-pw">
+        <div class="tr-info">
+          <div class="ti" style="background:rgba(251,191,36,.1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#fbbf24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          </div>
+          <div class="ttxt"><strong>Soft Paywall Bypass</strong><span>Remove blur overlays (opt-in)</span></div>
+        </div>
+        <div class="sw"><input type="checkbox" id="t-pw" data-s="paywall"><div class="sw-t"><div class="sw-k"></div></div></div>
+      </label>
+
+    </div>
+  </div>
+
+  <!-- ── WHITELIST PANEL ───────────────────────────────────────────── -->
+  <div class="panel" id="panel-whitelist">
+    <div class="wl-wrap">
+      <div class="site-card">
+        <div class="site-url" id="site-url">—</div>
+        <div class="site-row">
+          <span class="site-lbl">Block ads on this site</span>
+          <div class="sw lg">
+            <input type="checkbox" id="site-toggle" checked>
+            <div class="sw-t"><div class="sw-k"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="wl-hd">Whitelisted sites</div>
+      <div id="wl-list"><div class="wl-empty">No sites whitelisted</div></div>
+    </div>
+  </div>
+
+  <!-- ── SUPPORT PANEL ─────────────────────────────────────────────── -->
+  <div class="panel" id="panel-support">
+    <div class="sup">
+
+      <!-- ── Health check ─────────────────────────────────────────────── -->
+      <div class="sup-card" style="padding:11px 13px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--accent2);letter-spacing:.1em;text-transform:uppercase">Extension Health</div>
+          <button class="ghost" id="run-health-check" style="font-size:9px;padding:2px 8px;border:1px solid var(--border2)">Run check</button>
+        </div>
+        <div id="health-summary" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:5px">Click 'Run check' to test all subsystems</div>
+        <div id="health-checks" style="font-size:9px;font-family:var(--mono);line-height:1.8"></div>
+      </div>
+
+      <div class="sup-card">
+        <div class="sup-label">Free Software</div>
+        <p>ShieldBlock is completely free — no subscription, no license, no tricks.</p>
+        <p style="color:var(--muted);font-size:11px;margin-top:4px">If it saves you time, a tip is always appreciated but never required.</p>
+      </div>
+
+      <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener" class="tip-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="white" opacity=".9"><path d="M8.5 8L7 16h1.5l.5-3h2.14c2.21 0 4-1.79 4-4a3 3 0 00-3-3H9L8.5 8z"/></svg>
+        <div>
+          <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;letter-spacing:.06em">TIP VIA PAYPAL</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.65);margin-top:1px">paypal.me/BronsonBissell</div>
+        </div>
+      </a>
+
+      <a href="mailto:zombiekillacrew@gmail.com" target="_blank" rel="noopener" class="dev-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:#fff">Developer</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">zombiekillacrew@gmail.com</div>
+        </div>
+      </a>
+
+      <div class="sup-card" style="padding:11px 13px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--accent2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Preferences</div>
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+          <span style="font-size:11px;color:var(--muted)">Show block count badge</span>
+          <div class="sw"><input type="checkbox" id="t-badge" data-s="badgeEnabled" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+        </label>
+      </div>
+
+      <div class="sup-card" style="padding:11px 13px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--accent2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Cloud Sync</div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Sync settings &amp; whitelist across your Chrome devices</p>
+        <div style="display:flex;gap:6px">
+          <button class="ghost" id="cloud-restore-btn" style="flex:1;text-align:center;border:1px solid var(--border2)">↓ Pull</button>
+        </div>
+        <div id="cloud-status" style="font-family:var(--mono);font-size:9px;color:var(--green);margin-top:5px;min-height:12px"></div>
+      </div>
+
+      <div class="sup-card" style="padding:11px 13px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--accent2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Import uBlock Origin</div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Migrate your rules &amp; whitelist from a uBO backup file</p>
+        <label class="ghost" style="display:block;text-align:center;border:1px solid var(--border2);border-radius:6px;padding:7px;cursor:pointer">
+          ↑ Select uBO backup (.json)
+          <input type="file" id="ubo-import-btn" accept=".json" style="display:none">
+        </label>
+        <div id="ubo-status" style="font-family:var(--mono);font-size:9px;color:var(--green);margin-top:5px;min-height:12px"></div>
+      </div>
+
+      <div class="sup-card" style="padding:11px 13px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--accent2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Backup & Restore</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <button class="ghost" id="export-btn" style="flex:1;text-align:center;border:1px solid var(--border2)">⬇ Export settings</button>
+          <label class="ghost" style="flex:1;text-align:center;border:1px solid var(--border2);cursor:pointer">
+            ⬆ Import
+            <input type="file" id="import-btn" accept=".json" style="display:none">
+          </label>
+        </div>
+        <div style="margin-bottom:6px">
+          <button class="ghost" id="export-diagnostic" style="width:100%;text-align:center;border:1px solid var(--border2);color:var(--muted);font-size:10px" title="Export full diagnostic snapshot (settings + stats + filter status + recent log) for debugging">🔍 Export diagnostic report</button>
+        </div>
+        <div style="margin-bottom:6px">
+          <button class="ghost" id="export-stats-csv" style="width:100%;text-align:center;border:1px solid var(--border2);color:var(--muted);font-size:10px" title="Export 30-day blocking stats as CSV">📊 Export stats CSV</button>
+        </div>
+        <div id="import-status" style="font-family:var(--mono);font-size:9px;color:var(--green);min-height:12px"></div>
+      </div>
+      <div class="sup-card" style="padding:11px 13px">
+        <div style="font-size:11px;color:var(--muted);line-height:1.7">
+          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.10.1<br>
+          <a href="https://astonishing-swan-da7249.netlify.app" target="_blank" rel="noopener"
+             style="color:var(--accent2);text-decoration:none;font-size:10px">Privacy Policy ↗</a>
+        </div>
+      </div>
+
+      <div class="wl-hd" style="margin-top:12px">Custom hidden elements</div>
+      <div id="custom-rules-list"><div class="wl-empty">None — use ⊕ pick to hide elements</div></div>
+    </div>
+  </div>
+
+  <!-- ── MY FILTERS PANEL ───────────────────────────────────────────── -->
+   <div class="panel" id="panel-filters">
+     <div style="padding:10px 14px 6px">
+       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+         <span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase">My Filter Rules</span>
+         <div style="display:flex;gap:4px">
+           <button class="ghost" id="import-ub-btn" style="font-size:9px;padding:2px 6px;border:1px solid var(--border2)" title="Import rules from clipboard (uBlock Origin / ABP format)">⬆ Import</button>
+           <button class="ghost" id="export-ub-btn" style="font-size:9px;padding:2px 6px;border:1px solid var(--border2)" title="Copy all rules to clipboard">⬇ Copy</button>
+         </div>
+       </div>
+       <textarea id="filters-text" spellcheck="false" placeholder="# One rule per line. Supports uBlock / ABP / ABP+ format:
+ example.com##.ad-class
+ ##.global-ad-selector
+ example.com##+js(set-constant, adblock, false)
+ ||bad-domain.com^
+ $removeparam=fbclid" style="width:100%;height:180px;background:var(--s2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:10px;padding:8px;resize:vertical;outline:none;line-height:1.5;box-sizing:border-box"></textarea>
+       <div style="display:flex;gap:6px;margin-top:6px">
+         <button class="ghost" id="filters-save" style="flex:1;text-align:center;border:1px solid var(--accent);color:var(--accent2)">Apply rules</button>
+         <button class="ghost" id="filters-clear">Clear all</button>
+       </div>
+       <div id="filters-status" style="font-family:var(--mono);font-size:9px;color:var(--green);margin-top:5px;min-height:14px"></div>
+     </div>
+
+     <!-- ── Import from URL ──────────────────────────────────────────── -->
+     <div style="padding:0 14px 10px;border-top:1px solid var(--border);margin-top:2px">
+       <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;padding-top:10px;margin-bottom:6px">Import from URL</div>
+       <div style="display:flex;gap:5px">
+         <input type="text" id="import-url-input" placeholder="https://… (any .txt filter list)"
+           style="flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:10px;padding:6px 8px;outline:none">
+         <button class="ghost" id="import-url-btn" style="border:1px solid var(--accent);color:var(--accent2);white-space:nowrap">Fetch</button>
+       </div>
+       <div id="import-url-status" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;min-height:12px"></div>
+     </div>
+
+     <div style="padding:0 14px 12px;border-top:1px solid var(--border);margin-top:2px">
+       <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;padding-top:10px;margin-bottom:6px">Supported filter types</div>
+       <div style="font-size:10px;color:var(--muted);line-height:1.8;font-family:var(--mono)">
+         <div>##<span style="color:var(--text)">.selector</span> — global hide</div>
+         <div>site.com##<span style="color:var(--text)">.selector</span> — site hide</div>
+         <div>||<span style="color:var(--text)">domain.com</span>^ — block domain</div>
+         <div>##+js(<span style="color:var(--text)">scriptlet, args</span>) — scriptlet</div>
+         <div>$removeparam=<span style="color:var(--text)">param</span> — strip tracking param</div>
+       </div>
+     </div>
+    <div style="padding:0 14px 14px;border-top:1px solid var(--border);margin-top:2px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;margin-bottom:8px">
+        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Subscribe to Filter Lists</span>
+        <button class="ghost" id="catalog-toggle" style="font-size:9px;padding:2px 6px;border:1px solid var(--border2)">Browse catalog</button>
+      </div>
+      <!-- Curated catalog browser — hidden until toggled -->
+      <div id="catalog-panel" style="display:none;margin-bottom:10px">
+        <div id="catalog-categories" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px"></div>
+        <div id="catalog-list" style="max-height:160px;overflow-y:auto;font-family:var(--mono);font-size:9px"></div>
+      </div>
+      <div id="custom-lists-container" style="margin-bottom:8px"></div>
+      <input type="text" id="cl-url" placeholder="https://example.com/filters.txt"
+        style="width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:10px;padding:6px 8px;outline:none;margin-bottom:5px;box-sizing:border-box">
+      <div style="display:flex;gap:5px">
+        <input type="text" id="cl-name" placeholder="List name (optional)"
+          style="flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:10px;padding:6px 8px;outline:none">
+        <button class="ghost" id="cl-add-btn" style="border:1px solid var(--accent);color:var(--accent2)">Add</button>
+      </div>
+      <div id="cl-status" style="font-family:var(--mono);font-size:9px;color:var(--green);margin-top:5px;min-height:14px"></div>
+    </div>
+
+    <!-- ── Per-list sync status ───────────────────────────────────────── -->
+    <div style="padding:0 14px 14px;border-top:1px solid var(--border);margin-top:2px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;padding-top:10px;margin-bottom:6px">
+        Last Sync Status
+        <button id="refresh-list-status" class="ghost" style="font-size:9px;padding:1px 5px;margin-left:6px">↺</button>
+      </div>
+      <div id="list-status-container" style="max-height:180px;overflow-y:auto;font-family:var(--mono);font-size:9px;line-height:1.7"></div>
+    </div>
+  </div>
+
+  <!-- ── LOG PANEL ─────────────────────────────────────────────────── -->
+  <div class="panel" id="panel-log">
+    <div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:6px">
+      <div id="log-filters" style="display:flex;gap:3px;flex-wrap:wrap">
+        <button class="log-ftag active" data-src="all">all</button>
+        <button class="log-ftag" data-src="network">net</button>
+        <button class="log-ftag" data-src="general">web</button>
+        <button class="log-ftag" data-src="cookies">🍪</button>
+        <button class="log-ftag" data-src="social">📱</button>
+        <button class="log-ftag" data-src="amazon">📦</button>
+        <button class="log-ftag" data-src="picker">🎯</button>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="ghost" id="download-log-txt" title="Download full log as .txt file" style="border:1px solid var(--border2)">⬇ txt</button>
+        <button class="ghost" id="clear-log">clear</button>
+      </div>
+    </div>
+    <div id="log-list" style="max-height:340px;overflow-y:auto;font-family:var(--mono);font-size:10px"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ftr">
+    <div class="ftr-l">
+      <span class="ftr-badge">FREE</span>
+      <span class="ver">ShieldBlock v2.10.1</span>
+    </div>
+    <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
+       class="ghost" style="text-decoration:none">tip ❤</a>
+  </div>
+
+</div>
+
+<script src="src/browser-compat.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

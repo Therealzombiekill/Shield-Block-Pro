@@ -101,7 +101,7 @@
         const hasBlur   = cs.filter?.includes('blur') || cs.webkitFilter?.includes('blur');
         const hasMask   = cs.webkitMaskImage && cs.webkitMaskImage !== 'none';
         const hasMaxH   = cs.maxHeight && cs.maxHeight !== 'none' && parseInt(cs.maxHeight) < 1200;
-        const hasOverH  = cs.overflow === 'hidden' && parseInt(cs.maxHeight) < 1200;
+        const hasOverH  = cs.overflow === 'hidden' || cs.overflowY === 'hidden';
 
         if (hasBlur)  { el.style.filter = 'none'; el.style.webkitFilter = 'none'; }
         if (hasMask)  { el.style.webkitMaskImage = 'none'; el.style.maskImage = 'none'; }

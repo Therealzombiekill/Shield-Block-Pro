@@ -89,7 +89,7 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 .hero-label strong{display:block;font-family:var(--mono);font-size:9px;
   text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:2px;font-weight:500}
 
-.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
 .sc{
   background:var(--s2);border:1px solid var(--border);border-radius:8px;
   padding:8px 6px 7px;text-align:center;transition:border-color .15s;
@@ -103,6 +103,10 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 .sc.ck .sc-n{color:var(--cookie)}
 .sc.wb .sc-n{color:var(--accent2)}
 .sc.yt .sc-n{color:#ff4444}
+.sc.tw .sc-n{color:#9146ff}
+.sc.sp .sc-n{color:#1db954}
+.sc.hl .sc-n{color:#1ce783}
+.sc.kk .sc-n{color:#53fc18}
 
 /* Page + lifetime rows */
 .info-rows{border-top:1px solid var(--border)}
@@ -309,9 +313,25 @@ textarea:focus{border-color:var(--accent)!important}
           <span class="sc-n" id="s-yt">0</span>
           <span class="sc-l">YouTube</span>
         </div>
+        <div class="sc tw">
+          <span class="sc-n" id="s-tw">0</span>
+          <span class="sc-l">Twitch</span>
+        </div>
+        <div class="sc sp">
+          <span class="sc-n" id="s-sp">0</span>
+          <span class="sc-l">Spotify</span>
+        </div>
         <div class="sc az">
           <span class="sc-n" id="s-az">0</span>
           <span class="sc-l">Amazon</span>
+        </div>
+        <div class="sc hl">
+          <span class="sc-n" id="s-hl">0</span>
+          <span class="sc-l">Hulu</span>
+        </div>
+        <div class="sc kk">
+          <span class="sc-n" id="s-kk">0</span>
+          <span class="sc-l">Kick</span>
         </div>
         <div class="sc sc">
           <span class="sc-n" id="s-sc">0</span>
@@ -340,6 +360,10 @@ textarea:focus{border-color:var(--accent)!important}
       <div class="info-row">
         <span class="info-label">Time saved</span>
         <span class="info-val green" id="stat-time-saved">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Filters synced</span>
+        <span class="info-val" id="stat-last-sync">—</span>
       </div>
     </div>
         <!-- ── Per-page blocked requests ──────────────────────────────────────── -->

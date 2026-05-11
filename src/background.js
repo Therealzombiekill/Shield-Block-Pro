@@ -316,7 +316,7 @@ function _flushStats() {
     try {
       const { stats, lifetime, timeSaved: prevSaved } =
         await chrome.storage.local.get(['stats','lifetime','timeSaved']);
-      const s  = stats   ?? { total:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
+      const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
       const lt = lifetime ?? { total:0 };
       for (const [type, count] of Object.entries(pending)) {
         s.total  = (s.total  | 0) + count;
@@ -598,7 +598,7 @@ async function countNetworkBlocks(tabId, url) {
     _statQueue = _statQueue.then(async () => {
       try {
         const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
-        const s  = stats   ?? { total:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
+        const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
         const lt = lifetime ?? { total:0 };
         s.total  = (s.total  | 0) + count;
         s[cat]   = (s[cat]   | 0) + count;
@@ -1684,7 +1684,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'GET_STATS': {
         const { stats } = await chrome.storage.local.get('stats');
-        sendResponse(stats ?? { total:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 });
+        sendResponse(stats ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 });
         break;
       }
       case 'GET_LIFETIME': {
@@ -1693,7 +1693,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'RESET_STATS':
-        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 } });
+        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
         try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
         sendResponse({ ok: true });
         break;

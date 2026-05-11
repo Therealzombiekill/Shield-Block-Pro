@@ -85,7 +85,7 @@ async function refreshStats() {
   try {
     const [s, lt, ps, stored] = await Promise.all([
       msg('GET_STATS'), msg('GET_LIFETIME'), msg('GET_PAGE_STATS'),
-      chrome.storage.local.get('timeSaved'),
+      chrome.storage.local.get(['timeSaved','filterSyncedAt']),
     ]);
     const stats = s  ?? { total:0, amazon:0, general:0, social:0, cookies:0 };
     const life  = lt ?? { total:0 };
@@ -103,12 +103,32 @@ async function refreshStats() {
     _lastTotal = total;
 
     $('s-yt').textContent = fmt(stats.youtube  || 0);
+    $('s-tw').textContent = fmt(stats.twitch   || 0);
+    $('s-sp').textContent = fmt(stats.spotify  || 0);
     $('s-az').textContent = fmt(stats.amazon   || 0);
+    $('s-hl').textContent = fmt(stats.hulu     || 0);
+    $('s-kk').textContent = fmt(stats.kick     || 0);
     $('s-sc').textContent = fmt(stats.social   || 0);
     $('s-ck').textContent = fmt(stats.cookies  || 0);
     $('s-wb').textContent = fmt(stats.general  || 0);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
+
+    const syncedAt = stored?.filterSyncedAt;
+    if ($('stat-last-sync')) {
+      if (!syncedAt) {
+        $('stat-last-sync').textContent = 'never';
+      } else {
+        const age = Date.now() - syncedAt;
+        const mins = Math.floor(age / 60000);
+        const hrs  = Math.floor(age / 3600000);
+        const days = Math.floor(age / 86400000);
+        $('stat-last-sync').textContent =
+          days  > 0 ? `${days}d ago` :
+          hrs   > 0 ? `${hrs}h ago`  :
+          mins  > 0 ? `${mins}m ago` : 'just now';
+      }
+    }
 
     const n = page.total ?? 0;
     if (n > 0) {

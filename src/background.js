@@ -2630,12 +2630,13 @@ chrome.runtime.onStartup.addListener(async () => {
   const existing = await chrome.alarms.get('filterSync');
   if (!existing) chrome.alarms.create('filterSync', { periodInMinutes: 720 });
   try {
+    const _curVer = chrome.runtime.getManifest().version;
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== '2.10.1') {
+    if (sbRulesVersion !== _curVer) {
       const all = await chrome.storage.local.get(null);
       const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
       if (stale.length) await chrome.storage.local.remove(stale);
-      await chrome.storage.local.set({ sbRulesVersion: '2.10.1' });
+      await chrome.storage.local.set({ sbRulesVersion: _curVer });
     }
   } catch (_) {}
 

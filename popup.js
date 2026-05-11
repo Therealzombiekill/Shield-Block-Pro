@@ -644,17 +644,24 @@ async function checkGlobalPause() {
     btn.textContent = `▶ Resume All (${mins}m left)`;
     btn.classList.add('paused');
   } else {
-    btn.textContent = '⏸ Pause All (30m)';
+    const dur = parseInt($('pause-dur')?.value) || 30;
+    const label = dur >= 60 ? `${dur / 60}h` : `${dur}m`;
+    btn.textContent = `⏸ Pause All (${label})`;
+    btn.title = `Pause ALL blocking for ${label}`;
     btn.classList.remove('paused');
   }
 }
+
+// Keep the "Pause All" label in sync with the duration selector
+$('pause-dur')?.addEventListener('change', () => { checkGlobalPause(); });
 
 $('pause-all-btn')?.addEventListener('click', async () => {
   const status = await msg('GET_GLOBAL_PAUSE');
   if (status?.active) {
     await msg('RESUME_ALL');
   } else {
-    await msg('PAUSE_ALL', { minutes: 30 });
+    const minutes = parseInt($('pause-dur')?.value) || 30;
+    await msg('PAUSE_ALL', { minutes });
   }
   checkGlobalPause();
 });

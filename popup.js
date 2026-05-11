@@ -2,6 +2,14 @@
 
 const $ = id => document.getElementById(id);
 
+function formatTimeSaved(s) {
+  s = Math.floor(s || 0);
+  if (s < 60)    return s + 's';
+  if (s < 3600)  return Math.floor(s / 60) + 'm';
+  if (s < 86400) { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); return m ? `${h}h ${m}m` : `${h}h`; }
+  const d = Math.floor(s/86400), h = Math.floor((s%86400)/3600); return h ? `${d}d ${h}h` : `${d}d`;
+}
+
 // ── Nav ───────────────────────────────────────────────────────────────
 // ── Single consolidated nav handler ──────────────────────────────────────────
 let _logInterval = null;
@@ -75,8 +83,9 @@ let _lastTotal = 0;
 
 async function refreshStats() {
   try {
-    const [s, lt, ps] = await Promise.all([
+    const [s, lt, ps, stored] = await Promise.all([
       msg('GET_STATS'), msg('GET_LIFETIME'), msg('GET_PAGE_STATS'),
+      chrome.storage.local.get('timeSaved'),
     ]);
     const stats = s  ?? { total:0, amazon:0, general:0, social:0, cookies:0 };
     const life  = lt ?? { total:0 };
@@ -99,6 +108,7 @@ async function refreshStats() {
     $('s-ck').textContent = fmt(stats.cookies  || 0);
     $('s-wb').textContent = fmt(stats.general  || 0);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
+    $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 
     const n = page.total ?? 0;
     if (n > 0) {

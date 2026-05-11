@@ -74,6 +74,19 @@ const STATIC_REMOVE_PARAMS = new Set([
   'cvosrc', 'cvo_campaign',
 ]);
 
+// ── Time saved estimates (seconds per blocked item by type) ───────────────────
+const TIME_SAVED_SECONDS = {
+  youtube:  15, // avg of 5s skippable + 30s unskippable
+  twitch:   30, // full SSAI ad break
+  spotify:  30, // audio ad segment
+  hulu:     30, // video ad break
+  kick:     30, // video ad break
+  amazon:    3, // page load improvement
+  general:   5, // typical ad script load time
+  social:    2, // skipped sponsored post
+  cookies:   8, // time to find + click "reject all"
+};
+
 // ── Browser detection ─────────────────────────────────────────────────────────
 // Service workers don't have navigator.userAgent in all MV3 builds, so we check
 // both paths. Firefox exposes globalThis.browser; Chrome does not.
@@ -264,8 +277,9 @@ function formatBadge(n) {
 
 // Batched stat writer — accumulates increments and flushes in one storage write
 // every 500ms (or immediately if > 20 pending). Avoids a read+write per ad removal.
-let _pendingStats = {};  // { statType: count }
-let _pendingFlush = null;
+let _pendingStats     = {};  // { statType: count }
+let _pendingTimeSaved = 0;   // seconds accumulated since last flush
+let _pendingFlush     = null;
 
 // Track daily stats for 7-day chart
 async function recordDailyStats(count) {
@@ -287,9 +301,11 @@ let _flushQueue = Promise.resolve();
 
 function _flushStats() {
   _pendingFlush = null;
-  const pending = _pendingStats;
-  _pendingStats = {};
-  if (Object.keys(pending).length === 0) return;
+  const pending        = _pendingStats;
+  const savedThisFlush = _pendingTimeSaved;
+  _pendingStats     = {};
+  _pendingTimeSaved = 0;
+  if (Object.keys(pending).length === 0 && savedThisFlush === 0) return;
 
   // Record daily total for 7-day chart (fire-and-forget, non-critical)
   const pendingTotal = Object.values(pending).reduce((a,b)=>a+b,0);
@@ -298,7 +314,8 @@ function _flushStats() {
   // Serialise writes — chain onto the queue so concurrent flushes never race
   _flushQueue = _flushQueue.then(async () => {
     try {
-      const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
+      const { stats, lifetime, timeSaved: prevSaved } =
+        await chrome.storage.local.get(['stats','lifetime','timeSaved']);
       const s  = stats   ?? { total:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
       const lt = lifetime ?? { total:0 };
       for (const [type, count] of Object.entries(pending)) {
@@ -306,7 +323,10 @@ function _flushStats() {
         s[type]  = (s[type]  | 0) + count;
         lt.total = (lt.total | 0) + count;
       }
-      await chrome.storage.local.set({ stats: s, lifetime: lt });
+      await chrome.storage.local.set({
+        stats: s, lifetime: lt,
+        timeSaved: (prevSaved ?? 0) + savedThisFlush,
+      });
       try {
         chrome.action.setBadgeText({ text: formatBadge(s.total) });
         chrome.action.setBadgeBackgroundColor({ color: '#7c6aff' });
@@ -325,15 +345,70 @@ const _requestLog = [];       // network blocks (last 150) — in-memory only
 const _eventLog   = [];       // all events from content scripts (last 1000 in-memory)
 const LOG_MAX     = 150;
 const EVENT_MAX   = 1000;
-const PERSIST_LOG_MAX = 1000; // entries kept in storage across service worker restarts
+const PERSIST_LOG_MAX = 1000; // entries kept in chrome.storage for quick SW-restart restore
 
-// ── Persistent session log ─────────────────────────────────────────────────
-// _eventLog is in-memory and lost when the MV3 service worker is killed (~30s idle).
-// persistedLog survives across restarts. We flush to storage in batches every
-// LOG_PERSIST_INTERVAL ms or when LOG_PERSIST_BATCH_SIZE new entries accumulate.
+// ── IndexedDB — permanent all-time log ────────────────────────────────────────
+// chrome.storage.local is capped at ~10 MB. IndexedDB has no practical limit
+// and persists forever. We write every logEvent here (fire-and-forget) so the
+// full history survives across SW restarts, browser restarts, and extension updates.
+let _logDB = null;
+
+function _getLogDB() {
+  if (_logDB) return Promise.resolve(_logDB);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('sbProLog', 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('events')) {
+        const store = db.createObjectStore('events', { autoIncrement: true });
+        store.createIndex('by_ts', 'ts', { unique: false });
+      }
+    };
+    req.onsuccess = e => { _logDB = e.target.result; resolve(_logDB); };
+    req.onerror   = ()  => reject(req.error);
+    req.onblocked = ()  => reject(new Error('IDB blocked'));
+  });
+}
+
+function _writeLogToDB(entry) {
+  _getLogDB()
+    .then(db => {
+      const tx = db.transaction('events', 'readwrite');
+      tx.objectStore('events').add(entry);
+    })
+    .catch(() => {});
+}
+
+async function _readLogsFromDB(since = 0) {
+  try {
+    const db = await _getLogDB();
+    return new Promise((resolve, reject) => {
+      const tx    = db.transaction('events', 'readonly');
+      const store = tx.objectStore('events');
+      const idx   = store.index('by_ts');
+      const range = since > 0 ? IDBKeyRange.lowerBound(since) : null;
+      const req   = range ? idx.getAll(range) : idx.getAll();
+      req.onsuccess = () => resolve(req.result ?? []);
+      req.onerror   = ()  => reject(req.error);
+    });
+  } catch (_) { return []; }
+}
+
+async function _clearLogDB() {
+  try {
+    const db = await _getLogDB();
+    await new Promise((res, rej) => {
+      const req = db.transaction('events', 'readwrite').objectStore('events').clear();
+      req.onsuccess = res; req.onerror = rej;
+    });
+  } catch (_) {}
+}
+
+// ── Persistent session log (short-term chrome.storage cache) ──────────────────
+// Used to restore _eventLog on SW restart so GET_EVENT_LOG works immediately.
 const LOG_PERSIST_INTERVAL  = 15000; // 15s
 const LOG_PERSIST_BATCH_SIZE = 20;
-let _logDirty = 0; // count of unflushed entries since last persist
+let _logDirty = 0;
 let _logFlushTimer = null;
 
 async function _persistLog() {
@@ -370,7 +445,8 @@ function logEvent(source, level, message, data = {}) {
   const entry = { source, level, message, data, ts: Date.now() };
   _eventLog.push(entry);
   if (_eventLog.length > EVENT_MAX) _eventLog.shift();
-  _schedulePersist();
+  _writeLogToDB(entry);   // permanent all-time storage (IndexedDB)
+  _schedulePersist();     // short-term cache (chrome.storage for SW restart restore)
 }
 
 // tabId → { total, network, dom, youtube, twitch, amazon, general }
@@ -459,6 +535,7 @@ function incrementStat(type, tabId) {
   }
   // Accumulate — flush to storage in a single write after 500ms idle
   _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
+  _pendingTimeSaved  += TIME_SAVED_SECONDS[type] ?? 2;
   const pending = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
   if (pending >= 20) {
     clearTimeout(_pendingFlush);
@@ -1918,14 +1995,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(_eventLog.slice().reverse());
         break;
       case 'GET_PERSISTED_LOG': {
-        // Full persistent log — survives service worker restarts
+        // Read last 7 days from IndexedDB — survives SW restarts and browser restarts
         try {
-          const { persistedLog = [] } = await chrome.storage.local.get('persistedLog');
-          // De-dupe persistedLog itself (may contain duplicates from older SW versions),
-          // then add any in-memory entries not yet flushed.
+          const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const dbEntries = await _readLogsFromDB(since);
           const seen = new Set();
           const merged = [];
-          for (const e of persistedLog) {
+          for (const e of dbEntries) {
             const k = `${e.ts}:${e.source}:${e.message}`;
             if (!seen.has(k)) { seen.add(k); merged.push(e); }
           }
@@ -1933,20 +2009,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const k = `${e.ts}:${e.source}:${e.message}`;
             if (!seen.has(k)) { seen.add(k); merged.push(e); }
           }
-          merged.sort((a, b) => b.ts - a.ts); // newest first
+          merged.sort((a, b) => b.ts - a.ts); // newest first for popup display
           sendResponse(merged.slice(0, 1000));
         } catch (_) { sendResponse([]); }
         break;
       }
       case 'EXPORT_LOG_TXT': {
-        // Build a full plaintext log: persisted + in-memory + network request log.
-        // Newline-separated, one entry per line — ready to save as a .txt file.
+        // Read ALL history from IndexedDB — unlimited, permanent log export.
         try {
-          const { persistedLog = [] } = await chrome.storage.local.get('persistedLog');
-          // De-dupe persistedLog itself first, then add unreached in-memory entries.
+          const dbEntries = await _readLogsFromDB(); // no since = all time
           const seen = new Set();
           const merged = [];
-          for (const e of persistedLog) {
+          for (const e of dbEntries) {
             const k = `${e.ts}:${e.source}:${e.message}`;
             if (!seen.has(k)) { seen.add(k); merged.push(e); }
           }
@@ -1983,6 +2057,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'CLEAR_EVENT_LOG':
         _eventLog.length = 0;
         try { await chrome.storage.local.remove('persistedLog'); } catch (_) {}
+        await _clearLogDB().catch(() => {});
         sendResponse({ ok: true });
         break;
       case 'GET_LIST_STATUS':

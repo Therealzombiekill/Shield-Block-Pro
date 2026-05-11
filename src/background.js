@@ -2236,7 +2236,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Full diagnostic snapshot: settings, stats, filter status, log, list status
         try {
           const [stored, filterStatus] = await Promise.all([
-            chrome.storage.local.get(['settings','whitelist','stats','lifetime','filterSyncedAt',
+            chrome.storage.local.get(['settings','whitelist','stats','lifetime','timeSaved','filterSyncedAt',
               'filterRuleCount','syncFailures','syncDuration','syncListStatus','dailyStats','persistedLog']),
             (async () => {
               const dynamic = await chrome.declarativeNetRequest.getDynamicRules();
@@ -2254,6 +2254,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               whitelist: stored.whitelist,
               stats: stored.stats,
               lifetime: stored.lifetime,
+              timeSaved: stored.timeSaved ?? 0,
               filterSyncedAt: stored.filterSyncedAt,
               filterRuleCount: stored.filterRuleCount,
               dynamicRuleCount: filterStatus.dynamicRuleCount,

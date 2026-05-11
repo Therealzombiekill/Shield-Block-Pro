@@ -2395,6 +2395,13 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
         removeRuleIds: [PAUSE_ALL_RULE_ID],
         addRules: [],
       });
+      // Notify content scripts so they resume DOM/video ad handling immediately
+      try {
+        const tabs = await chrome.tabs.query({ status: 'complete' });
+        for (const tab of tabs) {
+          chrome.tabs.sendMessage(tab.id, { type: 'GLOBAL_RESUME' }).catch(() => {});
+        }
+      } catch (_) {}
       logEvent('pause', 'info', 'Global pause expired — blocking resumed');
     } catch (e) {
       logEvent('pause', 'warn', `pauseAll alarm cleanup failed: ${e.message}`);

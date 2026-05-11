@@ -1827,11 +1827,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const warn = (name, detail) => checks.push({ name, status: 'warn', detail });
         const fail = (name, detail) => checks.push({ name, status: 'fail', detail });
 
+        // Fetch dynamic rules once — reused by checks 1, 6, 7 below
+        let _dynRules = [];
+        try { _dynRules = await chrome.declarativeNetRequest.getDynamicRules(); } catch (_) {}
+
         // 1. Dynamic filter rules loaded
         try {
-          const dyn = await chrome.declarativeNetRequest.getDynamicRules();
-          if (dyn.length > 1000) pass('Filter rules', `${dyn.length} dynamic rules active`);
-          else if (dyn.length > 0) warn('Filter rules', `Only ${dyn.length} dynamic rules — sync may be needed`);
+          if (_dynRules.length > 1000) pass('Filter rules', `${_dynRules.length} dynamic rules active`);
+          else if (_dynRules.length > 0) warn('Filter rules', `Only ${_dynRules.length} dynamic rules — sync may be needed`);
           else fail('Filter rules', 'No dynamic rules loaded — run Force Sync');
         } catch (e) { fail('Filter rules', e.message); }
 
@@ -1865,17 +1868,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         // 6. Removeparam rules active
         try {
-          const allRules = await chrome.declarativeNetRequest.getDynamicRules();
-          const rpRules  = allRules.filter(r => r.id >= REMOVEPARAM_BASE && r.id < MATRIX_BASE);
+          const rpRules = _dynRules.filter(r => r.id >= REMOVEPARAM_BASE && r.id < MATRIX_BASE);
           if (rpRules.length > 0) pass('$removeparam', `${rpRules.length} param-stripping rules active`);
           else warn('$removeparam', 'No removeparam rules — sync may be needed');
         } catch (e) { warn('$removeparam', e.message); }
 
         // 7. Privacy header rules
         try {
-          const allRules = await chrome.declarativeNetRequest.getDynamicRules();
-          const hasDNT   = allRules.some(r => r.id === DNT_GPC_RULE_ID);
-          const hasHTTPS = allRules.some(r => r.id === HTTPS_UPGRADE_ID);
+          const hasDNT   = _dynRules.some(r => r.id === DNT_GPC_RULE_ID);
+          const hasHTTPS = _dynRules.some(r => r.id === HTTPS_UPGRADE_ID);
           if (hasDNT && hasHTTPS) pass('Privacy rules', 'DNT/GPC headers + HTTPS upgrade active');
           else warn('Privacy rules', `DNT/GPC: ${hasDNT}, HTTPS upgrade: ${hasHTTPS}`);
         } catch (e) { warn('Privacy rules', e.message); }

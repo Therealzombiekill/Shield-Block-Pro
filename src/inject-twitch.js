@@ -24,7 +24,8 @@
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     if (e.data?.type === 'SB_TWITCH_DISABLE') _disabled = true;
-  }, { once: true });
+    if (e.data?.type === 'SB_TWITCH_ENABLE')  _disabled = false;
+  });
 
   function getCurrentChannel() {
     const m = location.pathname.match(/^\/([a-zA-Z0-9_]{1,25})\/?(?:\?|$|\/)/);

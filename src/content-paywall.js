@@ -163,11 +163,16 @@
 
   // Watch for dynamically injected paywalls
   let _pwDeb = null;
-  new MutationObserver((muts) => {
+  const _pwObserver = new MutationObserver((muts) => {
     if (muts.every(m => m.type === 'characterData')) return;
     clearTimeout(_pwDeb);
     _pwDeb = setTimeout(unlockContent, 400);
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  _pwObserver.observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('beforeunload', () => {
+    _pwObserver.disconnect();
+    clearTimeout(_pwDeb);
+  }, { once: true });
 
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'paywall', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}

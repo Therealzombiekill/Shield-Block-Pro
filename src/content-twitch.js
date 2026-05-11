@@ -31,6 +31,8 @@
     window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
     return;
   }
+  // Signal MAIN world that Twitch blocking is active (handles re-enable after toggle)
+  window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
 
   const _hostname = location.hostname.replace(/^www\./, '');
   if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;

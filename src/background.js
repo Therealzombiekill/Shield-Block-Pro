@@ -364,9 +364,17 @@ function _getLogDB() {
         store.createIndex('by_ts', 'ts', { unique: false });
       }
     };
-    req.onsuccess = e => { _logDB = e.target.result; resolve(_logDB); };
+    req.onsuccess = e => {
+      _logDB = e.target.result;
+      // Reset cache if the connection is closed unexpectedly (quota eviction,
+      // another tab calls deleteDatabase, version conflict) so the next write
+      // re-opens it instead of using a dead handle forever.
+      _logDB.addEventListener('close', () => { _logDB = null; });
+      _logDB.addEventListener('error', () => { _logDB = null; });
+      resolve(_logDB);
+    };
     req.onerror   = ()  => reject(req.error);
-    req.onblocked = ()  => reject(new Error('IDB blocked'));
+    req.onblocked = ()  => { _logDB = null; reject(new Error('IDB blocked')); };
   });
 }
 
@@ -375,8 +383,11 @@ function _writeLogToDB(entry) {
     .then(db => {
       const tx = db.transaction('events', 'readwrite');
       tx.objectStore('events').add(entry);
+      // Reset on transaction failure so the next write re-opens the connection
+      // instead of re-using a handle that is no longer valid.
+      tx.onerror = () => { _logDB = null; };
     })
-    .catch(() => {});
+    .catch(() => { _logDB = null; }); // allow reconnect on next write attempt
 }
 
 async function _readLogsFromDB(since = 0) {
@@ -470,6 +481,13 @@ let _retryQueue = []; // [{ list, limit, reason }]
 
 async function _retryFailedLists() {
   if (_retryQueue.length === 0) return;
+  // Don't run concurrently with a full sync — both update DNR rules and can
+  // collide. Reschedule for 2 minutes later when the sync will have finished.
+  if (_syncLock) {
+    logEvent('filter-sync', 'info', 'Retry deferred: full sync in progress, rescheduling in 2m');
+    try { await chrome.alarms.create('retrySync', { delayInMinutes: 2 }); } catch (_) {}
+    return;
+  }
   const toRetry = _retryQueue.splice(0);
   _startKeepAlive('_retryFailedLists');
   logEvent('filter-sync', 'info', `Retrying ${toRetry.length} failed list(s)`, { lists: toRetry.map(l => l.list.name) });
@@ -2310,8 +2328,8 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
 // ── Alarms ─────────────────────────────────────────────────────────────────
 
 chrome.alarms.onAlarm.addListener(async ({ name }) => {
-  if (name === 'filterSync') { syncFilterLists(false); return; }
-  if (name === 'retrySync') { await _retryFailedLists(); return; }
+  if (name === 'filterSync') { syncFilterLists(false).catch(e => logEvent('filter-sync', 'error', `Sync alarm error: ${e.message}`)); return; }
+  if (name === 'retrySync') { await _retryFailedLists().catch(e => logEvent('filter-sync', 'error', `Retry alarm error: ${e.message}`)); return; }
   if (name === 'safeBrowsingRefresh') { fetchSafeBrowsingLists().catch(() => {}); return; }
   if (name === 'pauseAll') {
     try {

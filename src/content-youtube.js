@@ -168,26 +168,42 @@
   // ── Main loop ─────────────────────────────────────────────────────────────────
   function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); }
 
-  setInterval(tick, 750);
+  const _tickInterval = setInterval(tick, 750);
   tick();
 
   // Fast path: click skip button the moment it appears in the DOM
-  new MutationObserver(() => {
+  const _skipObserver = new MutationObserver(() => {
     const skip = document.querySelector(
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
     if (skip) { skip.click(); _sbLog('info', 'Ad: MutationObserver skip button clicked'); }
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
 
   // Stat — count each ad encounter once
   let _wasAd = false;
-  setInterval(() => {
+  const _statInterval = setInterval(() => {
     const ad = isAdPlaying();
     if (ad && !_wasAd) {
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'youtube' }).catch(() => {});
     }
     _wasAd = ad;
   }, 1000);
+
+  // Cleanup — disconnect observers and clear intervals when YouTube SPA navigates
+  // away or the feature toggle is turned off (prevents memory/CPU accumulation).
+  function _cleanup() {
+    clearInterval(_tickInterval);
+    clearInterval(_statInterval);
+    _skipObserver.disconnect();
+  }
+  window.addEventListener('beforeunload', _cleanup, { once: true });
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.youtube === false) {
+      _cleanup();
+      window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    }
+  });
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'youtube', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
   console.warn('[SB:youtube] script error:', e?.message ?? e);

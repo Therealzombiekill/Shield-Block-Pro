@@ -440,6 +440,13 @@ const _intervals = [];
 async function boot() {
   _intervals.forEach(clearInterval);
   _intervals.length = 0;
+
+  // Populate version strings from manifest (avoid hardcoding)
+  const _ver = chrome.runtime.getManifest().version;
+  const _verStr = `v${_ver}`;
+  const fv = $('footer-ver');  if (fv) fv.textContent = `ShieldBlock ${_verStr}`;
+  const sv = $('support-ver'); if (sv) sv.textContent = _verStr;
+
   await Promise.all([loadSettings(), refreshStats(), refreshFilterStatus(), refreshWhitelist()]);
   $('app').classList.add('ready');
   _intervals.push(setInterval(refreshStats, 3000));
@@ -627,8 +634,8 @@ $('export-diagnostic')?.addEventListener('click', async () => {
 // ── Stats CSV export ───────────────────────────────────────────────────────────
 $('export-stats-csv')?.addEventListener('click', async () => {
   try {
-    const { dailyStats = {}, lifetime = {}, stats = {} } =
-      await chrome.storage.local.get(['dailyStats','lifetime','stats']);
+    const { dailyStats = {}, lifetime = {}, stats = {}, timeSaved = 0 } =
+      await chrome.storage.local.get(['dailyStats','lifetime','stats','timeSaved']);
 
     const rows = [
       ['ShieldBlock Pro — Stats Export', new Date().toLocaleDateString()],
@@ -639,8 +646,6 @@ $('export-stats-csv')?.addEventListener('click', async () => {
       [],
       ['=== SESSION BREAKDOWN ==='],
       ['Category',    'Count'],
-      ['Network',     stats.network  ?? 0],
-      ['DOM cosmetic',stats.dom      ?? 0],
       ['YouTube',     stats.youtube  ?? 0],
       ['Twitch',      stats.twitch   ?? 0],
       ['Spotify',     stats.spotify  ?? 0],
@@ -653,6 +658,7 @@ $('export-stats-csv')?.addEventListener('click', async () => {
       [],
       ['=== LIFETIME ==='],
       ['Lifetime total', lifetime.total ?? 0],
+      ['Time saved',  formatTimeSaved(timeSaved)],
     ];
 
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');

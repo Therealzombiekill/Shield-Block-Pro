@@ -48,10 +48,10 @@
           "desc": "Chinese ads and annoyances"
         },
         {
-          "name": "I don't care about cookies",
-          "url": "https://www.i-dont-care-about-cookies.eu/abp/",
+          "name": "Fanboy Cookie Monsterlist",
+          "url": "https://secure.fanboy.co.nz/fanboy-cookiemonster.txt",
           "langs": [],
-          "desc": "Cookie consent notices (alternative)"
+          "desc": "Cookie consent notices — actively maintained replacement for I-don't-care-about-cookies"
         },
         {
           "name": "Fanboy Annoyances",
@@ -80,7 +80,7 @@
         },
         {
           "name": "Legitimate Interests",
-          "url": "https://www.fanboy.co.nz/fanboy-leaddinglist.txt",
+          "url": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-others.txt",
           "langs": [],
           "desc": "Block 'legitimate interest' GDPR loophole trackers"
         },
@@ -123,7 +123,7 @@
         },
         {
           "name": "NoTrack Malware",
-          "url": "https://gitlab.com/quidsup/notrack-blocklists/raw/master/notrack-malware.txt",
+          "url": "https://gitlab.com/quidsup/notrack-blocklists/-/raw/master/notrack-malware.txt",
           "langs": [],
           "desc": "Malware and telemetry domains"
         },
@@ -148,9 +148,9 @@
         },
         {
           "name": "Anti-Adblock Killer",
-          "url": "https://raw.githubusercontent.com/reek/anti-adblock-killer/HEAD/anti-adblock-killer-filters.txt",
+          "url": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt",
           "langs": [],
-          "desc": "Fight anti-adblock scripts"
+          "desc": "Fight anti-adblock scripts (uBlock Origins badware list — actively maintained)"
         },
         {
           "name": "Web Annoyances Ultralist",

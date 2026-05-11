@@ -93,6 +93,26 @@
     '#hs-eu-cookie-confirmation', '#hs-eu-cookie-confirmation-inner',
     // Civic Cookie Control
     '#ccc', '#ccc-module', '.ccc-notify',
+    // Axeptio (France)
+    '#axeptio_overlay', '.axeptio_buttons_wrapper', '#axeptio-cookies',
+    '[class*="axeptio"]',
+    // Consentmanager.net
+    '#cmpbox', '#cmpbox2', '.cmpboxbtn', '#cmp-container',
+    '[class*="cmpbox"]',
+    // Piwik PRO
+    '#ppms_cm_popup_overlay', '.ppms-popup', '#ppms_cm_consent_popup_overlay',
+    // Ketch
+    '#ketch-consent', '.ketch-consent__banner', '[class*="ketch-"]',
+    // Metomic
+    '[data-testid="metomic-consent-manager"]', '.metomic-consent',
+    '[id*="metomic"]', '[class*="metomic"]',
+    // Siteimprove / Privacy Manager
+    '.privacy-manager-overlay', '#privacy-manager-modal',
+    // Cookieassistant (WP plugin)
+    '#cookieassistant-com', '.cookie-assistant-consent',
+    // WP Consent API / GDPR Cookie Compliance
+    '#gdpr-cookie-compliance-popup', '.moove-gdpr-info-bar',
+    '#moove_gdpr_cookie_modal',
     // Generic strong patterns
     '[id*="cookie-banner"]', '[id*="cookiebanner"]', '[id*="cookie-consent"]',
     '[class*="cookie-banner"]', '[class*="cookie-consent"]',
@@ -151,6 +171,20 @@
     '#ccc-reject-settings', '.ccc-notify-decline',
     // HubSpot
     '#hs-eu-decline-button',
+    // Axeptio
+    '.axeptio_btn_dismiss', '[class*="axeptio"][class*="decline"]',
+    '[class*="axeptio"][class*="refuse"]',
+    // Consentmanager.net
+    '.cmpboxbtnno', '[class*="cmpboxbtn"][class*="no"]',
+    '#cmpwelcomebtndisagree', '.cmptxt_btn_no',
+    // Piwik PRO
+    '#ppms_cm_reject-all', '[data-testid="ppms-cm-reject-all"]',
+    // Ketch
+    '[class*="ketch"][class*="decline"]', '[class*="ketch"][class*="reject"]',
+    // Metomic
+    '[data-testid="metomic-reject-all"]', '[class*="metomic"][class*="decline"]',
+    // Moove GDPR
+    '#moove_gdpr_decline_cookies',
   ];
 
   // ── Text patterns for reject buttons ──────────────────────────────────────

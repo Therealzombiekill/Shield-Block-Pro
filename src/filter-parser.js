@@ -75,8 +75,11 @@ function parseLine(line, idCounter) {
   }
 
   // ── Cosmetic / scriptlet filters (## separator) ────────────────────────────
-  if (line.includes('##') && !line.includes('$')) {
-    const idx = line.indexOf('##');
+  // Guard: only skip if '$' appears BEFORE '##' (network-rule option).
+  // A '$' after '##' is CSS syntax (e.g. [href$=".pdf"]) and is valid in selectors.
+  const _hmIdx = line.indexOf('##');
+  if (_hmIdx !== -1 && (line.indexOf('$') < 0 || line.indexOf('$') > _hmIdx)) {
+    const idx = _hmIdx;
 
     // Exception cosmetic (#@#) — skip
     if (line[idx + 1] === '@') return null;

@@ -1755,6 +1755,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if ('referrerStrip'   in msg.settings) applyReferrerRule(merged.referrerStrip !== false);
         if ('httpsUpgrade'    in msg.settings) applyHttpsUpgradeRule(merged.httpsUpgrade !== false);
         if ('privacyHeaders'  in msg.settings) applyPrivacyHeadersRule(merged.privacyHeaders !== false);
+        if ('badgeEnabled' in msg.settings) {
+          if (!merged.badgeEnabled) {
+            try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
+          } else {
+            try {
+              const { stats: _bs } = await chrome.storage.local.get('stats');
+              const _bt = _bs?.total ?? 0;
+              if (_bt > 0) {
+                chrome.action.setBadgeText({ text: formatBadge(_bt) });
+                chrome.action.setBadgeBackgroundColor({ color: '#7c6aff' });
+              }
+            } catch (_) {}
+          }
+        }
         sendResponse({ ok: true });
         break;
       }

@@ -1303,10 +1303,5 @@ $('ubo-import-btn')?.addEventListener('change', async (e) => {
 
 // ── Badge toggle ───────────────────────────────────────────────────────────────
 $('t-badge')?.addEventListener('change', async (e) => {
-  const enabled = e.target.checked;
-  await msg('SET_SETTINGS', { settings: { badgeEnabled: enabled } });
-  if (!enabled) {
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (tab?.id) chrome.action.setBadgeText({ text: '', tabId: tab.id });
-  }
+  await msg('SET_SETTINGS', { settings: { badgeEnabled: e.target.checked } });
 });

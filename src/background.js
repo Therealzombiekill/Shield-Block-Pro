@@ -143,9 +143,9 @@ const FILTER_LISTS = [
   { name: 'Anti-Adblock Killer',    url: 'https://raw.githubusercontent.com/reek/anti-adblock-killer/master/anti-adblock-killer-filters.txt',                           key: 'anti_adblock',  max:  100, start: 18400 },
   // Regional lists
   { name: 'EasyList Polish',          url: 'https://easylist-downloads.adblockplus.org/easylistpolish.txt',                                                                    key: 'easylist_pl',   max:   80, start: 19000 },
-  { name: 'EasyList Brazil',          url: 'https://easylist-downloads.adblockplus.org/easylistbrazilportuguese.txt',                                                          key: 'easylist_br',   max:   80, start: 19200 },
-  { name: 'EasyList Korean',          url: 'https://easylist-downloads.adblockplus.org/easylistkorean.txt',                                                                    key: 'easylist_kr',   max:   80, start: 19400 },
-  { name: 'EasyList Turkish',         url: 'https://easylist.to/easylistturkish/easylistturkish.txt',                                                                          key: 'easylist_tr',   max:   80, start: 19600 },
+  { name: 'EasyList Brazil',          url: 'https://raw.githubusercontent.com/easylist/easylistbrazil/master/easylistbrazilportuguese.txt',                                    key: 'easylist_br',   max:   80, start: 19200 },
+  { name: 'EasyList Korean',          url: 'https://raw.githubusercontent.com/yous/YousList/master/youslist.txt',                                                              key: 'easylist_kr',   max:   80, start: 19400 },
+  { name: 'EasyList Turkish',         url: 'https://raw.githubusercontent.com/baris-zan/Turkish-Ad-Hosts/main/hosts',                                                          key: 'easylist_tr',   max:   80, start: 19600 },
   { name: 'ChinaList',               url: 'https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjxlist.txt',                                                            key: 'chinalist',     max:   80, start: 19800 },
   // Anti-cryptomining
   { name: 'NoCoin',                   url: 'https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt',                                               key: 'nocoin',        max:   80, start: 19900 },
@@ -155,11 +155,11 @@ const FILTER_LISTS = [
   { name: 'EasyList Dutch',         url: 'https://easylist-downloads.adblockplus.org/easylistdutch.txt',             key: 'easylist_nl',  max:  30, start: 20040 },
   { name: 'AdGuard Japanese',       url: adGuardUrl(7),                                                                                                                  key: 'adguard_ja',   max:  30, start: 20070 },
   { name: 'Liste AR Arabic',        url: 'https://easylist-downloads.adblockplus.org/Liste_AR.txt',                  key: 'liste_ar',     max:  25, start: 20100 },
-  { name: 'Czech and Slovak',       url: 'https://easylist-downloads.adblockplus.org/easylistczechandslovak.txt',    key: 'easylist_cs',  max:  25, start: 20125 },
+  { name: 'Czech and Slovak',       url: 'https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt', key: 'easylist_cs',  max:  25, start: 20125 },
   { name: 'ABP Indonesian',         url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                   key: 'abp_id',       max:  25, start: 20150 },
-  { name: 'Hebrew List',            url: 'https://easylist-downloads.adblockplus.org/israelilist.txt',               key: 'hebrew_il',    max:  25, start: 20175 },
+  { name: 'Hebrew List',            url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt', key: 'hebrew_il',    max:  25, start: 20175 },
   { name: 'ABPVN Vietnamese',       url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',    key: 'abp_vn',       max:  25, start: 20200 },
-  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20(Minified).txt', key: 'nordic', max: 25, start: 20225 },
+  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Dandelion%20Sprout%27s%20Nordic%20Filters.txt', key: 'nordic', max: 25, start: 20225 },
 ];
 
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
@@ -339,10 +339,10 @@ async function _persistLog() {
   if (_logDirty === 0) return;
   _logDirty = 0;
   try {
-    const { persistedLog = [] } = await chrome.storage.local.get('persistedLog');
-    // Merge in-memory log with stored, keep newest PERSIST_LOG_MAX entries
-    const merged = [...persistedLog, ..._eventLog].slice(-PERSIST_LOG_MAX);
-    await chrome.storage.local.set({ persistedLog: merged });
+    // _eventLog is already pre-seeded from storage at startup via _restoreLog().
+    // Do NOT re-read persistedLog here — merging storage + _eventLog duplicates every
+    // entry that existed before this flush (they appear in both sources).
+    await chrome.storage.local.set({ persistedLog: _eventLog.slice(-PERSIST_LOG_MAX) });
   } catch (_) {}
 }
 
@@ -1919,9 +1919,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Full persistent log — survives service worker restarts
         try {
           const { persistedLog = [] } = await chrome.storage.local.get('persistedLog');
-          // Merge with current in-memory log (dedup by ts+source)
-          const seen = new Set(persistedLog.map(e => `${e.ts}:${e.source}:${e.message}`));
-          const merged = [...persistedLog];
+          // De-dupe persistedLog itself (may contain duplicates from older SW versions),
+          // then add any in-memory entries not yet flushed.
+          const seen = new Set();
+          const merged = [];
+          for (const e of persistedLog) {
+            const k = `${e.ts}:${e.source}:${e.message}`;
+            if (!seen.has(k)) { seen.add(k); merged.push(e); }
+          }
           for (const e of _eventLog) {
             const k = `${e.ts}:${e.source}:${e.message}`;
             if (!seen.has(k)) { seen.add(k); merged.push(e); }
@@ -1936,8 +1941,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Newline-separated, one entry per line — ready to save as a .txt file.
         try {
           const { persistedLog = [] } = await chrome.storage.local.get('persistedLog');
-          const seen = new Set(persistedLog.map(e => `${e.ts}:${e.source}:${e.message}`));
-          const merged = [...persistedLog];
+          // De-dupe persistedLog itself first, then add unreached in-memory entries.
+          const seen = new Set();
+          const merged = [];
+          for (const e of persistedLog) {
+            const k = `${e.ts}:${e.source}:${e.message}`;
+            if (!seen.has(k)) { seen.add(k); merged.push(e); }
+          }
           for (const e of _eventLog) {
             const k = `${e.ts}:${e.source}:${e.message}`;
             if (!seen.has(k)) { seen.add(k); merged.push(e); }

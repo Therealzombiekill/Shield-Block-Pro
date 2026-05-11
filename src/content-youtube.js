@@ -60,8 +60,10 @@
   // ── Skip / mute ───────────────────────────────────────────────────────────────
   let _muted = false;
   let _origVol = null;
+  let _globalPaused = false;
 
   function handleAd() {
+    if (_globalPaused) return;
     if (!isAdPlaying()) {
       // Restore volume if we muted for an ad
       if (_muted) {
@@ -173,6 +175,7 @@
 
   // Fast path: click skip button the moment it appears in the DOM
   const _skipObserver = new MutationObserver(() => {
+    if (_globalPaused) return;
     const skip = document.querySelector(
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
@@ -206,14 +209,14 @@
   });
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'GLOBAL_PAUSE') {
-      // Restore audio if we had muted for an ad
+      _globalPaused = true;
       if (_muted) {
         const vid = document.querySelector('video');
         if (vid && _origVol !== null) { vid.muted = false; vid.volume = _origVol; }
         _muted = false; _origVol = null;
       }
     }
-    if (msg.type === 'GLOBAL_RESUME') { tick(); }
+    if (msg.type === 'GLOBAL_RESUME') { _globalPaused = false; tick(); }
   });
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'youtube', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}

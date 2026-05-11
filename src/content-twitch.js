@@ -41,11 +41,12 @@
 
   _sbLog('info', `Init — ${_hostname}`);
 
-  let adActive     = false;
-  let wasMuted     = false;
-  let adStartTime  = 0;
-  let toast        = null;
-  let toastTimeout = null;
+  let adActive      = false;
+  let wasMuted      = false;
+  let adStartTime   = 0;
+  let toast         = null;
+  let toastTimeout  = null;
+  let _globalPaused = false;
 
   // ── Small corner toast ────────────────────────────────────────────────────────
   function showToast() {
@@ -176,6 +177,7 @@
 
   // ── Main tick ─────────────────────────────────────────────────────────────────
   function domTick() {
+    if (_globalPaused) return;
     const hasAd = detectAdByDOM();
     removeAdUI();
 
@@ -261,14 +263,20 @@
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'GLOBAL_PAUSE') {
+      _globalPaused = true;
       adActive = false;
       unmuteVideo();
       hideToast();
     }
     if (msg.type === 'GLOBAL_RESUME') {
+      _globalPaused = false;
       domTick();
     }
   });
+
+  window.addEventListener('beforeunload', () => {
+    observer.disconnect(); clearInterval(interval); clearTimeout(debounce);
+  }, { once: true });
 
   domTick();
 })().catch(e => {

@@ -448,10 +448,17 @@ async function boot() {
   const sv = $('support-ver'); if (sv) sv.textContent = _verStr;
 
   await Promise.all([loadSettings(), refreshStats(), refreshFilterStatus(), refreshWhitelist()]);
+  checkGlobalPause();
+  checkPauseStatus();
+  drawSparkline();
+  refreshTopDomains();
+  refreshPageLog();
+  refreshMatrix();
   $('app').classList.add('ready');
   _intervals.push(setInterval(refreshStats, 3000));
   _intervals.push(setInterval(refreshFilterStatus, 8000));
   _intervals.push(setInterval(checkGlobalPause, 10000));
+  _intervals.push(setInterval(checkPauseStatus, 10000));
 
   // Check for updates (silently, non-blocking)
   setTimeout(async () => {

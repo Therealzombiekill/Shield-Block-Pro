@@ -2302,6 +2302,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           await chrome.storage.local.set(safe);
           invalidateSettingsCache(); // settings may have changed
+          if (safe.settings) {
+            const s = safe.settings;
+            if ('referrerStrip'  in s) applyReferrerRule(s.referrerStrip !== false);
+            if ('httpsUpgrade'   in s) applyHttpsUpgradeRule(s.httpsUpgrade !== false);
+            if ('privacyHeaders' in s) applyPrivacyHeadersRule(s.privacyHeaders !== false);
+          }
         }
         sendResponse({ ok: true });
         break;
@@ -2353,6 +2359,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           await chrome.storage.local.set(synced);
           invalidateSettingsCache();
+          if (synced.settings) {
+            const s = synced.settings;
+            if ('referrerStrip'  in s) applyReferrerRule(s.referrerStrip !== false);
+            if ('httpsUpgrade'   in s) applyHttpsUpgradeRule(s.httpsUpgrade !== false);
+            if ('privacyHeaders' in s) applyPrivacyHeadersRule(s.privacyHeaders !== false);
+          }
           logEvent('cloud', 'info', `Restored from sync: ${Object.keys(synced).join(', ')}`);
           sendResponse({ ok: true, keys: Object.keys(synced) });
         } catch (e) { sendResponse({ ok: false, error: e.message }); }

@@ -173,6 +173,17 @@
     },
     {
       "matches": [
+        "*://www.hulu.com/*",
+        "*://hulu.com/*"
+      ],
+      "js": [
+        "src/browser-compat.js",
+        "src/content-hulu.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
         "*://www.youtube.com/*",
         "*://youtube.com/*",
         "*://music.youtube.com/*"

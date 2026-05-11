@@ -86,9 +86,16 @@
     if (history.length > 1) {
       history.back();
     } else {
-      // New tab or no history — go to browser new-tab page
-      location.href = 'chrome://newtab'; // Chrome
-      setTimeout(() => { location.href = 'about:newtab'; }, 50); // Firefox fallback
+      // location.href = 'chrome://' is blocked by browsers — use the tabs API instead.
+      // blocked.html is an extension page so chrome.tabs is available.
+      try {
+        const api = (typeof browser !== 'undefined' && browser.tabs) ? browser.tabs : chrome.tabs;
+        const newTab = (typeof browser !== 'undefined') ? 'about:newtab' : 'chrome://newtab';
+        api.getCurrent(function (tab) {
+          if (tab && tab.id != null) api.update(tab.id, { url: newTab });
+          else window.close();
+        });
+      } catch (_) { window.close(); }
     }
   });
 

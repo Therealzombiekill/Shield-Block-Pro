@@ -26,6 +26,43 @@
     if (e.data?.type === 'SB_TWITCH_ENABLE')  _disabled = false;
   });
 
+  // ── Fake IMA SDK stub ─────────────────────────────────────────────────────────
+  // Twitch checks window.google.ima after loading imasdk.googleapis.com.
+  // Returning an empty 200 leaves google.ima undefined, which Twitch detects
+  // and shows an "ad blocker" warning that blocks the stream.
+  // This stub satisfies the detection without serving any real ads.
+  const _IMA_STUB = `(function(){
+    if(window.google&&window.google.ima)return;
+    function n(){}
+    window.google=window.google||{};
+    window.google.ima={
+      AdDisplayContainer:function(c,v){this.initialize=n;this.destroy=n;},
+      AdsLoader:function(c){
+        this.settings={setVpaidMode:n,setLocale:n,setNumRedirects:n,setPlayerType:n,setPlayerVersion:n};
+        this.addEventListener=n;this.removeEventListener=n;
+        this.requestAds=n;this.destroy=n;this.contentComplete=n;
+      },
+      AdsRequest:function(){this.setAdWillAutoPlay=n;this.setAdWillPlayMuted=n;},
+      AdsRenderingSettings:function(){},
+      AdsManagerLoadedEvent:{Type:{ADS_MANAGER_LOADED:'adsManagerLoaded'}},
+      AdErrorEvent:{Type:{AD_ERROR:'adError'}},
+      AdEvent:{Type:{
+        ALL_ADS_COMPLETED:'allAdsCompleted',CLICK:'click',COMPLETE:'complete',
+        CONTENT_PAUSE_REQUESTED:'contentPauseRequested',
+        CONTENT_RESUME_REQUESTED:'contentResumeRequested',
+        DURATION_CHANGE:'durationChange',FIRST_QUARTILE:'firstQuartile',
+        IMPRESSION:'impression',LOADED:'loaded',MIDPOINT:'midpoint',
+        PAUSED:'pause',RESUMED:'resume',SKIPPABLE_STATE_CHANGED:'skippableStateChanged',
+        SKIPPED:'skip',STARTED:'start',THIRD_QUARTILE:'thirdQuartile',
+        USER_CLOSE:'userClose',VOLUME_CHANGED:'volumeChange',VOLUME_MUTED:'mute'
+      }},
+      settings:{setVpaidMode:n,setLocale:n,setNumRedirects:n,setPlayerType:n,setPlayerVersion:n},
+      UiElements:{AD_ATTRIBUTION:'adAttribution',COUNTDOWN:'countdown'},
+      ViewMode:{FULLSCREEN:'fullscreen',NORMAL:'normal'},
+      VERSION:'3.517.2'
+    };
+  })();`;
+
   // ── Main-thread fetch hook ────────────────────────────────────────────────────
   const _fetch = window.fetch;
   window.fetch = async function (resource, init) {
@@ -34,14 +71,15 @@
     const url = (typeof resource === 'string' ? resource : resource?.url) ?? '';
 
     // 1. Patch PlaybackAccessToken playerType site → embed to reduce pre-rolls.
-    //    'embed' player type skips many server-side ad insertions.
+    //    Falls back to the original (site) request if Twitch rejects embed —
+    //    this ensures streams always load even if Twitch patches the embed trick.
     if (url.includes('gql.twitch.tv') && init?.body) {
       try {
         const raw  = typeof init.body === 'string' ? init.body : null;
         if (raw) {
-          const arr     = JSON.parse(raw);
-          const items   = Array.isArray(arr) ? arr : [arr];
-          let changed   = false;
+          const arr   = JSON.parse(raw);
+          const items = Array.isArray(arr) ? arr : [arr];
+          let changed = false;
           for (const q of items) {
             if (
               (q.operationName === 'PlaybackAccessToken' ||
@@ -53,21 +91,47 @@
             }
           }
           if (changed) {
-            return _fetch.call(this, resource, {
+            const patchedInit = {
               ...init,
               body: JSON.stringify(Array.isArray(arr) ? items : items[0]),
-            });
+            };
+            try {
+              const resp = await _fetch.call(this, resource, patchedInit);
+              if (resp.ok) {
+                try {
+                  const clone = resp.clone();
+                  const data  = await clone.json();
+                  const isArr = Array.isArray(data);
+                  const hasErr = isArr
+                    ? data.some(d => d.errors?.length > 0)
+                    : (data.errors?.length > 0);
+                  if (!hasErr) return resp;
+                } catch (_) {
+                  return resp; // can't parse JSON — assume success
+                }
+              }
+            } catch (_) {}
+            // embed was rejected or errored — fall through to unpatched request
+            return _fetch.call(this, resource, init);
           }
         }
       } catch (_) {}
     }
 
-    // 2. Block obvious ad-tracking / ad-serving endpoints.
+    // 2. Return fake IMA SDK stub — prevents Twitch's anti-adblock detection
+    //    from firing when google.ima is accessed after script load.
+    if (url.includes('imasdk.googleapis.com')) {
+      return new Response(_IMA_STUB, {
+        status: 200,
+        headers: { 'Content-Type': 'text/javascript' },
+      });
+    }
+
+    // 3. Block obvious ad-tracking / ad-serving endpoints.
     //    Note: client-event.twitch.tv is intentionally NOT blocked — Twitch
     //    uses it for session heartbeats that gate stream playback.
     const BLOCK = [
       'twitchadvertising.tv',
-      'imasdk.googleapis.com',
       'tv.freewheel.tv',
       'securepubads.g.doubleclick.net',
       'stats.g.doubleclick.net',
@@ -75,6 +139,8 @@
       'tag.targeting.unrulymedia.com',
       'beacon.krxd.net',
       'audience-media.twitch.tv',
+      'ad.doubleclick.net',
+      'twitchsvc.net',
     ];
     if (BLOCK.some(h => url.includes(h))) {
       return new Response('', { status: 200 });

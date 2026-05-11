@@ -123,6 +123,13 @@
     'div[class*="ad-choice"]',
     '[data-test-selector="ChannelRecommendationCard"]',
     'article[data-a-target*="promoted"]',
+    // Anti-adblock detection banners
+    '[data-test-selector="adblock-warning"]',
+    '[data-a-target="adblock-overlay"]',
+    '[class*="VideoAdblockNotice"]',
+    '[class*="adblock-notification"]',
+    '[class*="AdblockNotice"]',
+    '[class*="SunsetCommunicationBanner"]',
   ];
 
   function removeAdUI() {
@@ -141,6 +148,19 @@
     'Thanks for watching this ad',
     'Publicité en cours', 'Pause publicitaire',
     'Anuncio', 'Werbung',
+    'Reklam oynatılıyor', 'Реклама',
+    'Preparing Ad', 'Loading Ad',
+  ];
+
+  const AD_SELECTORS = [
+    '[data-test-selector="ad-banner-default-wrapper"]',
+    '[data-a-target="video-ad-label"]',
+    '[data-a-target="player-overlay-ad-badge"]',
+    '[data-a-target="ad-card-component"]',
+    '[class*="PlayerAdBanner"]',
+    '[class*="VideoPlayerAdSkin"]',
+    '[class*="ad-countdown"]',
+    '[data-test-selector="ad-overlay"]',
   ];
 
   function detectAdByDOM() {
@@ -150,8 +170,7 @@
     if (!player) return false;
     const text = player.textContent || '';
     if (AD_TEXT.some(t => text.includes(t))) return true;
-    if (player.querySelector('[data-test-selector="ad-banner-default-wrapper"]')) return true;
-    if (player.querySelector('[data-a-target="video-ad-label"]')) return true;
+    if (AD_SELECTORS.some(sel => { try { return !!player.querySelector(sel); } catch(_) { return false; } })) return true;
     return false;
   }
 

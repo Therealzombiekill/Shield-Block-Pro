@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
   "version": "2.10.1",
-  "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Amazon, Spotify, and everywhere else. Privacy protection, safe browsing, and fingerprint resistance built in.",
+  "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
     "declarativeNetRequest",
@@ -14,26 +14,11 @@
     "contextMenus"
   ],
   "host_permissions": [
-    "*://*.amazon.com/*",
-    "*://*.amazon.co.uk/*",
-    "*://*.amazon.de/*",
-    "*://*.amazon.ca/*",
-    "*://*.amazon.com.au/*",
-    "*://easylist.to/*",
-    "*://*.github.io/*",
-    "<all_urls>",
-    "*://*.amazon.co.jp/*",
-    "*://*.amazon.in/*",
-    "*://*.amazon.fr/*",
-    "*://*.amazon.es/*",
-    "*://*.amazon.it/*",
-    "*://*.amazon.com.mx/*",
-    "*://*.amazon.com.br/*",
-    "*://*.amazon.nl/*",
-    "*://*.amazon.pl/*",
-    "*://*.amazon.se/*",
-    "*://*.amazon.sg/*"
+    "<all_urls>"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "background": {
     "service_worker": "src/background.js",
     "type": "module"

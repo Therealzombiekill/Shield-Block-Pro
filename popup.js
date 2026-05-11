@@ -1208,6 +1208,18 @@ $('pause-btn')?.addEventListener('click', async () => {
 
 // ── Cloud sync ─────────────────────────────────────────────────────────────────
 
+$('cloud-push-btn')?.addEventListener('click', async () => {
+  const s = $('cloud-status');
+  if (s) s.textContent = 'Pushing…';
+  const r = await msg('PUSH_TO_CLOUD');
+  if (r?.ok) {
+    if (s) s.textContent = `✓ Pushed: ${r.keys?.join(', ')}`;
+  } else {
+    if (s) s.textContent = '✗ ' + (r?.error || 'Push failed');
+  }
+  setTimeout(() => { if (s) s.textContent = ''; }, 3000);
+});
+
 $('cloud-restore-btn')?.addEventListener('click', async () => {
   const s = $('cloud-status');
   if (s) s.textContent = 'Restoring…';
@@ -1216,7 +1228,7 @@ $('cloud-restore-btn')?.addEventListener('click', async () => {
     if (s) s.textContent = `✓ Restored: ${r.keys?.join(', ')}`;
     await loadSettings();
   } else {
-    if (s) s.textContent = '✗ ' + (r?.error || 'Nothing saved');
+    if (s) s.textContent = '✗ ' + (r?.error || 'No cloud data found');
   }
   setTimeout(() => { if (s) s.textContent = ''; }, 3000);
 });

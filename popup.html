@@ -673,7 +673,8 @@ textarea:focus{border-color:var(--accent)!important}
         <div style="font-family:var(--mono);font-size:9px;color:var(--accent2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Cloud Sync</div>
         <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Sync settings &amp; whitelist across your Chrome devices</p>
         <div style="display:flex;gap:6px">
-          <button class="ghost" id="cloud-restore-btn" style="flex:1;text-align:center;border:1px solid var(--border2)">↓ Pull</button>
+          <button class="ghost" id="cloud-push-btn" style="flex:1;text-align:center;border:1px solid var(--border2)" title="Save current settings &amp; whitelist to Chrome sync storage">↑ Push</button>
+          <button class="ghost" id="cloud-restore-btn" style="flex:1;text-align:center;border:1px solid var(--border2)" title="Restore settings &amp; whitelist from Chrome sync storage">↓ Pull</button>
         </div>
         <div id="cloud-status" style="font-family:var(--mono);font-size:9px;color:var(--green);margin-top:5px;min-height:12px"></div>
       </div>

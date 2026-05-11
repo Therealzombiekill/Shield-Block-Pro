@@ -2315,6 +2315,39 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
       }
+      case 'PUSH_TO_CLOUD': {
+        try {
+          const local = await chrome.storage.local.get(['settings','whitelist','userFilterText','customFilterLists']);
+          const payload = {};
+          if (local.settings)           payload.settings           = local.settings;
+          if (local.whitelist?.length)  payload.whitelist          = local.whitelist;
+          if (local.userFilterText)     payload.userFilterText     = local.userFilterText;
+          if (local.customFilterLists?.length) payload.customFilterLists = local.customFilterLists;
+          if (!Object.keys(payload).length) { sendResponse({ ok: false, error: 'Nothing to push' }); break; }
+          await chrome.storage.sync.set(payload);
+          logEvent('cloud', 'info', `Pushed to sync: ${Object.keys(payload).join(', ')}`);
+          sendResponse({ ok: true, keys: Object.keys(payload) });
+        } catch (e) { sendResponse({ ok: false, error: e.message }); }
+        break;
+      }
+      case 'RESTORE_FROM_CLOUD': {
+        try {
+          const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
+          if (!Object.keys(synced).length) { sendResponse({ ok: false, error: 'No cloud data found' }); break; }
+          if (synced.settings && typeof synced.settings === 'object') {
+            const validated = {};
+            for (const [k, v] of Object.entries(synced.settings)) {
+              if (k in DEFAULT_SETTINGS && typeof v === typeof DEFAULT_SETTINGS[k]) validated[k] = v;
+            }
+            synced.settings = validated;
+          }
+          await chrome.storage.local.set(synced);
+          invalidateSettingsCache();
+          logEvent('cloud', 'info', `Restored from sync: ${Object.keys(synced).join(', ')}`);
+          sendResponse({ ok: true, keys: Object.keys(synced) });
+        } catch (e) { sendResponse({ ok: false, error: e.message }); }
+        break;
+      }
       default: sendResponse({ error: 'Unknown message' });
     }
   })();

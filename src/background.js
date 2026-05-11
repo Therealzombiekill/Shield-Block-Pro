@@ -2269,7 +2269,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'EXPORT_SETTINGS': {
         const exported = await chrome.storage.local.get([
-          'settings','whitelist','customHideRules','userFilterText','stats','lifetime','customFilterLists'
+          'settings','whitelist','customHideRules','userFilterText','stats','lifetime','timeSaved','dailyStats','customFilterLists'
         ]);
         sendResponse({ ok: true, data: exported });
         break;
@@ -2277,7 +2277,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'IMPORT_SETTINGS': {
         const { data } = msg;
         if (data && typeof data === 'object') {
-          const allowed = ['settings','whitelist','customHideRules','userFilterText','customFilterLists'];
+          const allowed = ['settings','whitelist','customHideRules','userFilterText','customFilterLists','timeSaved','dailyStats'];
           const safe = {};
           for (const k of allowed) {
             if (!(k in data)) continue;
@@ -2291,6 +2291,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 }
               }
               safe[k] = validated;
+            } else if (k === 'timeSaved') {
+              if (typeof data[k] === 'number' && isFinite(data[k])) safe[k] = data[k];
+            } else if (k === 'dailyStats') {
+              if (typeof data[k] === 'object' && !Array.isArray(data[k])) safe[k] = data[k];
             } else {
               safe[k] = data[k];
             }

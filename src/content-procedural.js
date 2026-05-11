@@ -152,14 +152,22 @@
     procedural.forEach(applyProcedural);
   }
 
+  let _procObs = null;
   if (procedural.length > 0) {
     runProcedural();
     let _deb = null;
-    new MutationObserver((muts) => {
+    _procObs = new MutationObserver((muts) => {
       if (muts.every(m => m.type === 'characterData')) return;
       clearTimeout(_deb); _deb = setTimeout(runProcedural, 500);
-    }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+    });
+    _procObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
   }
+
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.cosmetic === false) {
+      _procObs?.disconnect();
+    }
+  });
 
   // ── Element Picker ────────────────────────────────────────────────────────
   let _pickerActive = false;

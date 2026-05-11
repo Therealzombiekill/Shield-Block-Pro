@@ -451,6 +451,7 @@ async function boot() {
   $('app').classList.add('ready');
   _intervals.push(setInterval(refreshStats, 3000));
   _intervals.push(setInterval(refreshFilterStatus, 8000));
+  _intervals.push(setInterval(checkGlobalPause, 10000));
 
   // Check for updates (silently, non-blocking)
   setTimeout(async () => {

@@ -5,8 +5,6 @@ You're protected.
 Ads blocked. Privacy secured.
 ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
 
-Youtube is Blocked Right now Please disable to FIX working on fixing it right now
-
 🛡
 22 Filter Lists
 EasyList, uBlock Filters, AdGuard, regional lists, and more — updated automatically every 12 hours

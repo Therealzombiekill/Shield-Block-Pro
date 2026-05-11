@@ -2560,13 +2560,16 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   const { stats, settings: existingSettings } = await chrome.storage.local.get(['stats','settings']);
 
   if (!stats) {
-    // Fresh install — write all defaults
-    await chrome.storage.local.set({
+    // Fresh install — write defaults only for keys not already set by cloud restore above
+    const freshDefaults = {
       stats:    { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 },
       lifetime: { total:0 },
-      whitelist: [],
-      settings: DEFAULT_SETTINGS,
-    });
+    };
+    if (!existingSettings) freshDefaults.settings  = DEFAULT_SETTINGS;
+    // Only blank the whitelist if cloud restore didn't provide one
+    const { whitelist: _cwl } = await chrome.storage.local.get('whitelist');
+    if (!_cwl || !_cwl.length) freshDefaults.whitelist = [];
+    await chrome.storage.local.set(freshDefaults);
   } else if (reason === 'update' && existingSettings) {
     // Extension update — merge new default keys into existing settings so new
     // toggles are available to existing users without resetting their preferences

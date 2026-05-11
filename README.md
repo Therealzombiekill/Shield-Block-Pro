@@ -1,4 +1,76 @@
-ShieldBlock Pro
+SHIELDBLOCK PRO
+v2.9.0 · Free forever
+ACTIVE & BLOCKING
+You're protected.
+Ads blocked. Privacy secured.
+ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
+
+Youtube is Blocked Right now Please disable to FIX working on fixing it right now
+
+🛡
+22 Filter Lists
+EasyList, uBlock Filters, AdGuard, regional lists, and more — updated automatically every 12 hours
+🍪
+Cookie Auto-Reject
+60+ consent management platforms handled automatically — banners rejected, not just hidden
+👁
+Anti-Fingerprinting
+Canvas, WebGL, AudioContext, Battery API, and Screen all spoofed to prevent tracking
+📱
+Social Media
+Sponsored posts removed from Facebook, Instagram, Reddit, X, LinkedIn, and TikTok in 30+ languages
+🔗
+URL Cleaning
+80+ tracking parameters stripped from every URL — fbclid, utm_*, ttclid, gclid, and more
+⚡
+Scriptlet Injection
+38 anti-adblock bypass scripts defuse detection on sites that fight back
+Keyboard shortcuts
+Open ShieldBlock
+Alt + Shift + S
+TogSHIELDBLOCK PRO
+v2.9.0 · Free forever
+ACTIVE & BLOCKING
+You're protected.
+Ads blocked. Privacy secured.
+ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
+
+Youtube is Blocked Right now Please disable to FIX working on fixing it right now
+
+🛡
+22 Filter Lists
+EasyList, uBlock Filters, AdGuard, regional lists, and more — updated automatically every 12 hours
+🍪
+Cookie Auto-Reject
+60+ consent management platforms handled automatically — banners rejected, not just hidden
+👁
+Anti-Fingerprinting
+Canvas, WebGL, AudioContext, Battery API, and Screen all spoofed to prevent tracking
+📱
+Social Media
+Sponsored posts removed from Facebook, Instagram, Reddit, X, LinkedIn, and TikTok in 30+ languages
+🔗
+URL Cleaning
+80+ tracking parameters stripped from every URL — fbclid, utm_*, ttclid, gclid, and more
+⚡
+Scriptlet Injection
+38 anti-adblock bypass scripts defuse detection on sites that fight back
+Keyboard shortcuts
+Open ShieldBlock
+Alt + Shift + S
+Toggle blocking on current site
+Alt + Shift + B
+Activate element picker
+Alt + Shift + P
+Start browsing →
+Settings
+Found a missed ad? Right-click it → ShieldBlock: Hide this elementgle blocking on current site
+Alt + Shift + B
+Activate element picker
+Alt + Shift + P
+Start browsing →
+Settings
+Found a missed ad? Right-click it → ShieldBlock: Hide this elementShieldBlock Pro
 Privacy Policy
 Last updated: May 11, 2026  ·  Effective immediately
 

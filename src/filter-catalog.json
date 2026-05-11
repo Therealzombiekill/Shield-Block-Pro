@@ -73,14 +73,14 @@
       "color": "#a78bfa",
       "lists": [
         {
-          "name": "DuckDuckGo Tracker Radar",
-          "url": "https://raw.githubusercontent.com/nicehash/NiceHashQuickMiner/HEAD/duckduckgo-privacy-essentials.txt",
+          "name": "OISD Blocklist",
+          "url": "https://abp.oisd.nl/",
           "langs": [],
-          "desc": "DuckDuckGo's tracker block list"
+          "desc": "Comprehensive ads, tracking & malware domains (ABP format)"
         },
         {
           "name": "Legitimate Interests",
-          "url": "https://easylist-downloads.adblockplus.org/fanboy-leaddinglist.txt",
+          "url": "https://www.fanboy.co.nz/fanboy-leaddinglist.txt",
           "langs": [],
           "desc": "Block 'legitimate interest' GDPR loophole trackers"
         },
@@ -92,7 +92,7 @@
         },
         {
           "name": "1Hosts (Lite)",
-          "url": "https://o0.pages.dev/Lite/adblock.txt",
+          "url": "https://raw.githubusercontent.com/badmojr/1Hosts/master/Lite/adblock.txt",
           "langs": [],
           "desc": "Lightweight DNS-style privacy list"
         },
@@ -110,10 +110,10 @@
       "color": "#f59e0b",
       "lists": [
         {
-          "name": "Malware Domain List",
-          "url": "https://www.malwaredomainlist.com/hostslist/hosts.txt",
+          "name": "Malware Filter",
+          "url": "https://raw.githubusercontent.com/curbengh/malware-filter/master/malware-filter-hosts.txt",
           "langs": [],
-          "desc": "Known malware distribution domains"
+          "desc": "Known malware distribution domains (actively maintained)"
         },
         {
           "name": "Phishing Army",
@@ -222,7 +222,7 @@
         },
         {
           "name": "ABPVN (Vietnamese)",
-          "url": "https://raw.githubusercontent.com/abpvn/abpvn/HEAD/filter/src/abpvn.txt",
+          "url": "https://raw.githubusercontent.com/abpvn/abpvn/HEAD/filter/abpvn.txt",
           "langs": [
             "vi"
           ],

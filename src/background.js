@@ -185,6 +185,7 @@ const DEFAULT_SETTINGS = {
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
   spotify: true,
+  hulu: true,
   youtube: true,
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking

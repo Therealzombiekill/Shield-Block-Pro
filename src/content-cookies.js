@@ -454,4 +454,13 @@
     }
   });
 
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'GLOBAL_PAUSE') { observer.disconnect(); clearTimeout(_debounce); }
+    if (msg.type === 'GLOBAL_RESUME') { observer.observe(document.documentElement, { childList: true, subtree: true }); handleBanners(); }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    observer.disconnect(); clearTimeout(_debounce);
+  }, { once: true });
+
 })().catch(e => console.warn('[SB:cookies] script error:', e?.message ?? e));

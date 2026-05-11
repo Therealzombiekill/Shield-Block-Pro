@@ -183,9 +183,18 @@ _qs.textContent = `
     if (changes.settings?.newValue?.amazon === false) {
       observer.disconnect();
       clearTimeout(debounce);
-      document.getElementById('_sb_amazon_css')?.remove(); // also remove injected CSS
+      document.getElementById('_sb_amazon_css')?.remove();
     }
   });
+
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'GLOBAL_PAUSE') { observer.disconnect(); clearTimeout(debounce); }
+    if (msg.type === 'GLOBAL_RESUME') { observer.observe(document.documentElement, { childList: true, subtree: true }); clean(); }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    observer.disconnect(); clearTimeout(debounce);
+  }, { once: true });
 
   clean();
   window.addEventListener('load', clean);

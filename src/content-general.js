@@ -286,4 +286,8 @@
     }
   });
 
+  window.addEventListener('beforeunload', () => {
+    _observer.disconnect(); clearTimeout(_debounce);
+  }, { once: true });
+
 })().catch(e => console.warn('[SB:general] script error:', e?.message ?? e));

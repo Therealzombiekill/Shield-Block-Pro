@@ -153,21 +153,25 @@
   }
 
   let _procObs = null;
+  let _procDeb = null;
   if (procedural.length > 0) {
     runProcedural();
-    let _deb = null;
     _procObs = new MutationObserver((muts) => {
       if (muts.every(m => m.type === 'characterData')) return;
-      clearTimeout(_deb); _deb = setTimeout(runProcedural, 500);
+      clearTimeout(_procDeb); _procDeb = setTimeout(runProcedural, 500);
     });
     _procObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
   }
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.cosmetic === false) {
-      _procObs?.disconnect();
+      _procObs?.disconnect(); clearTimeout(_procDeb);
     }
   });
+
+  window.addEventListener('beforeunload', () => {
+    _procObs?.disconnect(); clearTimeout(_procDeb);
+  }, { once: true });
 
   // ── Element Picker ────────────────────────────────────────────────────────
   let _pickerActive = false;
@@ -346,6 +350,11 @@
       el.style.setProperty('display', 'none', 'important');
       sendResponse({ ok: true });
       return true;
+    }
+    if (msg.type === 'GLOBAL_PAUSE') { _procObs?.disconnect(); clearTimeout(_procDeb); }
+    if (msg.type === 'GLOBAL_RESUME') {
+      if (_procObs) _procObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      runProcedural();
     }
   });
 

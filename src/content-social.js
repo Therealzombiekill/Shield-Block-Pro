@@ -435,6 +435,15 @@
     }
   });
 
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'GLOBAL_PAUSE') { _observer.disconnect(); clearInterval(_interval); clearTimeout(_debounce); }
+    if (msg.type === 'GLOBAL_RESUME') { _observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true }); clean(); }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    _observer.disconnect(); clearInterval(_interval); clearTimeout(_debounce);
+  }, { once: true });
+
   // SPA navigation — patch both pushState AND replaceState
   let _lastUrl = location.href;
   function onUrlChange() {

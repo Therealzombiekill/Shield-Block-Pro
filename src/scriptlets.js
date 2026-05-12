@@ -297,10 +297,17 @@
       if (!obj || !key) return;
       const orig = obj[key];
       if (!orig || typeof orig !== 'object') return;
-      paths.forEach(p => {
-        const { obj: o2, key: k2 } = getProp(p, false);
-        if (o2 && k2) delete o2[k2];
-      });
+      // Traverse orig (not window) to delete each leaf — same fix as json-prune
+      function pruneByPath(root, path) {
+        const parts = path.split('.');
+        let node = root;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (node == null || typeof node !== 'object') return;
+          node = node[parts[i]];
+        }
+        if (node != null && typeof node === 'object') delete node[parts[parts.length - 1]];
+      }
+      paths.forEach(p => pruneByPath(orig, p));
     },
 
     // replace-node-text / trusted-replace-node-text

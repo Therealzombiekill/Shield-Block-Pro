@@ -81,7 +81,7 @@ h1 span{color:var(--accent2)}
     </div>
   </div>
 
-  <div class="badge"><div style="width:6px;height:6px;border-radius:50%;background:currentColor"></div>ACTIVE & BLOCKING</div>
+  <div class="badge"><div style="width:6px;height:6px;border-radius:50%;background:currentColor"></div>ACTIVE &amp; BLOCKING</div>
 
   <h1>You're protected.<br><span>Ads blocked. Privacy secured.</span></h1>
   <p class="sub">ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.</p>
@@ -169,12 +169,24 @@ h1 span{color:var(--accent2)}
   </div>
 
   <div class="cta">
-    <button class="btn-primary" onclick="window.close()">Start browsing →</button>
-    <button class="btn-secondary" onclick="window.open(chrome.runtime.getURL('popup.html'),'_blank','width=390,height=620,left=200,top=80')">Settings</button>
+    <button class="btn-primary" id="btn-start">Start browsing →</button>
+    <button class="btn-secondary" id="btn-settings">Settings</button>
   </div>
 
   <p class="tip">Found a missed ad? Right-click it → <strong>ShieldBlock: Hide this element</strong><br>
   Or tip the developer: <a href="https://paypal.me/BronsonBissell" target="_blank">paypal.me/BronsonBissell</a></p>
 </div>
+<script>
+(function () {
+  document.getElementById('btn-start').addEventListener('click', function () {
+    window.close();
+  });
+  document.getElementById('btn-settings').addEventListener('click', function () {
+    try {
+      window.open(chrome.runtime.getURL('popup.html'), '_blank', 'width=390,height=620,left=200,top=80');
+    } catch (_) {}
+  });
+})();
+</script>
 </body>
 </html>

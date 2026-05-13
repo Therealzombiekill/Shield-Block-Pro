@@ -67,6 +67,18 @@ const STATIC_REMOVE_PARAMS = new Set([
   'elqTrackId', 'elqak',
   // ActiveCampaign
   'vuid',
+  // Matomo / Piwik (pk_* = classic Piwik, mtm_* = Matomo Tag Manager)
+  'pk_campaign', 'pk_kwd', 'pk_source', 'pk_medium', 'pk_content', 'pk_cid',
+  'mtm_campaign', 'mtm_source', 'mtm_medium', 'mtm_content',
+  'mtm_keyword', 'mtm_cid', 'mtm_group', 'mtm_placement',
+  // Branch.io (mobile deep-link attribution)
+  '_branch_match_id', '_branch_referrer',
+  // Sailthru / Omeda
+  'oly_anon_id', 'oly_enc_id',
+  // Twilio SendGrid email tracking
+  'sg_ehash',
+  // Brevo (formerly Sendinblue)
+  'sib_uid',
   // Other common trackers
   'origin_referrer', 'otc', 'spm', 'wtrid', 'aff_id', 'affiliate_id',
   'source_caller', 'mibextid', // Meta Business

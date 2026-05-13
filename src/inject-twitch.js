@@ -130,6 +130,9 @@
     // 3. Block obvious ad-tracking / ad-serving endpoints.
     //    Note: client-event.twitch.tv is intentionally NOT blocked — Twitch
     //    uses it for session heartbeats that gate stream playback.
+    //    Note: twitchsvc.net is intentionally NOT blocked — it is also used
+    //    for stream authentication / playback and lives in PROTECTED_DOMAINS
+    //    in filter-parser.js for the same reason.
     const BLOCK = [
       'twitchadvertising.tv',
       'tv.freewheel.tv',
@@ -140,7 +143,6 @@
       'beacon.krxd.net',
       'audience-media.twitch.tv',
       'ad.doubleclick.net',
-      'twitchsvc.net',
     ];
     if (BLOCK.some(h => url.includes(h))) {
       return new Response('', { status: 200 });

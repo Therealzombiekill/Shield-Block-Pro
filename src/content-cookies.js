@@ -189,6 +189,7 @@
 
   // ── Text patterns for reject buttons ──────────────────────────────────────
   const REJECT_PATTERNS = [
+    // ── English ────────────────────────────────────────────────────────────
     /reject\s+all/i, /decline\s+all/i, /refuse\s+all/i, /deny\s+all/i,
     /necessary\s+only/i, /essential\s+only/i, /only\s+necessary/i,
     /only\s+essential/i, /strictly\s+necessary/i,
@@ -197,6 +198,145 @@
     /manage\s+prefer/i, /save\s+prefer/i, /save\s+settings/i,
     /continue\s+without/i, /proceed\s+without/i,
     /use\s+necessary/i, /keep\s+necessary/i,
+    // ── German (de) ────────────────────────────────────────────────────────
+    /^ablehnen$/i,
+    /alle?\s+ablehnen/i,                      // "Alle ablehnen"
+    /alles\s+ablehnen/i,
+    /^nicht\s+zustimmen$/i,
+    /^nicht\s+akzeptieren$/i,
+    /nur\s+(notwendige|erforderliche|wesentliche)/i,
+    /ohne\s+zustimmung/i,                     // "Ohne Zustimmung fortfahren"
+    /^nein[,\s]+danke/i,
+    /auswahl\s+ablehnen/i,
+    /einstellungen\s+speichern/i,             // necessary-only save on some CMPs
+    // ── French (fr) ────────────────────────────────────────────────────────
+    /tout\s+refuser/i, /refuser\s+tout/i,
+    /tout\s+rejeter/i, /rejeter\s+tout/i,
+    /continuer\s+sans\s+accepter/i,
+    /^non[,\s]+merci/i,
+    /uniquement\s+n.cessaire/i,               // accent-optional
+    /^refuser$/i,
+    /^rejeter$/i,
+    // ── Spanish (es) ───────────────────────────────────────────────────────
+    /rechazar\s+todo/i, /rechazar\s+todas/i,
+    /solo\s+(necesarias?|esenciales?)/i,
+    /solo\s+lo\s+esencial/i,
+    /^no[,\s]+gracias/i,
+    /continuar\s+sin\s+aceptar/i,
+    /^rechazar$/i,
+    // ── Italian (it) ───────────────────────────────────────────────────────
+    /rifiuta\s+tutt[io]/i,                    // "tutto" / "tutti"
+    /solo\s+(necessari|essenziali)/i,
+    /^no[,\s]+grazie/i,
+    /continua\s+senza\s+accettare/i,
+    /^rifiuta$/i,
+    // ── Portuguese (pt) ────────────────────────────────────────────────────
+    /rejeitar\s+tudo/i, /recusar\s+tudo/i,
+    /rejeitar\s+todos/i,
+    /apenas\s+necess.rios/i,
+    /n.o[,\s]+obrigad/i,                      // "Não, obrigado/a"
+    /continuar\s+sem\s+aceitar/i,
+    /^rejeitar$/i, /^recusar$/i,
+    // ── Dutch (nl) ─────────────────────────────────────────────────────────
+    /alles\s+(weigeren|afwijzen)/i,
+    /alle\s+cookies\s+weigeren/i,
+    /alleen\s+(noodzakelijke|essenti.le)/i,
+    /^nee[,\s]+bedankt/i,
+    /^weigeren$/i, /^afwijzen$/i,
+    // ── Polish (pl) ────────────────────────────────────────────────────────
+    /odrzuć\s+wszystko/i, /odmów\s+wszystkiego/i,
+    /tylko\s+niezbędne/i,
+    /^nie[,\s]+dziękuję/i,
+    /^odrzuć$/i,
+    // ── Swedish (sv) ───────────────────────────────────────────────────────
+    /avvisa\s+alla/i, /neka\s+alla/i, /avböj\s+alla/i,
+    /endast\s+nödvändiga/i,
+    /^nej\s+tack/i,
+    /^avvisa$/i, /^avböj$/i,
+    // ── Norwegian (no) ─────────────────────────────────────────────────────
+    /avsl[åa]\s+alle/i, /avvis\s+alle/i,
+    /kun\s+n.dvendige/i,
+    /^nei\s+takk/i,
+    /^avsl[åa]$/i, /^avvis$/i,
+    // ── Danish (da) ────────────────────────────────────────────────────────
+    /afvis\s+alle/i, /afsl[åa]\s+alle/i,
+    /kun\s+n.dvendige/i,
+    /^nej\s+tak/i,
+    /^afvis$/i,
+    // ── Finnish (fi) ───────────────────────────────────────────────────────
+    /hylk.ä\s+kaikki/i, /kieltäydy\s+kaikesta/i,
+    /vain\s+välttämättömät/i,
+    /^ei\s+kiitos/i,
+    /^hylkää$/i,
+    // ── Czech (cs) ─────────────────────────────────────────────────────────
+    /odm.tnout\s+v.e/i,                       // "Odmítnout vše"
+    /pouze\s+nezbytn/i,
+    /^ne[,\s]+d.kuji/i,                       // "Ne, děkuji"
+    /^odm.tnout$/i,
+    // ── Slovak (sk) ────────────────────────────────────────────────────────
+    /odmietnuť\s+vš/i,
+    /len\s+nevyhnutné/i,
+    /^nie[,\s]+ďakujem/i,
+    /^odmietnuť$/i,
+    // ── Romanian (ro) ──────────────────────────────────────────────────────
+    /respinge\s+tot/i, /refuza\s+tot/i,
+    /doar\s+necesare/i,
+    /^nu[,\s]+mul.umesc/i,                    // "Nu, mulțumesc"
+    /^respinge$/i,
+    // ── Hungarian (hu) ─────────────────────────────────────────────────────
+    /mindent\s+elutas.t/i, /összes\s+elutas.t/i,
+    /csak\s+szükséges/i,
+    /^nem[,\s]+köszönöm/i,
+    /^elutas.t$/i,
+    // ── Greek (el) ─────────────────────────────────────────────────────────
+    /απόρριψη\s+όλων/,
+    /απορρίπτω\s+όλα/,
+    /μόνο\s+απαραίτητα/,
+    /^όχι[,\s]+ευχαριστώ/,
+    /^απόρριψη$/,
+    // ── Bulgarian (bg) ─────────────────────────────────────────────────────
+    /откажи\s+всички/,
+    /само\s+задължителни/,
+    /^не[,\s]+благодаря/,
+    /^откажи$/,
+    // ── Croatian / Serbian (hr/sr) ──────────────────────────────────────────
+    /odbij\s+sve/i,
+    /samo\s+(neophodno|nužno)/i,
+    /^ne[,\s]+hvala/i,
+    /^odbij$/i,
+    // ── Turkish (tr) ───────────────────────────────────────────────────────
+    /hepsini\s+reddet/i, /tümünü\s+reddet/i,
+    /yalnızca\s+gerekli/i,
+    /^hayır[,\s]+teşekkürler/i,
+    /^reddet$/i,
+    // ── Russian (ru) ───────────────────────────────────────────────────────
+    /отклонить\s+всё/,
+    /отказаться\s+от\s+всего/,
+    /только\s+необходимые/,
+    /^нет[,\s]+спасибо/,
+    /^отклонить$/,
+    // ── Ukrainian (uk) ─────────────────────────────────────────────────────
+    /відхилити\s+всі/,
+    /лише\s+необхідні/,
+    /^ні[,\s]+дякую/,
+    /^відхилити$/,
+    // ── Japanese (ja) ──────────────────────────────────────────────────────
+    /必須のみ/,
+    /必要なもののみ/,
+    /すべて拒否/,
+    /同意しない/,
+    /拒否する/,
+    // ── Chinese Simplified / Traditional (zh) ──────────────────────────────
+    /仅必要/,           // Simplified: only necessary
+    /僅必要/,           // Traditional: only necessary
+    /拒绝全部/,         // Simplified: reject all
+    /拒絕全部/,         // Traditional: reject all
+    /只接受必要/,       // only accept necessary (both scripts)
+    /不接受/,           // "don't accept"
+    // ── Korean (ko) ────────────────────────────────────────────────────────
+    /전체\s*거부/,
+    /필수만\s*동의/,
+    /거부하기/,
   ];
 
   // ── Accept selectors (fallback — better than an endless banner) ───────────
@@ -211,8 +351,84 @@
   ];
 
   const ACCEPT_PATTERNS = [
+    // ── English ────────────────────────────────────────────────────────────
     /accept\s+all/i, /allow\s+all/i, /agree\s+all/i,
     /i\s+agree/i, /got\s+it/i, /^ok$/i, /^okay$/i,
+    /^accept$/i, /^allow$/i, /^agree$/i,
+    // ── German (de) ────────────────────────────────────────────────────────
+    /alle\s+akzeptieren/i, /alle\s+zustimmen/i,
+    /alles\s+akzeptieren/i,
+    /^zustimmen$/i, /^akzeptieren$/i, /^einverstanden$/i,
+    // ── French (fr) ────────────────────────────────────────────────────────
+    /tout\s+accepter/i, /accepter\s+tout/i,
+    /^j.accepte/i,                            // "J'accepte"
+    /^accepter$/i,
+    // ── Spanish (es) ───────────────────────────────────────────────────────
+    /aceptar\s+todo/i, /aceptar\s+todas/i,
+    /^aceptar$/i, /^acepto$/i,
+    // ── Italian (it) ───────────────────────────────────────────────────────
+    /accetta\s+tutt[io]/i,
+    /^accetta$/i, /^accetto$/i,
+    // ── Portuguese (pt) ────────────────────────────────────────────────────
+    /aceitar\s+tudo/i, /aceitar\s+todos/i,
+    /^aceitar$/i, /^aceito$/i,
+    // ── Dutch (nl) ─────────────────────────────────────────────────────────
+    /alles\s+accepteren/i,
+    /alle\s+cookies\s+accepteren/i,
+    /^accepteren$/i, /^akkoord$/i,
+    // ── Polish (pl) ────────────────────────────────────────────────────────
+    /zaakceptuj\s+wszystko/i,
+    /^akceptuję$/i, /^zaakceptuj$/i,
+    // ── Swedish (sv) ───────────────────────────────────────────────────────
+    /acceptera\s+alla/i, /godkänn\s+alla/i,
+    /^acceptera$/i, /^godkänn$/i,
+    // ── Norwegian (no) ─────────────────────────────────────────────────────
+    /godta\s+alle/i, /godkjenn\s+alle/i,
+    /^godta$/i, /^godkjenn$/i,
+    // ── Danish (da) ────────────────────────────────────────────────────────
+    /accepter\s+alle/i,
+    /^accepter$/i, /^godkend$/i,
+    // ── Finnish (fi) ───────────────────────────────────────────────────────
+    /hyväksy\s+kaikki/i,
+    /^hyväksy$/i,
+    // ── Czech (cs) ─────────────────────────────────────────────────────────
+    /p.ijmout\s+v.e/i,                        // "Přijmout vše"
+    /^p.ijmout$/i,
+    // ── Slovak (sk) ────────────────────────────────────────────────────────
+    /prijať\s+všetko/i,
+    /^prijať$/i,
+    // ── Romanian (ro) ──────────────────────────────────────────────────────
+    /accepta\s+tot/i,
+    /^accept$/i, /^accepta$/i,
+    // ── Hungarian (hu) ─────────────────────────────────────────────────────
+    /mindet\s+elfogad/i,
+    /^elfogadom$/i, /^elfogad$/i,
+    // ── Greek (el) ─────────────────────────────────────────────────────────
+    /αποδοχή\s+όλων/,
+    /^αποδέχομαι$/,
+    // ── Bulgarian (bg) ─────────────────────────────────────────────────────
+    /приемам\s+всички/,
+    /^приемам$/,
+    // ── Croatian / Serbian (hr/sr) ──────────────────────────────────────────
+    /prihvati\s+sve/i,
+    /^prihvati$/i, /^slažem\s+se$/i,
+    // ── Turkish (tr) ───────────────────────────────────────────────────────
+    /hepsini\s+kabul\s+et/i, /tümünü\s+kabul\s+et/i,
+    /^kabul\s+et$/i,
+    // ── Russian (ru) ───────────────────────────────────────────────────────
+    /принять\s+все/,
+    /^принять$/, /^согласен$/,
+    // ── Ukrainian (uk) ─────────────────────────────────────────────────────
+    /прийняти\s+всі/,
+    /^прийняти$/, /^погоджуюсь$/,
+    // ── Japanese (ja) ──────────────────────────────────────────────────────
+    /すべて同意/,
+    /同意する/,
+    // ── Chinese Simplified / Traditional (zh) ──────────────────────────────
+    /全部接受/, /接受全部/, /接受所有/,
+    // ── Korean (ko) ────────────────────────────────────────────────────────
+    /전체\s*동의/,
+    /동의하기/,
   ];
 
   // ── Button finder ──────────────────────────────────────────────────────────

@@ -78,8 +78,13 @@ function parseLine(line, idCounter) {
   if (line.includes('#@#')) return null;
 
   // ── Cosmetic / scriptlet filters (## separator) ────────────────────────────
-  if (line.includes('##') && !line.includes('$')) {
-    const idx = line.indexOf('##');
+  // BUG FIX: `!line.includes('$')` was too broad — it dropped valid cosmetic rules
+  // containing CSS $= attribute selectors (e.g. ##[class$="-ad"], ##[src$=".gif"]).
+  // The `$` that matters as a filter option separator only appears BEFORE `##`
+  // (e.g. `||ad.com^$script` never has `##`). Any `$` after `##` is CSS syntax.
+  const _hashIdx = line.indexOf('##');
+  if (_hashIdx !== -1 && (line.indexOf('$') === -1 || line.indexOf('$') > _hashIdx)) {
+    const idx = _hashIdx;
 
     const prefix   = line.slice(0, idx).trim();
     const rawAfter = line.slice(idx + 2).trim();

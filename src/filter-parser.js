@@ -74,12 +74,12 @@ function parseLine(line, idCounter) {
     return null;
   }
 
+  // ── Exception cosmetic (#@#) — skip before ## check ──────────────────────────
+  if (line.includes('#@#')) return null;
+
   // ── Cosmetic / scriptlet filters (## separator) ────────────────────────────
   if (line.includes('##') && !line.includes('$')) {
     const idx = line.indexOf('##');
-
-    // Exception cosmetic (#@#) — skip
-    if (line[idx + 1] === '@') return null;
 
     const prefix   = line.slice(0, idx).trim();
     const rawAfter = line.slice(idx + 2).trim();

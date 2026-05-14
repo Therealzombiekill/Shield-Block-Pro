@@ -2002,6 +2002,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } catch (e) { sendResponse({ ok: false, error: e.message }); }
         break;
       }
+      case 'RESTORE_FROM_CLOUD': {
+        try {
+          const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
+          if (!Object.keys(synced).length) { sendResponse({ ok: false, error: 'Nothing saved in cloud' }); break; }
+          if (synced.settings && typeof synced.settings === 'object') {
+            const validated = {};
+            for (const [k, v] of Object.entries(synced.settings)) {
+              if (k in DEFAULT_SETTINGS && typeof v === typeof DEFAULT_SETTINGS[k]) validated[k] = v;
+            }
+            synced.settings = validated;
+          }
+          await chrome.storage.local.set(synced);
+          invalidateSettingsCache();
+          logEvent('system', 'info', `Cloud restore: ${Object.keys(synced).join(', ')}`);
+          sendResponse({ ok: true, keys: Object.keys(synced) });
+        } catch (e) {
+          sendResponse({ ok: false, error: e.message });
+        }
+        break;
+      }
       case 'WHITELIST_UPDATED': {
         const wl = msg.whitelist ?? [];
         await chrome.storage.local.set({ whitelist: wl });
@@ -2359,7 +2379,7 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
       }
       await chrome.storage.local.set({ pausedSites, whitelist, pauseWhitelisted });
       logEvent('pause', 'info', `Auto-resumed ${domain}`);
-    } catch (e) { logEvent('system', 'warn', `Context menu setup failed: ${e.message}`); }
+    } catch (e) { logEvent('pause', 'warn', `Pause expiry cleanup failed for ${domain}: ${e.message}`); }
   }
 });
 

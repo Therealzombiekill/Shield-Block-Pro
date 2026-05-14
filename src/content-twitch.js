@@ -179,7 +179,7 @@
   }
 
   // ── Safety timeout: force-recover if muted for > 90s ─────────────────────────
-  setInterval(() => {
+  const safetyInterval = setInterval(() => {
     if (adActive && Date.now() - adStartTime > 90000) {
       adActive = false;
       unmuteVideo();
@@ -195,7 +195,7 @@
   let _lastFixAt   = 0;
   const _FIX_COOLDOWN = 5000;
 
-  setInterval(() => {
+  const bufferInterval = setInterval(() => {
     if (adActive) { _frozenTicks = 0; return; }
     const video = document.querySelector('video');
     if (!video || video.paused || document.hidden) { _frozenTicks = 0; return; }
@@ -233,6 +233,8 @@
     if (changes.settings?.newValue?.twitch === false) {
       observer.disconnect();
       clearInterval(interval);
+      clearInterval(safetyInterval);
+      clearInterval(bufferInterval);
       clearTimeout(debounce);
       clearTimeout(toastTimeout);
       hideToast();

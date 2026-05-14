@@ -297,9 +297,15 @@
       if (!obj || !key) return;
       const orig = obj[key];
       if (!orig || typeof orig !== 'object') return;
+      // Traverse `orig` directly (not window) to delete the target properties.
       paths.forEach(p => {
-        const { obj: o2, key: k2 } = getProp(p, false);
-        if (o2 && k2) delete o2[k2];
+        const parts = p.split('.');
+        let node = orig;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (node == null || typeof node !== 'object') return;
+          node = node[parts[i]];
+        }
+        if (node != null && typeof node === 'object') delete node[parts[parts.length - 1]];
       });
     },
 

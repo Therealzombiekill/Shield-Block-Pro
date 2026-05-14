@@ -2250,7 +2250,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       // ── Per-page request log ───────────────────────────────────────────────
       case 'GET_PAGE_LOG': {
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
         const tid = activeTab?.id;
         const pageEntries = tid
           ? _requestLog.filter(e => e.tabId === tid).slice().reverse()

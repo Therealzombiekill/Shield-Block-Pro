@@ -2080,7 +2080,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           const updates = {};
           // Import user filters
-          if (uboData.userFilters) {
+          if (uboData.userFilters && typeof uboData.userFilters === 'string') {
             updates.userFilterText = uboData.userFilters;
             const { cosmetics, domainCosmetics, scriptletRules } =
               parseFilterList(uboData.userFilters, 90000, 500);
@@ -2589,7 +2589,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     try {
       const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
       if (Object.keys(synced).length > 0) {
-        // Validate settings types before writing
+        // Validate types before writing (mirrors RESTORE_FROM_CLOUD checks)
         if (synced.settings && typeof synced.settings === 'object') {
           const validated = {};
           for (const [k, v] of Object.entries(synced.settings)) {
@@ -2597,6 +2597,9 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
           }
           synced.settings = validated;
         }
+        if ('whitelist' in synced && !Array.isArray(synced.whitelist)) delete synced.whitelist;
+        if ('userFilterText' in synced && typeof synced.userFilterText !== 'string') delete synced.userFilterText;
+        if ('customFilterLists' in synced && !Array.isArray(synced.customFilterLists)) delete synced.customFilterLists;
         await chrome.storage.local.set(synced);
         invalidateSettingsCache();
         logEvent('system', 'info', `Restored ${Object.keys(synced).join(', ')} from cloud sync`);

@@ -252,16 +252,19 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
         break;
       case 'removeparam': {
         const { param, initDomains, exclDomains } = result;
+        // ABP allows multiple params in one option via '|' (e.g. removeparam=utm_source|utm_medium).
+        // Split here so each param is individually matched by the DNR removeParams action.
+        const paramList = param.split('|').map(p => p.trim()).filter(Boolean);
         if (!initDomains.length && !exclDomains.length) {
           // Global param — add to global set
-          removeParams.global.add(param);
+          for (const p of paramList) removeParams.global.add(p);
         } else {
           // Domain-scoped — key by sorted domain list
           const key = [...initDomains].sort().join('|') + '~~' + [...exclDomains].sort().join('|');
           if (!removeParams.domain.has(key)) {
             removeParams.domain.set(key, { params: new Set(), initDomains, exclDomains });
           }
-          removeParams.domain.get(key).params.add(param);
+          for (const p of paramList) removeParams.domain.get(key).params.add(p);
         }
         break;
       }

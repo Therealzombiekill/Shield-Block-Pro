@@ -192,6 +192,16 @@
     clearTimeout(debounce);
   }, { once: true });
 
+  // Cleanup on toggle-off — restore audio and disconnect
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.spotify === false) {
+      _spotObserver.disconnect();
+      clearInterval(_spotInterval);
+      clearTimeout(debounce);
+      if (adActive) { muteAudio(wasMuted); hideOverlay(); adActive = false; }
+    }
+  });
+
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'spotify', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
   console.warn('[SB:spotify] script error:', e?.message ?? e);

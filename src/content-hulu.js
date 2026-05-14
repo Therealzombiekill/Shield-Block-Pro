@@ -140,6 +140,16 @@
     clearTimeout(_huluDebounce);
   }, { once: true });
 
+  // Cleanup on toggle-off — restore audio and disconnect
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.hulu === false) {
+      _huluObserver.disconnect();
+      clearInterval(_huluInterval);
+      clearTimeout(_huluDebounce);
+      if (adActive) { restoreAfterAd(); adActive = false; }
+    }
+  });
+
   tick(); // run immediately on load
 
 })().catch(e => {

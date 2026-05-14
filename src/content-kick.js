@@ -92,6 +92,20 @@
     _obs.disconnect(); clearInterval(_int); clearTimeout(_deb);
   }, { once: true });
 
+  // Cleanup on toggle-off — restore audio and disconnect
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.kick === false) {
+      _obs.disconnect();
+      clearInterval(_int);
+      clearTimeout(_deb);
+      if (adActive) {
+        const video = document.querySelector('video');
+        if (video) video.muted = wasMuted;
+        adActive = false;
+      }
+    }
+  });
+
   tick();
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'kick', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}

@@ -174,6 +174,14 @@
     clearTimeout(_pwDeb);
   }, { once: true });
 
+  // Cleanup on toggle-off
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.settings?.newValue?.paywall === false) {
+      _pwObserver.disconnect();
+      clearTimeout(_pwDeb);
+    }
+  });
+
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'paywall', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}
   console.warn('[SB:paywall] script error:', e?.message ?? e);

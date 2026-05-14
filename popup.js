@@ -24,6 +24,8 @@ document.querySelectorAll('.nb').forEach(btn => {
     $('panel-' + btn.dataset.panel)?.classList.add('active');
 
     clearInterval(_logInterval);
+    clearInterval(_pauseCheckInterval);
+    _pauseCheckInterval = null;
 
     switch (btn.dataset.panel) {
       case 'stats':
@@ -34,6 +36,7 @@ document.querySelectorAll('.nb').forEach(btn => {
         refreshMatrix();
         refreshPageLog();
         refreshTopDomains();
+        _pauseCheckInterval = setInterval(checkPauseStatus, 10000);
         break;
       case 'whitelist':
         refreshWhitelist();
@@ -1189,7 +1192,8 @@ $('pause-btn')?.addEventListener('click', async () => {
   } else {
     const minutes = parseInt($('pause-dur')?.value) || 30;
     await msg('PAUSE_SITE', { domain, minutes });
-    $('pause-btn').textContent = `▶ ${minutes >= 60 ? (minutes/60)+'h' : minutes+'m'} left`;
+    const h = Math.floor(minutes / 60), m = minutes % 60;
+    $('pause-btn').textContent = `▶ ${minutes >= 60 ? h + 'h' + (m ? ' ' + m + 'm' : '') : minutes + 'm'} left`;
     $('pause-btn').classList.add('pause-active');
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
   }

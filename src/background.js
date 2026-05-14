@@ -503,6 +503,9 @@ async function _retryFailedLists() {
     })
   );
   const newRules = [];
+  const retryCosmeticsToMerge = [];
+  const retryDomCosToMerge = [];
+  const retryScriptletsToMerge = [];
   for (const result of results) {
     if (result.status === 'rejected') {
       logEvent('filter-sync', 'warn', `Retry failed: ${result.reason?.message}`);
@@ -510,11 +513,19 @@ async function _retryFailedLists() {
     }
     const { list, limit, text } = result.value;
     try {
-      const { rules } = parseFilterList(text, list.start, limit);
+      const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } =
+        parseFilterList(text, list.start, limit);
       newRules.push(...rules);
+      retryCosmeticsToMerge.push(...cosmetics);
+      retryDomCosToMerge.push(domainCosmetics);
+      retryScriptletsToMerge.push(scriptletRules);
       await chrome.storage.local.set({
-        [`fr_${list.key}`]: rules,
-        [`fm_${list.key}`]: { at: Date.now(), count: rules.length },
+        [`fr_${list.key}`]:  rules,
+        [`fm_${list.key}`]:  { at: Date.now(), count: rules.length },
+        [`fc_${list.key}`]:  cosmetics,
+        [`fd_${list.key}`]:  domainCosmetics,
+        [`fs_${list.key}`]:  scriptletRules,
+        [`frp_${list.key}`]: { global: removeParams?.global ?? [], domain: removeParams?.domain ?? [] },
       });
       logEvent('filter-sync', 'info', `Retry OK: ${list.name} — ${rules.length} rules`);
     } catch (e) { logEvent('filter-sync', 'warn', `Retry parse failed: ${list.name}`); }
@@ -529,6 +540,34 @@ async function _retryFailedLists() {
         logEvent('filter-sync', 'info', `Retry: added ${Math.min(newRules.length, budget)} rules`);
       }
     } catch (e) { logEvent('filter-sync', 'warn', `Retry DNR apply failed: ${e.message}`); }
+  }
+  // Merge recovered cosmetics/scriptlets into aggregated caches so new navigations
+  // pick them up immediately — without this, they would be absent until the next full sync
+  if (retryCosmeticsToMerge.length > 0 || retryDomCosToMerge.length > 0 || retryScriptletsToMerge.length > 0) {
+    try {
+      const { cosmeticSelectors = [], domainCosmetics: aggDomCos = {}, scriptletRules: aggSR = {} } =
+        await chrome.storage.local.get(['cosmeticSelectors', 'domainCosmetics', 'scriptletRules']);
+      const mergedCos = [...new Set([...cosmeticSelectors, ...retryCosmeticsToMerge])];
+      const mergedDomCos = { ...aggDomCos };
+      for (const dc of retryDomCosToMerge) {
+        for (const [dom, sels] of Object.entries(dc)) {
+          if (!mergedDomCos[dom]) mergedDomCos[dom] = [];
+          mergedDomCos[dom].push(...sels);
+        }
+      }
+      const mergedSR = { ...aggSR };
+      for (const sr of retryScriptletsToMerge) {
+        for (const [dom, rules] of Object.entries(sr)) {
+          if (!mergedSR[dom]) mergedSR[dom] = [];
+          mergedSR[dom].push(...rules);
+        }
+      }
+      await chrome.storage.local.set({
+        cosmeticSelectors: mergedCos,
+        domainCosmetics:   mergedDomCos,
+        scriptletRules:    mergedSR,
+      });
+    } catch (e) { logEvent('filter-sync', 'warn', `Retry cosmetics merge failed: ${e.message}`); }
   }
   } finally { _stopKeepAlive(); }
 }

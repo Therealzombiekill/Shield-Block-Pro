@@ -140,46 +140,6 @@
     }
   },
   {
-    "id": 1007,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||sonobi.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1008,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||yieldmo.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1009,
     "priority": 1,
     "action": {
@@ -320,26 +280,6 @@
     }
   },
   {
-    "id": 1016,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||emxdgt.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1017,
     "priority": 1,
     "action": {
@@ -447,26 +387,6 @@
     },
     "condition": {
       "urlFilter": "||unrulymedia.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1023,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||teads.tv^",
       "resourceTypes": [
         "script",
         "image",
@@ -680,46 +600,6 @@
     }
   },
   {
-    "id": 1034,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||nativo.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1035,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||triplelift.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1036,
     "priority": 1,
     "action": {
@@ -727,26 +607,6 @@
     },
     "condition": {
       "urlFilter": "||lkqd.net^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1037,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||spotxchange.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -1940,26 +1800,6 @@
     }
   },
   {
-    "id": 1097,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||mouseflow.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1098,
     "priority": 1,
     "action": {
@@ -1967,26 +1807,6 @@
     },
     "condition": {
       "urlFilter": "||crazyegg.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1099,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||luckyorange.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -2440,26 +2260,6 @@
     }
   },
   {
-    "id": 1122,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||static.ads-twitter.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1123,
     "priority": 1,
     "action": {
@@ -2467,26 +2267,6 @@
     },
     "condition": {
       "urlFilter": "||analytics.twitter.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1124,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||ads.linkedin.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -2527,106 +2307,6 @@
     },
     "condition": {
       "urlFilter": "||px.ads.linkedin.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1127,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||sc-static.net^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1128,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||tr.snapchat.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1129,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||ads.tiktok.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1130,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||analytics.tiktok.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1131,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||adroll.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -3007,26 +2687,6 @@
     },
     "condition": {
       "urlFilter": "||adverticum.net^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1151,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||advertising.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -4700,26 +4360,6 @@
     }
   },
   {
-    "id": 1235,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||lijit.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1236,
     "priority": 1,
     "action": {
@@ -5580,26 +5220,6 @@
     }
   },
   {
-    "id": 1279,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||piano.io^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1280,
     "priority": 1,
     "action": {
@@ -5607,26 +5227,6 @@
     },
     "condition": {
       "urlFilter": "||pickrr.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1281,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||pixel.advertising.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -6227,26 +5827,6 @@
     },
     "condition": {
       "urlFilter": "||simpli.fi^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1312,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||sizmek.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -6947,26 +6527,6 @@
     },
     "condition": {
       "urlFilter": "||tradingdesk.strikead.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1348,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||trc.taboola.com^",
       "resourceTypes": [
         "script",
         "image",

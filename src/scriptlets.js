@@ -132,7 +132,7 @@
       try {
         obj[key] = function (...args) {
           const e = new Error();
-          if (/^(?:.*\n){1}[^\n]*<anonymous>/.test(e.stack || '')) {
+          if (/[^\n]*<anonymous>/.test(e.stack || '')) {
             if (!re || args.some(a => re.test(String(a ?? '')))) {
               throw new ReferenceError(api);
             }

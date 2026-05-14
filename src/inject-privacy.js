@@ -67,8 +67,8 @@
       const d = _getImageData.apply(this, arguments);
       try {
         const noise = stableNoise(SESSION_SEED + arguments[0] + arguments[1]);
-        const p = Math.floor(noise * 3);
-        if (d.data.length >= 4 && p > 0) {
+        const p = Math.floor(noise * 3) + 1; // always 1-3; ensures noise is always applied
+        if (d.data.length >= 4) {
           const copy = new ImageData(new Uint8ClampedArray(d.data), d.width, d.height);
           copy.data[0] = (copy.data[0] + p) % 256;
           return copy;

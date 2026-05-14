@@ -198,7 +198,7 @@
   const bufferInterval = setInterval(() => {
     if (adActive) { _frozenTicks = 0; return; }
     const video = document.querySelector('video');
-    if (!video || video.paused || document.hidden) { _frozenTicks = 0; return; }
+    if (!video || video.paused || document.hidden) { _frozenTicks = 0; _lastPos = -1; _lastBuf = -1; return; }
     if (video.readyState < 2) return;
 
     const pos = video.currentTime;

@@ -2532,6 +2532,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const idx = wl.indexOf(domain);
     if (idx !== -1) wl.splice(idx, 1); else wl.push(domain);
     await chrome.storage.local.set({ whitelist: wl });
+    pushToCloud().catch(() => {}); // keep cloud in sync (fire-and-forget)
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
@@ -2650,6 +2651,7 @@ chrome.commands.onCommand.addListener(async (command) => {
     const idx = wl.indexOf(domain);
     if (idx !== -1) wl.splice(idx, 1); else wl.push(domain);
     await chrome.storage.local.set({ whitelist: wl });
+    pushToCloud().catch(() => {}); // sync whitelist change to cloud (fire-and-forget)
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
     if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId: tab.id });

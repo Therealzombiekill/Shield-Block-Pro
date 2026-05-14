@@ -158,7 +158,7 @@ _qs.textContent = `
       if (AMZN_SPONSORED.has(_t)) {
         const card = el.closest('[data-asin]') || el.closest('[data-component-type]')
                   || el.closest('li.s-result-item') || el.closest('.s-result-item');
-        if (card && card.querySelector('[data-asin]') !== null) {
+        if (card && (card.hasAttribute('data-asin') || card.querySelector('[data-asin]') !== null)) {
           card.remove(); batch++;
         }
       }

@@ -122,24 +122,26 @@
       });
     } catch (_) {}
 
-    // 3. Restore scroll locks
+    // 3. Restore scroll locks (skip when fullscreen or a real dialog is open)
     let restoredScroll = false;
     try {
-      if (document.fullscreenElement) return;
-      const activeDialog = document.querySelector('[role="dialog"]:not([aria-hidden="true"])');
-      if (activeDialog) return; // real modal open — don't unlock scroll
-      for (const el of [document.documentElement, document.body]) {
-        if (!el) continue;
-        const cs = window.getComputedStyle(el);
-        if (cs.overflow === 'hidden' || cs.overflowY === 'hidden') {
-          el.style.overflow = ''; el.style.overflowY = '';
-          restoredScroll = true;
-        }
-        if (cs.position === 'fixed' && parseFloat(cs.top) < 0) {
-          const top = Math.abs(parseFloat(cs.top));
-          el.style.position = ''; el.style.top = '';
-          window.scrollTo(0, top);
-          restoredScroll = true;
+      if (!document.fullscreenElement) {
+        const activeDialog = document.querySelector('[role="dialog"]:not([aria-hidden="true"])');
+        if (!activeDialog) {
+          for (const el of [document.documentElement, document.body]) {
+            if (!el) continue;
+            const cs = window.getComputedStyle(el);
+            if (cs.overflow === 'hidden' || cs.overflowY === 'hidden') {
+              el.style.overflow = ''; el.style.overflowY = '';
+              restoredScroll = true;
+            }
+            if (cs.position === 'fixed' && parseFloat(cs.top) < 0) {
+              const top = Math.abs(parseFloat(cs.top));
+              el.style.position = ''; el.style.top = '';
+              window.scrollTo(0, top);
+              restoredScroll = true;
+            }
+          }
         }
       }
     } catch (_) {}

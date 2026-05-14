@@ -7504,5 +7504,277 @@
         "youtube-nocookie.com"
       ]
     }
+  },
+  {
+    "id": 1402,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||freestar.com^",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1403,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||improvedigital.com^",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1404,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||improve-digital.com^",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1405,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||rakutenadvertising.com^",
+      "resourceTypes": [
+        "image",
+        "ping",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1406,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||commission-junction.com^",
+      "resourceTypes": [
+        "image",
+        "ping",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1407,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||fpjs.pro^",
+      "resourceTypes": [
+        "image",
+        "ping",
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1408,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||coinhive.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1409,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||cryptoloot.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1410,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||minero.cc^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1411,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||jsecoin.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1412,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||deepminer.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1413,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||crypto-loot.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1414,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||papoto.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
   }
 ]

@@ -83,7 +83,23 @@
               "rb_clickid",
               "__twitter_impression",
               "nr_email_referer",
-              "vero_id"
+              "vero_id",
+              "tt_from",
+              "tt_medium",
+              "tt_content",
+              "tt_campaign_id",
+              "tt_ad_id",
+              "tt_group_id",
+              "tt_creative_id",
+              "li_fat_id",
+              "li_giant",
+              "li_source",
+              "pin_unauth_id",
+              "ScCid",
+              "rdt_cid",
+              "xclid",
+              "dclid",
+              "wickedid"
             ]
           }
         }
@@ -180,7 +196,23 @@
               "rb_clickid",
               "__twitter_impression",
               "nr_email_referer",
-              "vero_id"
+              "vero_id",
+              "tt_from",
+              "tt_medium",
+              "tt_content",
+              "tt_campaign_id",
+              "tt_ad_id",
+              "tt_group_id",
+              "tt_creative_id",
+              "li_fat_id",
+              "li_giant",
+              "li_source",
+              "pin_unauth_id",
+              "ScCid",
+              "rdt_cid",
+              "xclid",
+              "dclid",
+              "wickedid"
             ]
           }
         }

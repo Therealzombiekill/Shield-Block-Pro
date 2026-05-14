@@ -1515,7 +1515,7 @@ async function injectCosmetics(tabId, tabUrl) {
         },
         args: [applicable],
       });
-    } catch (e) { logEvent('filter-sync', 'warn', `User filter parse failed: ${e.message}`); }
+    } catch (e) { logEvent('scriptlets', 'warn', `Scriptlet injection failed: ${e.message}`); }
   }
 
   // userCosmetics / userDomainCosmetics already loaded above
@@ -2313,6 +2313,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
       }
+      case 'RESTORE_FROM_CLOUD': {
+        try {
+          const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
+          if (!Object.keys(synced).length) { sendResponse({ ok: false, error: 'Nothing saved' }); break; }
+          if (synced.settings && typeof synced.settings === 'object') {
+            const validated = {};
+            for (const [k, v] of Object.entries(synced.settings)) {
+              if (k in DEFAULT_SETTINGS && typeof v === typeof DEFAULT_SETTINGS[k]) validated[k] = v;
+            }
+            synced.settings = validated;
+          }
+          await chrome.storage.local.set(synced);
+          invalidateSettingsCache();
+          logEvent('system', 'info', `Cloud restore: ${Object.keys(synced).join(', ')}`);
+          sendResponse({ ok: true, keys: Object.keys(synced) });
+        } catch (e) { sendResponse({ ok: false, error: e.message }); }
+        break;
+      }
       default: sendResponse({ error: 'Unknown message' });
     }
   })();
@@ -2359,7 +2377,7 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
       }
       await chrome.storage.local.set({ pausedSites, whitelist, pauseWhitelisted });
       logEvent('pause', 'info', `Auto-resumed ${domain}`);
-    } catch (e) { logEvent('system', 'warn', `Context menu setup failed: ${e.message}`); }
+    } catch (e) { logEvent('pause', 'warn', `pauseExpiry cleanup failed for ${domain}: ${e.message}`); }
   }
 });
 

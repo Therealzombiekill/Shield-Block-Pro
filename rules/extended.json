@@ -128,14 +128,15 @@
     "condition": {
       "urlFilter": "||33across.com^",
       "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
         "font",
+        "image",
+        "media",
+        "other",
         "ping",
-        "other"
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
       ]
     }
   },
@@ -148,14 +149,15 @@
     "condition": {
       "urlFilter": "||sovrn.com^",
       "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
         "font",
+        "image",
+        "media",
+        "other",
         "ping",
-        "other"
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
       ]
     }
   },
@@ -1808,14 +1810,15 @@
     "condition": {
       "urlFilter": "||crazyegg.com^",
       "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
         "font",
+        "image",
+        "media",
+        "other",
         "ping",
-        "other"
+        "script",
+        "stylesheet",
+        "sub_frame",
+        "xmlhttprequest"
       ]
     }
   },
@@ -2287,26 +2290,6 @@
     },
     "condition": {
       "urlFilter": "||analytics.linkedin.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1126,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||px.ads.linkedin.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -3220,26 +3203,6 @@
     }
   },
   {
-    "id": 1178,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||dp.g.doubleclick.net^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1179,
     "priority": 1,
     "action": {
@@ -4108,14 +4071,15 @@
     "condition": {
       "urlFilter": "||indexww.com^",
       "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
         "font",
+        "image",
+        "media",
+        "other",
         "ping",
-        "other"
+        "script",
+        "stylesheet",
+        "sub_frame",
+        "xmlhttprequest"
       ]
     }
   },
@@ -4167,26 +4131,6 @@
     },
     "condition": {
       "urlFilter": "||jads.co^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1226,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||jadserve.postrelease.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -4287,26 +4231,6 @@
     },
     "condition": {
       "urlFilter": "||kpler.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1232,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||launch.appsflyer.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -6260,26 +6184,6 @@
     }
   },
   {
-    "id": 1334,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||sync.search.spotxchange.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
     "id": 1335,
     "priority": 1,
     "action": {
@@ -6507,26 +6411,6 @@
     },
     "condition": {
       "urlFilter": "||tradetracker.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other"
-      ]
-    }
-  },
-  {
-    "id": 1347,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||tradingdesk.strikead.com^",
       "resourceTypes": [
         "script",
         "image",
@@ -7436,6 +7320,188 @@
         "font",
         "ping",
         "other"
+      ]
+    }
+  },
+  {
+    "id": 1394,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ix.com^",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1395,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||vidoomy.com^",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1396,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||beachfront.com^",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1397,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||prebid.net^",
+      "resourceTypes": [
+        "image",
+        "ping",
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1398,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||prebid.io^",
+      "resourceTypes": [
+        "image",
+        "ping",
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1399,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||clarity.ms^",
+      "resourceTypes": [
+        "image",
+        "ping",
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1400,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||heap.io^",
+      "resourceTypes": [
+        "image",
+        "ping",
+        "script",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
+      ]
+    }
+  },
+  {
+    "id": 1401,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||pepperjam.com^",
+      "resourceTypes": [
+        "image",
+        "ping",
+        "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com"
       ]
     }
   }

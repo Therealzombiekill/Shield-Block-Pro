@@ -176,6 +176,7 @@
   // ── Element Picker ────────────────────────────────────────────────────────
   let _pickerActive = false;
   let _highlight    = null;
+  let _deactivatePicker = null; // set by activatePicker; called by DEACTIVATE_PICKER message
 
   function buildSelector(el) {
     if (!el || el === document.body) return 'body';
@@ -300,6 +301,7 @@
 
     const deactivatePicker = () => {
       _pickerActive = false;
+      _deactivatePicker = null;
       _highlight?.remove(); _highlight = null;
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('click', onClick, true);
@@ -307,6 +309,7 @@
       document.body.style.cursor = '';
       toast.remove();
     };
+    _deactivatePicker = deactivatePicker;
   }
 
   // ── Right-click element tracking ─────────────────────────────────────────
@@ -324,6 +327,7 @@
       return true;
     }
     if (msg.type === 'DEACTIVATE_PICKER') {
+      _deactivatePicker?.();
       sendResponse({ ok: true });
       return true;
     }

@@ -1459,6 +1459,50 @@ function domainMatchesWhitelist(domain, whitelist) {
   return whitelist.some(d => domain === d || domain.endsWith('.' + d));
 }
 
+// ── Cloud Sync Push ────────────────────────────────────────────────────────
+// Pushes settings, whitelist, userFilterText, and custom list metadata to
+// chrome.storage.sync so they are available on other devices.
+//
+// chrome.storage.sync limits:
+//   Total:    102,400 bytes
+//   Per-item:   8,192 bytes
+//   Writes/min: 1,800
+//
+// Large fields are size-guarded before writing; customFilterLists is stripped
+// down to metadata only (url/name/key/enabled) since cached rule data belongs
+// in local storage, not sync.
+async function pushToCloud() {
+  try {
+    const data = await chrome.storage.local.get(
+      ['settings', 'whitelist', 'userFilterText', 'customFilterLists']
+    );
+    const toSync = {};
+
+    if (data.settings) toSync.settings = data.settings;
+    if (data.whitelist) toSync.whitelist = data.whitelist;
+
+    // userFilterText: skip if too large for a single sync item (>7KB leaves
+    // margin for other items without approaching the 8,192-byte per-item cap)
+    if (typeof data.userFilterText === 'string' && data.userFilterText.length <= 7000) {
+      toSync.userFilterText = data.userFilterText;
+    }
+
+    // customFilterLists: strip cached rule data — only metadata needs to sync
+    if (Array.isArray(data.customFilterLists)) {
+      toSync.customFilterLists = data.customFilterLists.map(
+        ({ url, name, key, enabled }) => ({ url, name: name || url, key, enabled: enabled !== false })
+      );
+    }
+
+    await chrome.storage.sync.set(toSync);
+    logEvent('system', 'info', `Cloud push: ${Object.keys(toSync).join(', ')}`);
+    return { ok: true, keys: Object.keys(toSync) };
+  } catch (e) {
+    logEvent('system', 'warn', `Cloud push failed: ${e.message}`);
+    return { ok: false, error: e.message };
+  }
+}
+
 // ── Cosmetic Injection ─────────────────────────────────────────────────────
 
 async function injectCosmetics(tabId, tabUrl) {
@@ -1753,6 +1797,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if ('referrerStrip'   in msg.settings) applyReferrerRule(merged.referrerStrip !== false);
         if ('httpsUpgrade'    in msg.settings) applyHttpsUpgradeRule(merged.httpsUpgrade !== false);
         if ('privacyHeaders'  in msg.settings) applyPrivacyHeadersRule(merged.privacyHeaders !== false);
+        // Auto-push updated settings to chrome.storage.sync (fire-and-forget)
+        pushToCloud().catch(() => {});
         sendResponse({ ok: true });
         break;
       }
@@ -2002,6 +2048,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } catch (e) { sendResponse({ ok: false, error: e.message }); }
         break;
       }
+      case 'PUSH_TO_CLOUD': {
+        const pushResult = await pushToCloud();
+        sendResponse(pushResult);
+        break;
+      }
       case 'RESTORE_FROM_CLOUD': {
         try {
           const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
@@ -2025,6 +2076,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'WHITELIST_UPDATED': {
         const wl = msg.whitelist ?? [];
         await chrome.storage.local.set({ whitelist: wl });
+        // Auto-push whitelist changes to cloud (fire-and-forget)
+        pushToCloud().catch(() => {});
         sendResponse({ ok: true });
         break;
       }

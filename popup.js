@@ -1197,17 +1197,35 @@ $('pause-btn')?.addEventListener('click', async () => {
 
 // ── Cloud sync ─────────────────────────────────────────────────────────────────
 
+function _cloudStatus(text, isError = false) {
+  const s = $('cloud-status');
+  if (!s) return;
+  s.style.color = isError ? 'var(--red,#f87171)' : 'var(--green)';
+  s.textContent = text;
+  setTimeout(() => { if (s) { s.textContent = ''; s.style.color = 'var(--green)'; } }, 3000);
+}
+
+$('cloud-push-btn')?.addEventListener('click', async () => {
+  const s = $('cloud-status');
+  if (s) { s.style.color = 'var(--muted)'; s.textContent = 'Pushing…'; }
+  const r = await msg('PUSH_TO_CLOUD');
+  if (r?.ok) {
+    _cloudStatus(`✓ Pushed: ${r.keys?.join(', ')}`);
+  } else {
+    _cloudStatus('✗ ' + (r?.error || 'Push failed'), true);
+  }
+});
+
 $('cloud-restore-btn')?.addEventListener('click', async () => {
   const s = $('cloud-status');
-  if (s) s.textContent = 'Restoring…';
+  if (s) { s.style.color = 'var(--muted)'; s.textContent = 'Restoring…'; }
   const r = await msg('RESTORE_FROM_CLOUD');
   if (r?.ok) {
-    if (s) s.textContent = `✓ Restored: ${r.keys?.join(', ')}`;
+    _cloudStatus(`✓ Restored: ${r.keys?.join(', ')}`);
     await loadSettings();
   } else {
-    if (s) s.textContent = '✗ ' + (r?.error || 'Nothing saved');
+    _cloudStatus('✗ ' + (r?.error || 'Nothing saved'), true);
   }
-  setTimeout(() => { if (s) s.textContent = ''; }, 3000);
 });
 
 // ── Import uBlock Origin ───────────────────────────────────────────────────────

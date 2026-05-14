@@ -1674,6 +1674,9 @@ async function injectCosmetics(tabId, tabUrl) {
 // ── Messages ───────────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Only accept messages from this extension's own contexts (content scripts, popup).
+  // External pages cannot send runtime messages, but validating here is defense-in-depth.
+  if (sender.id !== chrome.runtime.id) return;
   (async () => {
     switch (msg.type) {
 

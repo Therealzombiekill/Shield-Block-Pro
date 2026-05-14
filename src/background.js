@@ -2116,6 +2116,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
             synced.settings = validated;
           }
+          if ('whitelist' in synced && !Array.isArray(synced.whitelist)) delete synced.whitelist;
+          if ('userFilterText' in synced && typeof synced.userFilterText !== 'string') delete synced.userFilterText;
+          if ('customFilterLists' in synced && !Array.isArray(synced.customFilterLists)) delete synced.customFilterLists;
+          if (!Object.keys(synced).length) { sendResponse({ ok: false, error: 'Nothing usable in cloud data' }); break; }
           await chrome.storage.local.set(synced);
           invalidateSettingsCache();
           logEvent('system', 'info', `Cloud restore: ${Object.keys(synced).join(', ')}`);

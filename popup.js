@@ -36,7 +36,7 @@ document.querySelectorAll('.nb').forEach(btn => {
         refreshMatrix();
         refreshPageLog();
         refreshTopDomains();
-        _pauseCheckInterval = setInterval(checkPauseStatus, 10000);
+        _pauseCheckInterval = setInterval(() => { checkPauseStatus(); checkGlobalPause(); }, 10000);
         break;
       case 'whitelist':
         refreshWhitelist();

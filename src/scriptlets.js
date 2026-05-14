@@ -36,6 +36,18 @@
     return new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   }
 
+  // Traverse an object by dotted path and delete the leaf key.
+  // Used by json-prune and object-prune.
+  function pruneByPath(obj, path) {
+    const parts = path.split('.');
+    let node = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (node == null || typeof node !== 'object') return;
+      node = node[parts[i]];
+    }
+    if (node != null && typeof node === 'object') delete node[parts[parts.length - 1]];
+  }
+
   function toVal(s) {
     if (s === 'true')       return true;
     if (s === 'false')      return false;
@@ -206,21 +218,9 @@
       if (!propsToRemove) return;
       const paths = propsToRemove.split(/\s+/).filter(Boolean);
       const _parse = JSON.parse;
-      // Traverse an object by dotted path and delete the leaf key.
-      function pruneByPath(obj, path) {
-        const parts = path.split('.');
-        let node = obj;
-        for (let i = 0; i < parts.length - 1; i++) {
-          if (node == null || typeof node !== 'object') return;
-          node = node[parts[i]];
-        }
-        if (node != null && typeof node === 'object') delete node[parts[parts.length - 1]];
-      }
       JSON.parse = function (text, reviver) {
         const result = _parse.apply(this, arguments);
         if (result && typeof result === 'object') {
-          // BUG WAS: getProp(path, false) — that traverses `window`, not `result`.
-          // Fix: traverse `result` directly using pruneByPath.
           paths.forEach(path => pruneByPath(result, path));
         }
         return result;
@@ -297,10 +297,7 @@
       if (!obj || !key) return;
       const orig = obj[key];
       if (!orig || typeof orig !== 'object') return;
-      paths.forEach(p => {
-        const { obj: o2, key: k2 } = getProp(p, false);
-        if (o2 && k2) delete o2[k2];
-      });
+      paths.forEach(p => pruneByPath(orig, p));
     },
 
     // replace-node-text / trusted-replace-node-text

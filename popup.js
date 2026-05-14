@@ -330,7 +330,7 @@ function updateStatusPill(domain, whitelist) {
   const el = $('hdr-status');
   el.className = wl ? 'pill pill-off' : 'pill pill-on';
   el.textContent = '';
-  const _d = document.createElement('div'); _d.className = 'dot'; el.appendChild(_d);
+  const _d = document.createElement('span'); _d.className = 'dot'; el.appendChild(_d);
   el.appendChild(document.createTextNode(wl ? 'PAUSED' : 'ACTIVE'));
 }
 

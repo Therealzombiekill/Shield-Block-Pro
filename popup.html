@@ -95,7 +95,7 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
   padding:8px 6px 7px;text-align:center;transition:border-color .15s;
 }
 .sc:hover{border-color:var(--border2)}
-.sc-n{display:block;font-family:var(--mono);font-size:14px;font-weight:700;line-height:1}
+.sc-n{display:block;font-family:var(--mono);font-size:14px;font-weight:700;line-height:1;transition:color .3s}
 .sc-l{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;
   letter-spacing:.05em;margin-top:3px}
 .sc.az .sc-n{color:var(--amzn)}
@@ -121,10 +121,14 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 
 /* Filter bar */
 .fbar{
-  padding:7px 14px;display:flex;align-items:center;
-  justify-content:space-between;border-top:1px solid var(--border);
-  background:var(--s1);
+  display:flex;flex-direction:column;align-items:stretch;
+  border-top:1px solid var(--border);background:var(--s1);
 }
+.fbar-top{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:6px;padding:7px 14px;flex-wrap:wrap;
+}
+.fbar-btns{display:flex;gap:3px;align-items:center;flex-shrink:0}
 .fbar-left{display:flex;align-items:center;gap:6px}
 .fdot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
 .fdot.syncing{background:var(--yellow);animation:pulse .8s ease-in-out infinite}
@@ -274,6 +278,59 @@ letter-spacing:.05em;margin-right:4px;flex-shrink:0}
 textarea:focus{border-color:var(--accent)!important}
 #spark-chart { image-rendering: pixelated; }
 .pause-active { color: var(--yellow) !important; border-color: var(--yellow) !important; }
+
+/* ── Popup fade-in ───────────────────────────────────────────────── */
+@keyframes sbFadeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+#app.ready{animation:sbFadeIn .14s ease}
+
+/* ── Custom scrollbars ───────────────────────────────────────────── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+
+/* ── Select elements ─────────────────────────────────────────────── */
+select{
+  font-family:var(--mono);font-size:10px;height:22px;padding:0 4px;
+  background:var(--s1);color:var(--text);
+  border:1px solid var(--border2);border-radius:4px;
+  cursor:pointer;outline:none;transition:border-color .15s;
+  -webkit-appearance:none;appearance:none;
+}
+select:hover,select:focus{border-color:var(--accent2)}
+
+/* ── Focus ring ──────────────────────────────────────────────────── */
+:focus-visible{outline:2px solid rgba(124,106,255,.55);outline-offset:1px;border-radius:3px}
+
+/* ── Nav underline transition ────────────────────────────────────── */
+.nb::after{transition:opacity .12s}
+.nb:not(.active)::after{opacity:0}
+
+/* ── Stats panel sections ────────────────────────────────────────── */
+.ss{border-top:1px solid var(--border);padding:8px 16px}
+.ss-hd{
+  font-family:var(--mono);font-size:9px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;
+}
+.ss-hd-row{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;
+}
+
+/* ── Matrix section ──────────────────────────────────────────────── */
+.matrix-sec{
+  border-top:1px solid var(--border);background:var(--s1);
+  padding:8px 14px 10px;flex-shrink:0;
+}
+.matrix-sec-hd{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;
+}
+.matrix-sec-label{
+  font-family:var(--mono);font-size:9px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;
+}
+
+/* ── Input transitions ───────────────────────────────────────────── */
+input[type="text"],input[type="url"]{transition:border-color .15s}
 </style>
 </head>
 <body>
@@ -293,7 +350,7 @@ textarea:focus{border-color:var(--accent)!important}
       </div>
       <span class="logo-name">SHIELD<em>BLOCK</em></span>
     </div>
-    <div id="hdr-status" class="pill pill-on"><div class="dot"></div>ACTIVE</div>
+    <div id="hdr-status" class="pill pill-on"><span class="dot"></span>ACTIVE</div>
   </div>
 
   <!-- NAV -->
@@ -372,55 +429,57 @@ textarea:focus{border-color:var(--accent)!important}
         <span class="info-val" id="stat-last-sync">—</span>
       </div>
     </div>
-        <!-- ── Per-page blocked requests ──────────────────────────────────────── -->
-    <div style="border-top:1px solid var(--border);padding:6px 16px 6px">
-      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Blocked on this page</div>
+    <!-- ── Per-page blocked requests ──────────────────────────────── -->
+    <div class="ss">
+      <div class="ss-hd">Blocked on this page</div>
       <div id="page-log-list" style="font-family:var(--mono);font-size:9px;max-height:80px;overflow-y:auto;color:var(--muted)">—</div>
     </div>
 
-    <!-- ── Top blocked domains ───────────────────────────────────────────── -->
-    <div style="border-top:1px solid var(--border);padding:10px 16px 6px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Top blocked this session</span>
+    <!-- ── Top blocked domains ─────────────────────────────────────── -->
+    <div class="ss">
+      <div class="ss-hd-row">
+        <span class="ss-hd" style="margin-bottom:0">Top blocked this session</span>
         <span id="sb-indicator" title="Safe browsing status" style="font-size:9px;display:none">🛡 Safe Browsing</span>
       </div>
       <div id="top-domains-list" style="font-family:var(--mono);font-size:9px;max-height:72px;overflow-y:auto;color:var(--muted)">No blocks recorded yet</div>
     </div>
 
-    <!-- 7-day chart -->
-    <div style="padding:6px 16px 4px;border-top:1px solid var(--border)">
-      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">7-day activity</div>
+    <!-- ── 7-day chart ─────────────────────────────────────────────── -->
+    <div class="ss" style="padding-bottom:6px">
+      <div class="ss-hd">7-day activity</div>
       <canvas id="spark-chart" height="36" style="width:100%;display:block;border-radius:4px"></canvas>
     </div>
 
     <div class="fbar">
-      <div class="fbar-left">
-        <div class="fdot" id="fdot"></div>
-        <span class="ftext" id="ftext"><strong>—</strong> rules active</span>
-      </div>
-      <div style="display:flex;gap:4px">
-        <button class="ghost" id="pause-btn" title="Pause blocking on this site">⏸ pause</button>
-        <select id="pause-dur" title="Pause duration" style="font-size:10px;height:22px;padding:0 2px;border:1px solid var(--border2);border-radius:4px;background:var(--bg2);color:var(--text);cursor:pointer">
-          <option value="30">30m</option>
-          <option value="60">1h</option>
-          <option value="180">3h</option>
-          <option value="480">8h</option>
-        </select>
-        <button class="ghost" id="pause-all-btn" title="Pause ALL blocking for 30 minutes">⏸ all</button>
-        <button class="ghost" id="pick-btn" title="Hide an element by clicking it">⊕ pick</button>
-        <button class="ghost" id="sync-btn">↺ sync</button>
-        <button class="ghost" id="reset-btn">↺ reset</button>
-      </div>
-
-      <!-- ── Domain filtering matrix ──────────────────────────────────── -->
-      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">3rd-party blocking</span>
-          <button class="ghost" id="matrix-clear" style="font-size:9px;padding:1px 5px" title="Reset all matrix rules for this site">↺ reset</button>
+      <div class="fbar-top">
+        <div class="fbar-left">
+          <div class="fdot" id="fdot"></div>
+          <span class="ftext" id="ftext"><strong>—</strong> rules active</span>
         </div>
-        <div id="matrix-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:3px"></div>
-        <div id="matrix-status" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;min-height:12px"></div>
+        <div class="fbar-btns">
+          <button class="ghost" id="pause-btn" title="Pause blocking on this site">⏸ pause</button>
+          <select id="pause-dur" title="Pause duration">
+            <option value="30">30m</option>
+            <option value="60">1h</option>
+            <option value="180">3h</option>
+            <option value="480">8h</option>
+          </select>
+          <button class="ghost" id="pause-all-btn" title="Pause ALL blocking for 30 minutes">⏸ all</button>
+          <button class="ghost" id="pick-btn" title="Hide an element by clicking it">⊕ pick</button>
+          <button class="ghost" id="sync-btn">↺ sync</button>
+          <button class="ghost" id="reset-btn">↺ reset</button>
+        </div>
       </div>
+    </div>
+
+    <!-- ── Domain filtering matrix ──────────────────────────────────── -->
+    <div class="matrix-sec">
+      <div class="matrix-sec-hd">
+        <span class="matrix-sec-label">3rd-party blocking</span>
+        <button class="ghost" id="matrix-clear" style="font-size:9px;padding:1px 5px" title="Reset all matrix rules for this site">↺ reset</button>
+      </div>
+      <div id="matrix-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:3px"></div>
+      <div id="matrix-status" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;min-height:12px"></div>
     </div>
 
   </div>
@@ -460,7 +519,7 @@ textarea:focus{border-color:var(--accent)!important}
         </div>
         <div class="sw"><input type="checkbox" id="t-sm" data-s="social" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
-<label class="tr" for="t-ck">
+      <label class="tr" for="t-ck">
         <div class="tr-info">
           <div class="ti" style="background:rgba(52,211,153,.1)">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#34d399"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>

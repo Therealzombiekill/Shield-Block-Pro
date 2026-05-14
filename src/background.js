@@ -1097,7 +1097,7 @@ async function syncFilterLists(force = false) {
     // Batch all storage reads — meta (staleness), cached rules, AND stored ETags
     const storeKeys = FILTER_LISTS.flatMap(l => [
       `fm_${l.key}`, `fr_${l.key}`, `fe_${l.key}`,
-      `fc_${l.key}`, `fd_${l.key}`, `fs_${l.key}`, // cosmetics / domain-cosmetics / scriptlets cache
+      `fc_${l.key}`, `fd_${l.key}`, `fs_${l.key}`, `frp_${l.key}`, // cosmetics / domain-cosmetics / scriptlets / removeparam cache
     ]);
     const stored = await chrome.storage.local.get(storeKeys);
 
@@ -1128,6 +1128,13 @@ async function syncFilterLists(force = false) {
         for (const [dom, rules] of Object.entries(cachedScriptlets)) {
           if (!allScriptletRules[dom]) allScriptletRules[dom] = [];
           allScriptletRules[dom].push(...rules);
+        }
+        // Restore cached removeparam data — same issue: without this, filter-list-derived
+        // $removeparam entries vanish after the first 12h cycle when lists return 304/cached.
+        const cachedRp = stored[`frp_${list.key}`];
+        if (cachedRp) {
+          for (const p of cachedRp.global ?? []) allRemoveParams.global.add(p);
+          allRemoveParams.domain.push(...(cachedRp.domain ?? []));
         }
       } else {
         staleLists.push({ list, limit, etag: stored[`fe_${list.key}`] ?? null });
@@ -1189,6 +1196,11 @@ async function syncFilterLists(force = false) {
             if (!allScriptletRules[dom]) allScriptletRules[dom] = [];
             allScriptletRules[dom].push(...rules);
           }
+          const cachedRp304 = stored[`frp_${val.list.key}`];
+          if (cachedRp304) {
+            for (const p of cachedRp304.global ?? []) allRemoveParams.global.add(p);
+            allRemoveParams.domain.push(...(cachedRp304.domain ?? []));
+          }
           // Refresh the staleness timestamp so we don't re-check too soon
           await chrome.storage.local.set({
             [`fm_${val.list.key}`]: { at: Date.now(), count: cached.length },
@@ -1223,6 +1235,7 @@ async function syncFilterLists(force = false) {
             [`fc_${val.list.key}`]: cosmetics,
             [`fd_${val.list.key}`]: domainCosmetics,
             [`fs_${val.list.key}`]: scriptletRules,
+            [`frp_${val.list.key}`]: { global: removeParams?.global ?? [], domain: removeParams?.domain ?? [] },
           };
           if (val.etag) updates[`fe_${val.list.key}`] = val.etag;
           await chrome.storage.local.set(updates);

@@ -461,13 +461,13 @@
       if (!key) return;
       try { localStorage.removeItem(key); } catch(_) {}
       // Also intercept future writes
-      const _orig = localStorage.setItem.bind(localStorage);
+      const _origSetItem = Storage.prototype.setItem;
       const re = typeof key === 'string' && key.startsWith('/') && key.lastIndexOf('/') > 0
         ? toRe(key) : new RegExp('^' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$');
       try {
         Storage.prototype.setItem = function(k, v) {
           if (this === localStorage && re && re.test(k)) return;
-          _orig.call(this, k, v);
+          _origSetItem.call(this, k, v);
         };
       } catch(_) {}
     },

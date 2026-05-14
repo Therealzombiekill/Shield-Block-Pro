@@ -149,18 +149,26 @@
   // We mute the audio element during the ad. Seeking to end was removed —
   // it's unreliable and the YTM audio element duration resets unpredictably.
   let _ytmAdActive = false;
+  let _ytmWasMuted = false;
   function handleYTMusicAd() {
     if (!location.hostname.includes('music.youtube.com')) return;
     const playerBar = document.querySelector('ytmusic-player-bar');
     if (!playerBar?.hasAttribute('ad-playing')) {
-      if (_ytmAdActive) { _ytmAdActive = false; _sbLog('info', 'YT Music audio ad cleared'); }
+      if (_ytmAdActive) {
+        _ytmAdActive = false;
+        const audio = document.querySelector('audio');
+        try { if (audio) audio.muted = _ytmWasMuted; } catch (_) {}
+        _sbLog('info', 'YT Music audio ad cleared — audio restored');
+      }
       return;
     }
     const audio = document.querySelector('audio');
     try {
-      if (audio && !audio.muted) {
+      if (audio && !_ytmAdActive) {
+        _ytmWasMuted = audio.muted;
         audio.muted = true;
-        if (!_ytmAdActive) { _ytmAdActive = true; _sbLog('warn', 'YT Music audio ad — muted'); }
+        _ytmAdActive = true;
+        _sbLog('warn', 'YT Music audio ad — muted');
       }
     } catch (_) {}
   }
@@ -201,6 +209,12 @@
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.youtube === false) {
       _cleanup();
+      // Restore audio if we muted it for an ad
+      if (_muted || _ytmAdActive) {
+        const media = document.querySelector('video') || document.querySelector('audio');
+        try { if (media) media.muted = false; } catch (_) {}
+        _muted = false; _ytmAdActive = false;
+      }
       window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
     }
   });

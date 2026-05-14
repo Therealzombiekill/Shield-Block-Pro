@@ -2409,6 +2409,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 }
               }
               safe[k] = validated;
+            } else if (k === 'userFilterText') {
+              if (typeof data[k] === 'string') safe[k] = data[k];
+            } else if (k === 'whitelist' || k === 'customHideRules') {
+              if (Array.isArray(data[k])) safe[k] = data[k].filter(v => typeof v === 'string');
+            } else if (k === 'customFilterLists') {
+              if (Array.isArray(data[k])) safe[k] = data[k];
             } else {
               safe[k] = data[k];
             }

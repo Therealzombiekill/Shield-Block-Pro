@@ -506,6 +506,7 @@ async function _retryFailedLists() {
   const retryCosmeticsToMerge = [];
   const retryDomCosToMerge = [];
   const retryScriptletsToMerge = [];
+  const retryRemoveParams = []; // collected to merge into aggregated removeParamData
   for (const result of results) {
     if (result.status === 'rejected') {
       logEvent('filter-sync', 'warn', `Retry failed: ${result.reason?.message}`);
@@ -519,6 +520,7 @@ async function _retryFailedLists() {
       retryCosmeticsToMerge.push(...cosmetics);
       retryDomCosToMerge.push(domainCosmetics);
       retryScriptletsToMerge.push(scriptletRules);
+      if (removeParams) retryRemoveParams.push(removeParams);
       await chrome.storage.local.set({
         [`fr_${list.key}`]:  rules,
         [`fm_${list.key}`]:  { at: Date.now(), count: rules.length },
@@ -568,6 +570,25 @@ async function _retryFailedLists() {
         scriptletRules:    mergedSR,
       });
     } catch (e) { logEvent('filter-sync', 'warn', `Retry cosmetics merge failed: ${e.message}`); }
+  }
+  // Merge recovered removeparam data into the aggregated cache and re-apply DNR rules.
+  // Without this, frp_* per-list keys are updated but removeParamData (read by
+  // applyRemoveParamRules) stays stale — recovered $removeparam rules are silently inactive.
+  if (retryRemoveParams.length > 0) {
+    try {
+      const { removeParamData = { global: [], domain: [] } } =
+        await chrome.storage.local.get('removeParamData');
+      const mergedGlobal = new Set(removeParamData.global ?? []);
+      const mergedDomain = [...(removeParamData.domain ?? [])];
+      for (const rp of retryRemoveParams) {
+        for (const p of rp.global ?? []) mergedGlobal.add(p);
+        mergedDomain.push(...(rp.domain ?? []));
+      }
+      await chrome.storage.local.set({
+        removeParamData: { global: [...mergedGlobal], domain: mergedDomain },
+      });
+      await applyRemoveParamRules();
+    } catch (e) { logEvent('filter-sync', 'warn', `Retry removeparam merge failed: ${e.message}`); }
   }
   } finally { _stopKeepAlive(); }
 }

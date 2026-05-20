@@ -645,6 +645,8 @@ local function resetGame()
 			if kv then kv.Value = 0 end
 			local wv = ls:FindFirstChild("Wave")
 			if wv then wv.Value = 0 end
+			local cv = ls:FindFirstChild("Coins")
+			if cv then cv.Value = GameConfig.START_COINS end
 		end
 	end
 end

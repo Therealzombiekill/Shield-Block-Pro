@@ -111,9 +111,10 @@ local timerLabel = label(topBar, "Timer", "",
 	UDim2.new(1,-140,0,8), UDim2.new(0,130,0,26),
 	18, Color3.fromRGB(180,200,255), Enum.TextXAlignment.Right)
 
-local zombieLabel = label(topBar, "Zombies", "",
-	UDim2.new(0.5,-60,0,8), UDim2.new(0,120,0,26),
-	14, Color3.fromRGB(200,100,100), Enum.TextXAlignment.Center)
+-- zombieLabel sits just below the top bar so it doesn't overlap waveLabel
+local zombieLabel = label(gui, "Zombies", "",
+	UDim2.new(0.5,-90,0,45), UDim2.new(0,180,0,20),
+	13, Color3.fromRGB(220,110,110), Enum.TextXAlignment.Center)
 
 -- ── Health bar (bottom-left) ──────────────────────────────────────────────────
 local hpOuter = frame(gui, "HPOuter",
@@ -414,22 +415,35 @@ local function onToolUnequipped()
 	updateAmmo()
 end
 
-local function watchCharacterTools(char)
-	local function watchTool(tool)
-		if not tool:IsA("Tool") then return end
-		tool.Equipped:Connect(function()   onToolEquipped(tool) end)
-		tool.Unequipped:Connect(function() onToolUnequipped()   end)
-	end
+-- Track which tools already have Equipped/Unequipped wired up so we never
+-- double-connect if the tool moves between Backpack and Character.
+local connectedTools = {}
 
-	for _, item in ipairs(char:GetChildren()) do watchTool(item) end
-	char.ChildAdded:Connect(watchTool)
-
-	for _, item in ipairs(player.Backpack:GetChildren()) do watchTool(item) end
-	player.Backpack.ChildAdded:Connect(watchTool)
+local function setupTool(tool)
+	if not tool:IsA("Tool") then return end
+	if connectedTools[tool]  then return end   -- already wired
+	connectedTools[tool] = true
+	tool.Equipped:Connect(function()   onToolEquipped(tool) end)
+	tool.Unequipped:Connect(function() onToolUnequipped()   end)
+	-- Clean up the entry when the tool is removed from the game entirely
+	tool.AncestryChanged:Connect(function()
+		if not tool.Parent then connectedTools[tool] = nil end
+	end)
 end
 
-player.CharacterAdded:Connect(watchCharacterTools)
-if player.Character then watchCharacterTools(player.Character) end
+-- Backpack persists across respawns — connect once, forever
+for _, item in ipairs(player.Backpack:GetChildren()) do setupTool(item) end
+player.Backpack.ChildAdded:Connect(setupTool)
+
+-- Character is replaced on each respawn — reconnect each time
+player.CharacterAdded:Connect(function(char)
+	for _, item in ipairs(char:GetChildren()) do setupTool(item) end
+	char.ChildAdded:Connect(setupTool)
+end)
+if player.Character then
+	for _, item in ipairs(player.Character:GetChildren()) do setupTool(item) end
+	player.Character.ChildAdded:Connect(setupTool)
+end
 
 -- Reload key (R)
 UserInputService.InputBegan:Connect(function(input, processed)
@@ -467,8 +481,9 @@ local function muzzleFlash(origin, hitPoint)
 end
 
 local function shoot()
-	if not equipped then return end
-	if isReloading   then return end
+	if not equipped         then return end
+	if isReloading          then return end
+	if not player.Character then return end
 
 	local wt   = equipped:FindFirstChild("WeaponType")
 	local wcfg = wt and GameConfig.WEAPONS[wt.Value]
@@ -615,17 +630,24 @@ task.delay(1.5, function()
 	end
 end)
 
--- ── Zombie counter update (live count from workspace) ────────────────────────
-RunService.Heartbeat:Connect(function()
-	local count = 0
-	for _, obj in ipairs(workspace:GetChildren()) do
-		if obj:IsA("Model") and GameConfig.ZOMBIES[obj.Name] then
-			count += 1
+-- ── Zombie counter (polls every 0.5s instead of every frame) ─────────────────
+task.spawn(function()
+	local lastCount = -1
+	while true do
+		task.wait(0.5)
+		local count = 0
+		for _, obj in ipairs(workspace:GetChildren()) do
+			if obj:IsA("Model") and GameConfig.ZOMBIES[obj.Name] then
+				count += 1
+			end
 		end
-	end
-	if count > 0 then
-		zombieLabel.Text = count .. " zombies left"
-	elseif zombieLabel.Text ~= "" and not zombieLabel.Text:find("incoming") then
-		zombieLabel.Text = ""
+		if count ~= lastCount then
+			lastCount = count
+			if count > 0 then
+				zombieLabel.Text = count .. " zombies left"
+			elseif zombieLabel.Text ~= "" and not zombieLabel.Text:find("incoming") then
+				zombieLabel.Text = ""
+			end
+		end
 	end
 end)

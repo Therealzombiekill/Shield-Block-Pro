@@ -613,12 +613,10 @@ async function _isOnline() {
 function incrementStat(type, tabId) {
   // Update per-page stats synchronously (in-memory only)
   if (tabId) {
-    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
-    ps.total = (ps.total | 0) + 1;
-    ps.dom   = (ps.dom   | 0) + 1;
-    if (ps[type] !== undefined || ['amazon','general','social','cookies','spotify'].includes(type)) {
-      ps[type] = (ps[type] | 0) + 1;
-    }
+    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
+    ps.total   = (ps.total | 0) + 1;
+    ps.dom     = (ps.dom   | 0) + 1;
+    ps[type]   = (ps[type] | 0) + 1;
     _pageStats.set(tabId, ps);
   }
   // Accumulate — flush to storage in a single write after 500ms idle

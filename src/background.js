@@ -1127,6 +1127,18 @@ async function applyPrivacyHeadersRule(enabled) {
   }
 }
 
+async function applyUserFilterDnrRules() {
+  try {
+    const { userFilterText = '' } = await chrome.storage.local.get('userFilterText');
+    const { rules } = parseFilterList(userFilterText || '', USER_DNR_BASE, 500);
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const oldIds = existing.filter(r => r.id >= USER_DNR_BASE && r.id < USER_DNR_BASE + 500).map(r => r.id);
+    if (oldIds.length || rules.length) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds, addRules: rules });
+    }
+  } catch (e) { logEvent('filter-sync', 'warn', `applyUserFilterDnrRules failed: ${e.message}`); }
+}
+
 async function syncFilterLists(force = false) {
   if (_syncLock) return;
   _syncLock = true;
@@ -1498,12 +1510,13 @@ async function syncFilterLists(force = false) {
       `Sync complete: ${deduped.length} rules, ${syncFailureCount} failure(s), ${duration}ms`);
 
     // Re-apply all feature DNR rules — the atomic rule swap above removes ALL
-    // dynamic rules (including privacy/referrer/https/matrix IDs) so they must
-    // be restored after every sync, not just on install.
+    // dynamic rules (including privacy/referrer/https/matrix/user-filter IDs) so
+    // they must be restored after every sync, not just on install.
     const _reapplySettings = await getSettings();
     await Promise.all([
       applyRemoveParamRules(),
       applyMatrixRules(),
+      applyUserFilterDnrRules(),
       applyReferrerRule(_reapplySettings.referrerStrip !== false),
       applyHttpsUpgradeRule(_reapplySettings.httpsUpgrade !== false),
       applyPrivacyHeadersRule(_reapplySettings.privacyHeaders !== false),

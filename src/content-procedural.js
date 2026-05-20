@@ -52,7 +52,8 @@
       ...chr,
     ].filter(Boolean);
     procedural = applicable.filter(s => PROCEDURAL_MARKERS.some(m => s.includes(m)));
-    plain      = applicable.filter(s => !procedural.includes(s));
+    const _proceduralSet = new Set(procedural);
+    plain      = applicable.filter(s => !_proceduralSet.has(s));
   }
   _buildSelectors(domainCosmetics, customHideRules);
 
@@ -179,7 +180,7 @@
   function _rebuildAndApply(newDc, newChr) {
     _buildSelectors(newDc, newChr);
     _injectStyle();
-    runProcedural();
+    if (procedural.length > 0) runProcedural();
     _startObserver();
   }
 

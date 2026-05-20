@@ -818,16 +818,12 @@
       const _rectNoise = (stableNoise(SESSION_SEED + 'rect') - 0.5) * 0.2; // ±0.1px
       const _addNoise = (rect) => {
         if (!rect) return rect;
-        return {
-          x: rect.x + _rectNoise, y: rect.y + _rectNoise,
-          width: rect.width, height: rect.height,
-          top: rect.top + _rectNoise, right: rect.right + _rectNoise,
-          bottom: rect.bottom + _rectNoise, left: rect.left + _rectNoise,
-          toJSON: () => ({ x: rect.x + _rectNoise, y: rect.y + _rectNoise,
-            width: rect.width, height: rect.height,
-            top: rect.top + _rectNoise, right: rect.right + _rectNoise,
-            bottom: rect.bottom + _rectNoise, left: rect.left + _rectNoise }),
-        };
+        const x = rect.x + _rectNoise, y = rect.y + _rectNoise;
+        const t = rect.top + _rectNoise, r = rect.right + _rectNoise;
+        const b = rect.bottom + _rectNoise, l = rect.left + _rectNoise;
+        const w = rect.width, h = rect.height;
+        return { x, y, width: w, height: h, top: t, right: r, bottom: b, left: l,
+          toJSON: () => ({ x, y, width: w, height: h, top: t, right: r, bottom: b, left: l }) };
       };
       const _origGBCR = Element.prototype.getBoundingClientRect;
       Element.prototype.getBoundingClientRect = function () {

@@ -155,14 +155,22 @@
 
     'prevent-xhr': ([urlPattern]) => {
       const re = toRe(urlPattern);
+      // Guard: if already patched, push additional pattern onto the existing regex list
+      // rather than wrapping the prototype chain again on every rule invocation.
+      if (XMLHttpRequest.prototype.open._sbXhrPatterns) {
+        if (re) XMLHttpRequest.prototype.open._sbXhrPatterns.push(re);
+        return;
+      }
+      const patterns = re ? [re] : [];
       const _open = XMLHttpRequest.prototype.open;
       const _send = XMLHttpRequest.prototype.send;
       XMLHttpRequest.prototype.open = function (method, url) {
         this._sbBlockedUrl = String(url ?? '');
         return _open.apply(this, arguments);
       };
+      XMLHttpRequest.prototype.open._sbXhrPatterns = patterns;
       XMLHttpRequest.prototype.send = function () {
-        if (re && re.test(this._sbBlockedUrl ?? '')) {
+        if (patterns.length > 0 && patterns.some(p => p.test(this._sbBlockedUrl))) {
           Object.defineProperty(this, 'readyState', { get: () => 4, configurable: true });
           Object.defineProperty(this, 'status',     { get: () => 200, configurable: true });
           Object.defineProperty(this, 'responseText', { get: () => '', configurable: true });

@@ -19,9 +19,9 @@ Go to **roblox.com/create** and download Roblox Studio for free. Sign in with yo
 
 ---
 
-## Step 3 — Add the 3 game files
+## Step 3 — Add the 4 game files
 
-You need to add exactly **3 scripts** into specific locations. Here's where each one goes:
+You need to add exactly **4 scripts** into specific locations. Here's where each one goes:
 
 ### File 1: `GameConfig.lua`
 - In the **Explorer** panel (left side), find **ReplicatedStorage**
@@ -30,14 +30,21 @@ You need to add exactly **3 scripts** into specific locations. Here's where each
 - Delete all the default code inside it
 - Paste the entire contents of `GameConfig.lua` from this folder
 
-### File 2: `Main.server.lua`
+### File 2: `Maps.lua`
+- In Explorer, find **ReplicatedStorage** again
+- Right-click it → **Insert Object** → choose **ModuleScript**
+- Rename it to exactly: `Maps`
+- Delete all the default code inside it
+- Paste the entire contents of `Maps.lua` from this folder
+
+### File 3: `Main.server.lua`
 - In Explorer, find **ServerScriptService**
 - Right-click it → **Insert Object** → choose **Script**
 - Rename it to: `Main`
 - Delete all default code inside it
 - Paste the entire contents of `Main.server.lua`
 
-### File 3: `Client.client.lua`
+### File 4: `Client.client.lua`
 - In Explorer, expand **StarterPlayer** → click on **StarterPlayerScripts**
 - Right-click **StarterPlayerScripts** → **Insert Object** → choose **LocalScript**
 - Rename it to: `Client`
@@ -63,7 +70,8 @@ You need to add exactly **3 scripts** into specific locations. Here's where each
 | Script | Location | What it does |
 |---|---|---|
 | `GameConfig` | ReplicatedStorage | All the numbers — zombie health, weapon damage, wave definitions. Easy to edit. |
-| `Main` | ServerScriptService | Builds the map, runs the game loop, spawns zombies, handles purchases, manages coins. |
+| `Maps` | ReplicatedStorage | Builds all 4 maps (City, Graveyard, Military, Forest). Picks a new one each round. |
+| `Main` | ServerScriptService | Runs the game loop, spawns zombies, handles purchases, manages coins. |
 | `Client` | StarterPlayerScripts | The entire HUD (health bar, wave info, kill feed, shop panel) + shooting system. |
 
 ---

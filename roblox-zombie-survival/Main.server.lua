@@ -7,6 +7,7 @@ local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MarketplaceService= game:GetService("MarketplaceService")
 local GameConfig        = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local Maps              = require(ReplicatedStorage:WaitForChild("Maps"))
 
 -- ════════════════════════════════════════════════════════════════
 -- 1. REMOTE EVENTS  (created here so the client can WaitForChild)
@@ -37,104 +38,10 @@ local fnGetCoins    = makeRemote("RemoteFunction", "GetCoins")
 local fnGetPhase    = makeRemote("RemoteFunction", "GetPhase")
 
 -- ════════════════════════════════════════════════════════════════
--- 2. MAP BUILDER  (runs once at startup, builds the arena)
+-- 2. MAP  (built from Maps module — rotates to a new map each round)
 -- ════════════════════════════════════════════════════════════════
 
-local ARENA = 200  -- full width/depth of the arena in studs
-
-local function buildMap()
-	-- Remove Roblox default baseplate if present
-	local bp = workspace:FindFirstChild("Baseplate")
-	if bp then bp:Destroy() end
-
-	local mapFolder = Instance.new("Folder")
-	mapFolder.Name   = "Map"
-	mapFolder.Parent = workspace
-
-	-- Floor
-	local floor = Instance.new("Part")
-	floor.Name      = "Floor"
-	floor.Anchored  = true
-	floor.Size      = Vector3.new(ARENA, 2, ARENA)
-	floor.CFrame    = CFrame.new(0, -1, 0)
-	floor.Material  = Enum.Material.SmoothPlastic
-	floor.Color     = Color3.fromRGB(55, 58, 48)
-	floor.Parent    = mapFolder
-
-	-- 4 outer walls
-	local walls = {
-		{ size = Vector3.new(ARENA+4, 22, 4), pos = Vector3.new(0,  10, -ARENA/2-2) },
-		{ size = Vector3.new(ARENA+4, 22, 4), pos = Vector3.new(0,  10,  ARENA/2+2) },
-		{ size = Vector3.new(4, 22, ARENA+4), pos = Vector3.new(-ARENA/2-2, 10, 0) },
-		{ size = Vector3.new(4, 22, ARENA+4), pos = Vector3.new( ARENA/2+2, 10, 0) },
-	}
-	for _, w in ipairs(walls) do
-		local wall = Instance.new("Part")
-		wall.Anchored  = true
-		wall.Size      = w.size
-		wall.CFrame    = CFrame.new(w.pos)
-		wall.Material  = Enum.Material.SmoothPlastic
-		wall.Color     = Color3.fromRGB(75, 75, 85)
-		wall.Parent    = mapFolder
-	end
-
-	-- Cover boxes scattered around the arena
-	local coverSpots = {
-		{35,0,0}, {-35,0,0}, {0,0,35}, {0,0,-35},
-		{22,0,22}, {-22,0,22}, {22,0,-22}, {-22,0,-22},
-		{55,0,18}, {-55,0,-18}, {18,0,55}, {-18,0,-55},
-		{50,0,-40}, {-50,0,40},
-	}
-	for _, c in ipairs(coverSpots) do
-		local box = Instance.new("Part")
-		box.Anchored  = true
-		box.Size      = Vector3.new(math.random(6,12), math.random(5,8), math.random(6,12))
-		box.CFrame    = CFrame.new(c[1], box.Size.Y/2, c[3])
-		box.Material  = Enum.Material.Concrete
-		box.Color     = Color3.fromRGB(95, 85, 75)
-		box.Parent    = mapFolder
-	end
-
-	-- Zombie spawn points: 12 positions around the arena edge (just inside the walls)
-	local spawnsFolder = Instance.new("Folder")
-	spawnsFolder.Name   = "ZombieSpawns"
-	spawnsFolder.Parent = workspace
-
-	local r = ARENA/2 - 6
-	for i = 1, 12 do
-		local a = (i-1) * (math.pi*2/12)
-		local sp = Instance.new("Part")
-		sp.Anchored     = true
-		sp.CanCollide   = false
-		sp.Transparency = 1
-		sp.Size         = Vector3.new(4,1,4)
-		sp.CFrame       = CFrame.new(math.cos(a)*r, 2, math.sin(a)*r)
-		sp.Parent       = spawnsFolder
-	end
-
-	-- Player spawn at center
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name     = "SpawnLocation"
-	spawn.Anchored = true
-	spawn.Neutral  = true
-	spawn.Size     = Vector3.new(8, 1, 8)
-	spawn.CFrame   = CFrame.new(0, 1, 0)
-	spawn.Color    = BrickColor.new("Bright blue")
-	spawn.Material = Enum.Material.SmoothPlastic
-	spawn.Parent   = workspace
-
-	-- Nice lighting
-	game.Lighting.Brightness    = 1.2
-	game.Lighting.ClockTime     = 20   -- night
-	game.Lighting.FogEnd        = 400
-	game.Lighting.FogColor      = Color3.fromRGB(100, 100, 120)
-	game.Lighting.Ambient       = Color3.fromRGB(50, 50, 70)
-	game.Lighting.OutdoorAmbient= Color3.fromRGB(60, 60, 80)
-
-	print("[Map] Arena built.")
-end
-
-buildMap()
+local currentMapName = Maps.build(Maps.random())
 
 -- ════════════════════════════════════════════════════════════════
 -- 3. COIN SYSTEM  (server-authoritative)
@@ -625,16 +532,19 @@ local function doWave(waveNum)
 end
 
 local function resetGame()
-	currentWave = 0
+	currentWave  = 0
 	zombiesAlive = {}
 	spawningDone = false
 
-	-- Kill any leftover zombies from workspace
+	-- Kill any leftover zombies
 	for _, obj in ipairs(workspace:GetChildren()) do
 		if obj:IsA("Model") and GameConfig.ZOMBIES[obj.Name] then
 			obj:Destroy()
 		end
 	end
+
+	-- Switch to a different map (excludes the one just played)
+	currentMapName = Maps.build(Maps.random(currentMapName))
 
 	for _, plr in ipairs(Players:GetPlayers()) do
 		playerCoins[plr.UserId] = GameConfig.START_COINS

@@ -53,7 +53,8 @@
       document.querySelector('.ytp-ad-text') ||
       document.querySelector('.ytp-ad-skip-button') ||
       document.querySelector('.ytp-skip-ad-button') ||
-      document.querySelector('.ytp-ad-skip-button-modern')
+      document.querySelector('.ytp-ad-skip-button-modern') ||
+      document.querySelector('.ytp-ad-persistent-progress-bar-container')
     );
   }
 
@@ -117,6 +118,9 @@
     '.ytd-banner-promo-renderer',
     '.ytd-promoted-sparkles-web-renderer',
     '.ytd-compact-promoted-item-renderer',
+    // Companion / action ads
+    'ytd-action-companion-ad-renderer',
+    'ytd-companion-slot-renderer',
     // Search page sponsored results
     'ytd-search-pyv-renderer',
     'ytd-promoted-video-renderer',

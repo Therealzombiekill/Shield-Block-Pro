@@ -38,12 +38,22 @@
   function stripAds(obj) {
     if (!obj || typeof obj !== 'object') return;
     let stripped = false;
-    if (Array.isArray(obj.adPlacements)  && obj.adPlacements.length)  { obj.adPlacements = [];  stripped = true; }
-    if (Array.isArray(obj.playerAds)     && obj.playerAds.length)     { obj.playerAds = [];     stripped = true; }
-    if (Array.isArray(obj.adSlots)       && obj.adSlots.length)       { obj.adSlots = [];       stripped = true; }
-    if (obj.auxiliaryUi)                                               { delete obj.auxiliaryUi; stripped = true; }
-    // Some responses nest ad data inside playerResponse
-    if (obj.playerResponse)               stripAds(obj.playerResponse);
+    if (Array.isArray(obj.adPlacements)    && obj.adPlacements.length)    { obj.adPlacements = [];    stripped = true; }
+    if (Array.isArray(obj.playerAds)       && obj.playerAds.length)       { obj.playerAds = [];       stripped = true; }
+    if (Array.isArray(obj.adSlots)         && obj.adSlots.length)         { obj.adSlots = [];         stripped = true; }
+    if (Array.isArray(obj.adBreaks)        && obj.adBreaks.length)        { obj.adBreaks = [];        stripped = true; }
+    if (obj.auxiliaryUi)                                                   { delete obj.auxiliaryUi;   stripped = true; }
+    if (obj.adMessagingConfig)                                             { delete obj.adMessagingConfig; stripped = true; }
+    // frameworkUpdates carries mid-roll cue-point mutations — strip ad-break entries only
+    if (obj.frameworkUpdates?.entityBatchUpdate?.mutations) {
+      const muts = obj.frameworkUpdates.entityBatchUpdate.mutations;
+      const before = muts.length;
+      obj.frameworkUpdates.entityBatchUpdate.mutations = muts.filter(
+        m => !m.payload?.adBreakSuggestionEntityPayload && !m.payload?.adSlotLoggingDataEntityPayload
+      );
+      if (obj.frameworkUpdates.entityBatchUpdate.mutations.length < before) stripped = true;
+    }
+    if (obj.playerResponse) stripAds(obj.playerResponse);
     return stripped;
   }
 

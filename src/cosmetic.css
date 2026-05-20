@@ -90,6 +90,19 @@
 /* ── FreeWheel ────────────────────────────────────────────────────────────── */
 [id*="freewheel"], [class*="freewheel"], .fwplaylist,
 
+/* ── Vidazoo ──────────────────────────────────────────────────────────────── */
+[class*="vidazoo"], [id*="vidazoo"],
+
+/* ── Connatix ─────────────────────────────────────────────────────────────── */
+[class*="connatix"], [id*="connatix"],
+
+/* ── Adagio ───────────────────────────────────────────────────────────────── */
+[id*="adagio-slot"], [class*="adagio"],
+
+/* ── Outstream video ads ──────────────────────────────────────────────────── */
+[class*="outstream-ad"], [id*="outstream-ad"],
+[class*="outstream-player"], [id*="outstream"],
+
 /* ── AMP ads ──────────────────────────────────────────────────────────────── */
 amp-ad, amp-embed, amp-sticky-ad,
 

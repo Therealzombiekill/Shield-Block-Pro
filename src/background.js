@@ -1894,8 +1894,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const en = [], dis = [];
           if (merged.general) en.push('base_rules','extended_rules','hosts_rules'); else dis.push('base_rules','extended_rules','hosts_rules');
           if (merged.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
-          if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
-          if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
+          await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en, disableRulesetIds: dis });
         } catch (e) { logEvent('settings', 'warn', `Settings apply failed: ${e.message}`); }
         if (msg.settings?.general === true) syncFilterLists(false);
         // Apply rule-backed settings whenever they change
@@ -2545,6 +2544,16 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
   if (name === 'filterSync') { syncFilterLists(false).catch(e => logEvent('filter-sync', 'error', `Sync alarm error: ${e.message}`)); return; }
   if (name === 'retrySync') { await _retryFailedLists().catch(e => logEvent('filter-sync', 'error', `Retry alarm error: ${e.message}`)); return; }
   if (name === 'safeBrowsingRefresh') { fetchSafeBrowsingLists().catch(() => {}); return; }
+  if (name === 'timeSavedSync') {
+    // Flush any in-memory pending stats so timeSaved in storage is up-to-date
+    if (_pendingTimeSaved > 0 || Object.keys(_pendingStats).length > 0) _flushStats();
+    try {
+      const { timeSaved = 0, lifetime = {} } = await chrome.storage.local.get(['timeSaved', 'lifetime']);
+      const hrs = Math.round((timeSaved ?? 0) / 3600);
+      logEvent('stats', 'info', `3-day timeSaved sync: ${timeSaved}s total (~${hrs}h), lifetime blocks: ${lifetime.total ?? 0}`);
+    } catch (_) {}
+    return;
+  }
   if (name === 'pauseAll') {
     try {
       await chrome.storage.local.set({ globalPause: false });
@@ -2648,7 +2657,8 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   logEvent('system', 'info', `Extension ${reason} (v${chrome.runtime.getManifest().version}, ${_IS_FIREFOX ? 'Firefox' : 'Chrome'})`);
   await chrome.storage.local.set({ licenseValid: true });
 
-  chrome.alarms.create('filterSync', { periodInMinutes: 720 });
+  chrome.alarms.create('filterSync',    { periodInMinutes: 720  });
+  chrome.alarms.create('timeSavedSync', { periodInMinutes: 4320 });
   setupContextMenus();
 
   // Init all feature engines on install/update
@@ -2767,8 +2777,7 @@ chrome.runtime.onStartup.addListener(async () => {
     const en = [], dis = [];
     if (_ss.general) en.push('base_rules','extended_rules','hosts_rules'); else dis.push('base_rules','extended_rules','hosts_rules');
     if (_ss.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
-    if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
-    if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
+    await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en, disableRulesetIds: dis });
   } catch (e) { logEvent('system', 'warn', `Ruleset restore failed: ${e.message}`); }
 
   await Promise.all([
@@ -2782,6 +2791,8 @@ chrome.runtime.onStartup.addListener(async () => {
 
   const existing = await chrome.alarms.get('filterSync');
   if (!existing) chrome.alarms.create('filterSync', { periodInMinutes: 720 });
+  const tssExisting = await chrome.alarms.get('timeSavedSync');
+  if (!tssExisting) chrome.alarms.create('timeSavedSync', { periodInMinutes: 4320 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
     if (sbRulesVersion !== '2.10.1') {

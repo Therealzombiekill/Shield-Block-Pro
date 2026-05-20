@@ -682,9 +682,11 @@
   // coordinator when the user enables the setting.
   // NOTE: This uses a postMessage from the isolated-world content script
   // because we can't read chrome.storage in MAIN world directly.
+  let _tzPatched = false;
   window.addEventListener('message', (e) => {
     if (e.source !== window || e.data?.type !== 'SB_TIMEZONE_SPOOF') return;
-    if (!e.data.enabled) return;
+    if (!e.data.enabled || _tzPatched) return;
+    _tzPatched = true;
     try {
       const _OrigDTF = Intl.DateTimeFormat;
       // Override Intl.DateTimeFormat to always resolve to UTC

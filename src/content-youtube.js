@@ -176,7 +176,7 @@
   // ── Main loop ─────────────────────────────────────────────────────────────────
   function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); }
 
-  const _tickInterval = setInterval(tick, 750);
+  let _tickInterval = setInterval(tick, 750);
   tick();
 
   // Fast path: click skip button the moment it appears in the DOM
@@ -190,7 +190,7 @@
 
   // Stat — count each ad encounter once
   let _wasAd = false;
-  const _statInterval = setInterval(() => {
+  let _statInterval = setInterval(() => {
     const ad = isAdPlaying();
     if (ad && !_wasAd) {
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'youtube' }).catch(() => {});
@@ -198,8 +198,6 @@
     _wasAd = ad;
   }, 1000);
 
-  // Cleanup — disconnect observers and clear intervals when YouTube SPA navigates
-  // away or the feature toggle is turned off (prevents memory/CPU accumulation).
   function _cleanup() {
     clearInterval(_tickInterval);
     clearInterval(_statInterval);
@@ -209,13 +207,23 @@
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.youtube === false) {
       _cleanup();
-      // Restore audio if we muted it for an ad
       if (_muted || _ytmAdActive) {
         const media = document.querySelector('video') || document.querySelector('audio');
         try { if (media) media.muted = false; } catch (_) {}
         _muted = false; _ytmAdActive = false;
       }
       window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    } else if (changes.settings?.newValue?.youtube === true &&
+               changes.settings?.oldValue?.youtube === false) {
+      window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
+      _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
+      _tickInterval = setInterval(tick, 750);
+      _statInterval = setInterval(() => {
+        const ad = isAdPlaying();
+        if (ad && !_wasAd) chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'youtube' }).catch(() => {});
+        _wasAd = ad;
+      }, 1000);
+      tick();
     }
   });
 })().catch(e => {

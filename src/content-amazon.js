@@ -183,7 +183,11 @@ _qs.textContent = `
     if (changes.settings?.newValue?.amazon === false) {
       observer.disconnect();
       clearTimeout(debounce);
-      document.getElementById('_sb_amazon_css')?.remove(); // also remove injected CSS
+      document.getElementById('_sb_amazon_css')?.remove();
+    } else if (changes.settings?.newValue?.amazon === true &&
+               changes.settings?.oldValue?.amazon === false) {
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      clean();
     }
   });
 

@@ -185,14 +185,15 @@
   }
 
   // ── Safety timeout: force-recover if muted for > 90s ─────────────────────────
-  const safetyInterval = setInterval(() => {
+  function _safetyCb() {
     if (adActive && Date.now() - adStartTime > 90000) {
       adActive = false;
       unmuteVideo();
       hideToast();
       _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
     }
-  }, 5000);
+  }
+  let safetyInterval = setInterval(_safetyCb, 5000);
 
   // ── Buffering monitor ─────────────────────────────────────────────────────────
   let _lastPos     = -1;
@@ -201,7 +202,7 @@
   let _lastFixAt   = 0;
   const _FIX_COOLDOWN = 5000;
 
-  const bufferInterval = setInterval(() => {
+  function _bufferCb() {
     if (adActive) { _frozenTicks = 0; return; }
     const video = document.querySelector('video');
     if (!video || video.paused || document.hidden) { _frozenTicks = 0; _lastPos = -1; _lastBuf = -1; return; }
@@ -224,7 +225,8 @@
       _lastBuf     = buf;
       _frozenTicks = 0;
     }
-  }, 500);
+  }
+  let bufferInterval = setInterval(_bufferCb, 500);
 
   // ── Observer + polling ────────────────────────────────────────────────────────
   let debounce = null;
@@ -233,7 +235,7 @@
     debounce = setTimeout(domTick, 300);
   });
   observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
-  const interval = setInterval(domTick, 1000);
+  let interval = setInterval(domTick, 1000);
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.twitch === false) {
@@ -245,6 +247,14 @@
       clearTimeout(toastTimeout);
       hideToast();
       unmuteVideo();
+    } else if (changes.settings?.newValue?.twitch === true &&
+               changes.settings?.oldValue?.twitch === false) {
+      window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
+      observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
+      interval        = setInterval(domTick,    1000);
+      safetyInterval  = setInterval(_safetyCb,  5000);
+      bufferInterval  = setInterval(_bufferCb,   500);
+      domTick();
     }
   });
 

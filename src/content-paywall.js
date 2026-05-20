@@ -165,8 +165,7 @@
 
   // Watch for dynamically injected paywalls
   let _pwDeb = null;
-  const _pwObserver = new MutationObserver((muts) => {
-    if (muts.every(m => m.type === 'characterData')) return;
+  const _pwObserver = new MutationObserver(() => {
     clearTimeout(_pwDeb);
     _pwDeb = setTimeout(unlockContent, 400);
   });

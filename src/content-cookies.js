@@ -451,6 +451,10 @@
     if (changes.settings?.newValue?.cookies === false) {
       observer.disconnect();
       clearTimeout(_debounce);
+    } else if (changes.settings?.newValue?.cookies === true &&
+               changes.settings?.oldValue?.cookies === false) {
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      handleBanners();
     }
   });
 

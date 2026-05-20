@@ -83,26 +83,30 @@
     }
   }
 
-  let _deb = null;
-  const _obs = new MutationObserver(() => { clearTimeout(_deb); _deb = setTimeout(tick, 300); });
-  _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
-  const _int = setInterval(tick, 1000);
+  let _kickDeb = null;
+  const _kickObs = new MutationObserver(() => { clearTimeout(_kickDeb); _kickDeb = setTimeout(tick, 300); });
+  _kickObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+  let _kickInt = setInterval(tick, 1000);
 
   window.addEventListener('beforeunload', () => {
-    _obs.disconnect(); clearInterval(_int); clearTimeout(_deb);
+    _kickObs.disconnect(); clearInterval(_kickInt); clearTimeout(_kickDeb);
   }, { once: true });
 
-  // Cleanup on toggle-off — restore audio and disconnect
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.kick === false) {
-      _obs.disconnect();
-      clearInterval(_int);
-      clearTimeout(_deb);
+      _kickObs.disconnect();
+      clearInterval(_kickInt);
+      clearTimeout(_kickDeb);
       if (adActive) {
         const video = document.querySelector('video');
         if (video) video.muted = wasMuted;
         adActive = false;
       }
+    } else if (changes.settings?.newValue?.kick === true &&
+               changes.settings?.oldValue?.kick === false) {
+      _kickObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      _kickInt = setInterval(tick, 1000);
+      tick();
     }
   });
 

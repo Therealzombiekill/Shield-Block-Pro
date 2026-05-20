@@ -279,6 +279,7 @@ function formatBadge(n) {
 // Batched stat writer — accumulates increments and flushes in one storage write
 // every 500ms (or immediately if > 20 pending). Avoids a read+write per ad removal.
 let _pendingStats     = {};  // { statType: count }
+let _pendingCount     = 0;   // running total of _pendingStats values — avoids reduce() in hot path
 let _pendingTimeSaved = 0;   // seconds accumulated since last flush
 let _pendingFlush     = null;
 
@@ -305,6 +306,7 @@ function _flushStats() {
   const pending        = _pendingStats;
   const savedThisFlush = _pendingTimeSaved;
   _pendingStats     = {};
+  _pendingCount     = 0;
   _pendingTimeSaved = 0;
   if (Object.keys(pending).length === 0 && savedThisFlush === 0) return;
 
@@ -621,9 +623,9 @@ function incrementStat(type, tabId) {
   }
   // Accumulate — flush to storage in a single write after 500ms idle
   _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
+  _pendingCount++;
   _pendingTimeSaved  += TIME_SAVED_SECONDS[type] ?? 2;
-  const pending = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
-  if (pending >= 20) {
+  if (_pendingCount >= 20) {
     clearTimeout(_pendingFlush);
     _flushStats(); // flush immediately when backlog hits 20
   } else if (!_pendingFlush) {
@@ -2544,7 +2546,7 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
   if (name === 'safeBrowsingRefresh') { fetchSafeBrowsingLists().catch(() => {}); return; }
   if (name === 'timeSavedSync') {
     // Flush any in-memory pending stats so timeSaved in storage is up-to-date
-    if (_pendingTimeSaved > 0 || Object.keys(_pendingStats).length > 0) _flushStats();
+    if (_pendingTimeSaved > 0 || _pendingCount > 0) _flushStats();
     try {
       const { timeSaved = 0, lifetime = {} } = await chrome.storage.local.get(['timeSaved', 'lifetime']);
       const hrs = Math.round((timeSaved ?? 0) / 3600);

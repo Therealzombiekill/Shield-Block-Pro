@@ -186,12 +186,10 @@
       const inlineStyle = el.getAttribute('style') || '';
       if (!inlineStyle.includes('fixed') && !inlineStyle.includes('absolute') &&
           !inlineStyle.includes('z-index')) continue;
-      // Only now pay for getComputedStyle
       try {
-        const pos = window.getComputedStyle(el).position;
-        if (pos !== 'fixed' && pos !== 'absolute') continue;
-        // Read zIndex separately — avoids constructing the full CSSStyleDeclaration again
-        const z = parseInt(el.style.zIndex, 10) || parseInt(window.getComputedStyle(el).zIndex, 10);
+        const cs = window.getComputedStyle(el);
+        if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
+        const z = parseInt(el.style.zIndex, 10) || parseInt(cs.zIndex, 10);
         if (!z || z < 1000) continue;
         const text = el.textContent || '';
         if (ANTIBLOCK_TEXT.some(r => r.test(text))) {
@@ -214,8 +212,9 @@
       const cls = ((el.className || '') + ' ' + (el.id || '')).toLowerCase();
       if (!/ad|promo|interstitial|popup|overlay|modal|newsletter|subscribe|sponsor/i.test(cls)) continue;
       try {
-        if (window.getComputedStyle(el).position !== 'fixed') continue;
-        const z = parseInt(el.style.zIndex, 10) || parseInt(window.getComputedStyle(el).zIndex, 10);
+        const cs = window.getComputedStyle(el);
+        if (cs.position !== 'fixed') continue;
+        const z = parseInt(el.style.zIndex, 10) || parseInt(cs.zIndex, 10);
         if (!z || z < 9000) continue;
         el.remove();
       } catch (_e) { console.warn('[SB:general]', _e?.message ?? _e); }
@@ -250,9 +249,7 @@
   // ── Observer ──────────────────────────────────────────────────────────────────
   let _debounce = null;
   const _target = document.body || document.documentElement;
-  const _observer = new MutationObserver((mutations) => {
-    // Fast-exit if only text content changed (no new elements to check)
-    if (mutations.every(m => m.type === 'characterData')) return;
+  const _observer = new MutationObserver(() => {
     clearTimeout(_debounce);
     _debounce = setTimeout(tick, 200);
   });

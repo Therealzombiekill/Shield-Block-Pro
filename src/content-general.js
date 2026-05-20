@@ -271,6 +271,10 @@
     if (changes.settings?.newValue?.cosmetic === false) {
       _observer.disconnect();
       clearTimeout(_debounce);
+    } else if (changes.settings?.newValue?.cosmetic === true &&
+               changes.settings?.oldValue?.cosmetic === false) {
+      if (_target) _observer.observe(_target, { childList: true, subtree: true });
+      tick();
     }
   });
 

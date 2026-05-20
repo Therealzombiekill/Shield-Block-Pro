@@ -176,11 +176,15 @@
     clearTimeout(_pwDeb);
   }, { once: true });
 
-  // Cleanup on toggle-off
+  // Cleanup on toggle-off / re-enable on toggle-on
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.paywall === false) {
       _pwObserver.disconnect();
       clearTimeout(_pwDeb);
+    } else if (changes.settings?.newValue?.paywall === true &&
+               changes.settings?.oldValue?.paywall === false) {
+      _pwObserver.observe(document.documentElement, { childList: true, subtree: true });
+      unlockContent();
     }
   });
 

@@ -67,6 +67,21 @@ function hasUnsupportedPseudo(selector) {
   );
 }
 
+function parseScriptletArgs(str) {
+  const args = [];
+  let current = '';
+  let inQuote = null;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if ((ch === '"' || ch === "'") && inQuote === null) { inQuote = ch; current += ch; }
+    else if (ch === inQuote) { inQuote = null; current += ch; }
+    else if (ch === ',' && inQuote === null) { args.push(current.trim()); current = ''; }
+    else { current += ch; }
+  }
+  if (current) args.push(current.trim());
+  return args;
+}
+
 function parseLine(line, idCounter) {
   try {
   line = line.trim();
@@ -92,7 +107,7 @@ function parseLine(line, idCounter) {
     // ── Scriptlet: example.com##+js(name, arg1, arg2) ─────────────────────
     if (rawAfter.startsWith('+js(') && rawAfter.endsWith(')')) {
       const inner = rawAfter.slice(4, -1).trim();
-      const parts = inner.split(',').map(s => s.trim());
+      const parts = parseScriptletArgs(inner);
       const [name, ...args] = parts;
       if (!name) return null;
       // '*' means apply to all domains

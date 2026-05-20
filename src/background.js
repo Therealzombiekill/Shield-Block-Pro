@@ -34,7 +34,13 @@ const STATIC_REMOVE_PARAMS = new Set([
   // Instagram
   'igshid', 'igsh',
   // TikTok
-  'tt_medium', 'tt_content', 'ttclid',
+  'tt_medium', 'tt_content', 'ttclid', 'ttp',
+  // Reddit
+  'rdt_cid',
+  // Google Shopping
+  'srsltid',
+  // Amazon deep link tracking
+  'pd_rd_r', 'pd_rd_w', 'pd_rd_wg', 'pd_rd_ts', 'pd_rd_i',
   // Snapchat
   'ScCid',
   // Mailchimp
@@ -118,7 +124,7 @@ function adGuardUrl(filterId) {
 //   Peter Lowe          │ 13000  │  200 │ 13200
 //   AdGuard Tracking    │ 13500  │  350 │ 13850   ← new, replaces AdGuard Annoyances
 //   uBlock Annoyances   │ 14000  │  150 │ 14150
-//   uBlock Filters      │ 14500  │  550 │ 15050   ← new: uBO main list
+//   uBlock Filters      │ 14500  │  300 │ 14800   ← new: uBO main list
 //   Fanboy Social       │ 15500  │  120 │ 15620   ← new: social widget blocking
 //   AdGuard Base        │ 16000  │  300 │ 16300
 //   uBlock Badware      │ 16500  │  150 │ 16650

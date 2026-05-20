@@ -207,6 +207,35 @@
     }
   } catch (_) {}
 
+  // ── 6b. navigator.plugins / mimeTypes normalization ──────────────────────────
+  // Without this, sites can enumerate installed plugin count/names as a fingerprint vector.
+  // Modern Chrome already limits plugins to the built-in PDF viewer; we normalize Firefox
+  // and older contexts to the same single-entry baseline.
+  try {
+    if (navigator.plugins && navigator.plugins.length > 1) {
+      const _fakePlugin = { name: 'PDF Viewer', filename: 'internal-pdf-viewer',
+        description: '', length: 0, item: () => null, namedItem: () => null };
+      const _fakePlugins = Object.assign(Object.create(PluginArray.prototype), {
+        length: 1, 0: _fakePlugin,
+        item: (i) => i === 0 ? _fakePlugin : null,
+        namedItem: (n) => n === 'PDF Viewer' ? _fakePlugin : null,
+        refresh: () => {},
+        [Symbol.iterator]: function* () { yield _fakePlugin; },
+      });
+      Object.defineProperty(navigator, 'plugins', { get: () => _fakePlugins, configurable: true });
+
+      const _fakeMime = { type: 'application/pdf', description: 'Portable Document Format',
+        suffixes: 'pdf', enabledPlugin: _fakePlugin };
+      const _fakeMimes = Object.assign(Object.create(MimeTypeArray.prototype), {
+        length: 1, 0: _fakeMime,
+        item: (i) => i === 0 ? _fakeMime : null,
+        namedItem: (n) => n === 'application/pdf' ? _fakeMime : null,
+        [Symbol.iterator]: function* () { yield _fakeMime; },
+      });
+      Object.defineProperty(navigator, 'mimeTypes', { get: () => _fakeMimes, configurable: true });
+    }
+  } catch (_) {}
+
   // ── 7. Screen dimension normalization ────────────────────────────────────────
   // Round to nearest 100px — reduces uniqueness without hiding the general device class.
   // Also normalizes colorDepth/pixelDepth (always 24) and availWidth/availHeight
@@ -777,5 +806,43 @@
   // they cannot be set or removed by extensions or JS. They're set by the browser
   // itself before each request and cannot be spoofed. No action needed here.
   // (Documented so future maintainers don't spend time attempting to override them.)
+
+  // ── 25. ClientRects sub-pixel noise ──────────────────────────────────────────
+  // getBoundingClientRect / getClientRects expose sub-pixel font metrics that
+  // can fingerprint the exact font stack even when font enumeration is blocked.
+  // A stable noise delta of ±0.1px makes the fingerprint session-unique without
+  // any visible effect on layout (browsers already snap to physical pixels).
+  // Skip on YouTube — DRM player relies on precise rect queries for PiP/fullscreen.
+  try {
+    if (!location.hostname.includes('youtube.com') && !location.hostname.includes('youtu.be')) {
+      const _rectNoise = (stableNoise(SESSION_SEED + 'rect') - 0.5) * 0.2; // ±0.1px
+      const _addNoise = (rect) => {
+        if (!rect) return rect;
+        return {
+          x: rect.x + _rectNoise, y: rect.y + _rectNoise,
+          width: rect.width, height: rect.height,
+          top: rect.top + _rectNoise, right: rect.right + _rectNoise,
+          bottom: rect.bottom + _rectNoise, left: rect.left + _rectNoise,
+          toJSON: () => ({ x: rect.x + _rectNoise, y: rect.y + _rectNoise,
+            width: rect.width, height: rect.height,
+            top: rect.top + _rectNoise, right: rect.right + _rectNoise,
+            bottom: rect.bottom + _rectNoise, left: rect.left + _rectNoise }),
+        };
+      };
+      const _origGBCR = Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = function () {
+        return _addNoise(_origGBCR.apply(this, arguments));
+      };
+      const _origGCR = Element.prototype.getClientRects;
+      Element.prototype.getClientRects = function () {
+        const rects = _origGCR.apply(this, arguments);
+        // DOMRectList is not directly constructable — return a plain array-like with noise
+        const noisy = Array.from(rects).map(_addNoise);
+        noisy.item = (i) => noisy[i] ?? null;
+        Object.setPrototypeOf(noisy, DOMRectList.prototype);
+        return noisy;
+      };
+    }
+  } catch (_) {}
 
 })();

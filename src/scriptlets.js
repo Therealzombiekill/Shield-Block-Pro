@@ -153,6 +153,30 @@
       try { window.fetch.toString = () => _fetch.toString(); } catch (_) {}
     },
 
+    'prevent-xhr': ([urlPattern]) => {
+      const re = toRe(urlPattern);
+      const _open = XMLHttpRequest.prototype.open;
+      const _send = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        this._sbBlockedUrl = String(url ?? '');
+        return _open.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function () {
+        if (re && re.test(this._sbBlockedUrl ?? '')) {
+          Object.defineProperty(this, 'readyState', { get: () => 4, configurable: true });
+          Object.defineProperty(this, 'status',     { get: () => 200, configurable: true });
+          Object.defineProperty(this, 'responseText', { get: () => '', configurable: true });
+          Object.defineProperty(this, 'response',   { get: () => '', configurable: true });
+          setTimeout(() => {
+            try { this.dispatchEvent(new Event('readystatechange')); } catch (_) {}
+            try { this.dispatchEvent(new Event('load')); } catch (_) {}
+          }, 0);
+          return;
+        }
+        return _send.apply(this, arguments);
+      };
+    },
+
     'remove-class': ([classNames, selector]) => {
       if (!classNames) return;
       const classes = classNames.split('|').map(c => c.trim()).filter(Boolean);
@@ -582,6 +606,7 @@
 
   // Aliases
   IMPL['prevent-fetch'] = IMPL['no-fetch-if']; // uBO uses 'prevent-fetch'; we implement it as no-fetch-if
+  IMPL['no-xhr-if']     = IMPL['prevent-xhr']; // ABP uses 'no-xhr-if'
   IMPL['aopr'] = IMPL['abort-on-property-read'];
   IMPL['aopw'] = IMPL['abort-on-property-write'];
   IMPL['sc']   = IMPL['set-constant'];

@@ -52,7 +52,7 @@
     '#taboola-above', '#taboola-below', '#taboola-stream',
     '.taboola', '.outbrain', '.zergnet', '[id^="taboola-"]',
     // Ad networks
-    '.adsbygoogle', '[data-adzerk]', '[class*="adroll"]',
+    '[data-adzerk]', '[class*="adroll"]',
     '[id*="freewheel"]', '.fwplaylist',
     '[id*="teads"]', '[id*="mgid"]',
     '[id*="primis"]', '[class*="primis"]',

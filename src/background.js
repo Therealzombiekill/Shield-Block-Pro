@@ -1632,7 +1632,7 @@ async function injectCosmetics(tabId, tabUrl) {
         },
         args: [applicable],
       });
-    } catch (e) { logEvent('filter-sync', 'warn', `User filter parse failed: ${e.message}`); }
+    } catch (e) { logEvent('cosmetic', 'warn', `Scriptlet injection failed: ${e.message}`); }
   }
 
   // userCosmetics / userDomainCosmetics already loaded above
@@ -1863,7 +1863,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
         try {
           const en = [], dis = [];
-          if (merged.general) en.push('base_rules','extended_rules'); else dis.push('base_rules','extended_rules');
+          if (merged.general) en.push('base_rules','extended_rules','hosts_rules'); else dis.push('base_rules','extended_rules','hosts_rules');
           if (merged.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
           if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
           if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
@@ -2704,6 +2704,18 @@ chrome.runtime.onStartup.addListener(async () => {
     const { staticRuleCount } = await chrome.storage.local.get('staticRuleCount');
     if (staticRuleCount) _staticRuleCount = staticRuleCount;
   } catch (_) {}
+  // Restore static ruleset enabled/disabled state from settings.
+  // The manifest defaults all rulesets to enabled. After a browser restart,
+  // Chrome resets them to the manifest state — if the user had disabled general
+  // or tracking blocking, those rulesets must be re-disabled here.
+  try {
+    const en = [], dis = [];
+    if (_ss.general) en.push('base_rules','extended_rules','hosts_rules'); else dis.push('base_rules','extended_rules','hosts_rules');
+    if (_ss.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
+    if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
+    if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
+  } catch (e) { logEvent('system', 'warn', `Ruleset restore failed: ${e.message}`); }
+
   await Promise.all([
     applyRemoveParamRules(), applyMatrixRules(),
     applyReferrerRule(_ss.referrerStrip !== false),

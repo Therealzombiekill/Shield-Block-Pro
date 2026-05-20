@@ -674,7 +674,7 @@ async function refreshMatrix() {
   if (!grid) return;
 
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (!tab?.url?.startsWith('http')) { grid.innerHTML = ''; if (status) status.textContent = 'Not available on this page'; return; }
     _currentHost = new URL(tab.url).hostname.replace(/^www\./, '');
 

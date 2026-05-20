@@ -416,6 +416,14 @@ async function boot() {
   _intervals.push(setInterval(refreshStats, 3000));
   _intervals.push(setInterval(refreshFilterStatus, 8000));
 
+  // Initialize stats panel (shown by default — nav click handler never fires on first open)
+  checkPauseStatus();
+  checkGlobalPause();
+  refreshMatrix();
+  refreshPageLog();
+  refreshTopDomains();
+  _pauseCheckInterval = setInterval(() => { checkPauseStatus(); checkGlobalPause(); }, 10000);
+
   // Check for updates (silently, non-blocking)
   setTimeout(async () => {
     try {
@@ -1255,10 +1263,10 @@ $('ubo-import-btn')?.addEventListener('change', async (e) => {
 });
 
 // ── Badge toggle ───────────────────────────────────────────────────────────────
+// Note: SET_SETTINGS is already handled by the generic [data-s] listener above.
+// This handler only needs to clear the badge text immediately when disabled.
 $('t-badge')?.addEventListener('change', async (e) => {
-  const enabled = e.target.checked;
-  await msg('SET_SETTINGS', { settings: { badgeEnabled: enabled } });
-  if (!enabled) {
+  if (!e.target.checked) {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id) chrome.action.setBadgeText({ text: '', tabId: tab.id });
   }

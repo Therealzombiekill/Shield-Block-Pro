@@ -2170,6 +2170,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (!Object.keys(synced).length) { sendResponse({ ok: false, error: 'Nothing usable in cloud data' }); break; }
           await chrome.storage.local.set(synced);
           invalidateSettingsCache();
+          // Re-apply user filter DNR rules if filter text was restored
+          if (synced.userFilterText) {
+            try {
+              const { rules: cloudDnr } = parseFilterList(synced.userFilterText, USER_DNR_BASE, 500);
+              const existingRls = await chrome.declarativeNetRequest.getDynamicRules();
+              const oldIds = existingRls.filter(r => r.id >= USER_DNR_BASE && r.id < USER_DNR_BASE + 500).map(r => r.id);
+              await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds, addRules: cloudDnr });
+            } catch (e) { logEvent('filter-sync', 'warn', `Cloud restore DNR apply failed: ${e.message}`); }
+          }
           logEvent('system', 'info', `Cloud restore: ${Object.keys(synced).join(', ')}`);
           sendResponse({ ok: true, keys: Object.keys(synced) });
         } catch (e) {
@@ -2473,6 +2482,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           await chrome.storage.local.set(safe);
           invalidateSettingsCache(); // settings may have changed
+          // Re-apply user filter DNR rules if filter text was imported
+          if (safe.userFilterText) {
+            try {
+              const { rules: importedDnr } = parseFilterList(safe.userFilterText, USER_DNR_BASE, 500);
+              const existing = await chrome.declarativeNetRequest.getDynamicRules();
+              const oldIds = existing.filter(r => r.id >= USER_DNR_BASE && r.id < USER_DNR_BASE + 500).map(r => r.id);
+              await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds, addRules: importedDnr });
+            } catch (e) { logEvent('filter-sync', 'warn', `Import settings DNR apply failed: ${e.message}`); }
+          }
         }
         sendResponse({ ok: true });
         break;

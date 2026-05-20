@@ -15,6 +15,7 @@ const PAUSE_ALL_RULE_ID = 49999;
 // so they never collide with either.
 const REMOVEPARAM_BASE  = 30000; // 30000-30999: global + domain-scoped removeparam rules
 const MATRIX_BASE       = 31000; // 31000-31999: per-domain filtering matrix rules
+const USER_DNR_BASE     = 32000; // 32000-32499: user-typed filter rules (My Filters textarea)
 // ── Hardcoded tracking parameter list ─────────────────────────────────────
 // These are applied REGARDLESS of what filter lists contain. Updated independently
 // of the 12-hour filter sync cycle — they never change in structure, just grow.
@@ -919,7 +920,7 @@ async function applyMatrixRules() {
     // Swap existing matrix rules: only remove IDs actually present
     const existingMxRules = await chrome.declarativeNetRequest.getDynamicRules();
     const mxRemoveIds = existingMxRules
-      .filter(r => r.id >= MATRIX_BASE && r.id < 32000)
+      .filter(r => r.id >= MATRIX_BASE && r.id < USER_DNR_BASE)
       .map(r => r.id);
 
     await chrome.declarativeNetRequest.updateDynamicRules({
@@ -1714,12 +1715,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'PARSE_USER_FILTERS': {
-        // Parse user-typed filter rules and store as cosmetics/scriptlets.
-        // Always REPLACE (not merge) — accumulating means deleted rules silently persist.
+        // Parse user-typed filter rules. Always REPLACE (not merge).
         const { text } = msg;
         if (text && typeof text === 'string') {
-          const { cosmetics, domainCosmetics, scriptletRules } =
-            parseFilterList(text, 90000, 500);
+          const { rules: userDnrRules, cosmetics, domainCosmetics, scriptletRules } =
+            parseFilterList(text, USER_DNR_BASE, 500);
+          // Remove old user DNR rules, apply new ones (IDs USER_DNR_BASE … +499)
+          try {
+            const existing = await chrome.declarativeNetRequest.getDynamicRules();
+            const oldIds = existing.filter(r => r.id >= USER_DNR_BASE && r.id < USER_DNR_BASE + 500).map(r => r.id);
+            if (oldIds.length || userDnrRules.length) {
+              await chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: oldIds,
+                addRules: userDnrRules,
+              });
+            }
+          } catch (e) { logEvent('filter-sync', 'warn', `User DNR apply failed: ${e.message}`); }
           await chrome.storage.local.set({
             userCosmetics:        cosmetics,
             userDomainCosmetics:  domainCosmetics,
@@ -1736,6 +1747,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'CLEAR_USER_FILTERS': {
+        try {
+          const existing = await chrome.declarativeNetRequest.getDynamicRules();
+          const userIds = existing.filter(r => r.id >= USER_DNR_BASE && r.id < USER_DNR_BASE + 500).map(r => r.id);
+          if (userIds.length) await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: userIds });
+        } catch (e) { logEvent('filter-sync', 'warn', `User DNR clear failed: ${e.message}`); }
         await chrome.storage.local.remove(
           ['userCosmetics','userDomainCosmetics','userScriptletRules','userFilterText']
         );
@@ -2106,11 +2122,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Import user filters
           if (uboData.userFilters && typeof uboData.userFilters === 'string') {
             updates.userFilterText = uboData.userFilters;
-            const { cosmetics, domainCosmetics, scriptletRules } =
-              parseFilterList(uboData.userFilters, 90000, 500);
+            const { rules: uboUserDnr, cosmetics, domainCosmetics, scriptletRules } =
+              parseFilterList(uboData.userFilters, USER_DNR_BASE, 500);
             updates.userCosmetics = cosmetics;
             updates.userDomainCosmetics = domainCosmetics;
             updates.userScriptletRules = scriptletRules;
+            // Apply imported network rules into the user DNR range
+            if (uboUserDnr.length) {
+              try {
+                const existing = await chrome.declarativeNetRequest.getDynamicRules();
+                const oldIds = existing.filter(r => r.id >= USER_DNR_BASE && r.id < USER_DNR_BASE + 500).map(r => r.id);
+                await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds, addRules: uboUserDnr });
+              } catch (e) { logEvent('filter-sync', 'warn', `UBO import DNR apply failed: ${e.message}`); }
+            }
           }
           // Import whitelist
           if (uboData.whitelist && typeof uboData.whitelist === 'string') {

@@ -287,7 +287,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "blocked.html",
         "welcome.html",
         "src/blank.js",
         "rules/base.json",

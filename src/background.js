@@ -209,7 +209,6 @@ const DEFAULT_SETTINGS = {
   kick: true,
   youtube: true,
   badgeEnabled: true,
-  safeBrowsing: true,   // phishing / malware URL checking
   paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
   referrerStrip: true,  // strip Referer header on 3rd-party requests
   httpsUpgrade: true,   // upgrade http:// navigations to https://
@@ -725,30 +724,6 @@ chrome.webNavigation.onBeforeNavigate.addListener(async ({ tabId, frameId, url }
   _navCounted.delete(tabId);
   _navCounting.delete(tabId);
 
-  // ── Safe browsing check ──────────────────────────────────────────────────
-  if (!url?.startsWith('http')) return;
-  try {
-    const s = await getSettings();
-    if (!s.safeBrowsing) return;
-
-    // Skip if the user explicitly chose to proceed past this warning
-    const hostname = new URL(url).hostname.replace(/^www\./, '');
-    const bypassExpiry = _sbBypassedHostnames.get(hostname);
-    if (bypassExpiry) {
-      if (Date.now() < bypassExpiry) return; // still within bypass window
-      _sbBypassedHostnames.delete(hostname); // expired — clean up
-    }
-
-    if (checkSafeBrowsing(url)) {
-      const warningUrl = chrome.runtime.getURL('blocked.html') + '?url=' + encodeURIComponent(url);
-      await chrome.tabs.update(tabId, { url: warningUrl });
-      _sbBlockCount++;
-      chrome.storage.local.get('sbBlocks', ({ sbBlocks = 0 }) => {
-        chrome.storage.local.set({ sbBlocks: sbBlocks + 1 }).catch(() => {});
-      });
-      logEvent('safe-browsing', 'warn', `Blocked malicious URL: ${hostname}`);
-    }
-  } catch (_) {}
 });
 
 chrome.webNavigation.onCompleted.addListener(({ tabId, frameId, url }) => {
@@ -974,110 +949,6 @@ async function setMatrixRule(hostname, ruleKey, action) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ── Safe browsing ─────────────────────────────────────────────────────────
-// Downloads malware/phishing domain lists and checks navigations against them.
-// Sources used (all free, no API key required):
-//   urlhaus.abuse.ch  — active malware distribution URLs (updated hourly)
-//   openphish.com     — phishing URLs (updated every 30 min)
-// Blocked URLs redirect to a local warning page with option to proceed.
-// ══════════════════════════════════════════════════════════════════════════════
-
-let _safeBrowsingDomains = new Set(); // in-memory for fast synchronous lookup
-const SB_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
-
-// Hostnames the user explicitly chose to bypass. Entries expire after 30 s so
-// the bypass doesn't persist if the user closes the tab without navigating.
-const _sbBypassedHostnames = new Map(); // hostname → expiry timestamp
-let _sbBlockCount = 0; // in-memory threat-block counter (persisted in sbBlocks)
-
-// Periodic sweep of expired bypass entries (lazy cleanup at lookup handles the common
-// case; this sweep handles domains the user bypassed but never revisited).
-setInterval(() => {
-  const now = Date.now();
-  for (const [h, expiry] of _sbBypassedHostnames) {
-    if (now >= expiry) _sbBypassedHostnames.delete(h);
-  }
-}, 60000);
-
-async function loadSafeBrowsingCache() {
-  try {
-    const { sbDomains = [], sbLastFetch = 0, sbBlocks = 0 } =
-      await chrome.storage.local.get(['sbDomains', 'sbLastFetch', 'sbBlocks']);
-    _safeBrowsingDomains = new Set(sbDomains);
-    _sbBlockCount = sbBlocks;
-    logEvent('safe-browsing', 'info', `Loaded ${_safeBrowsingDomains.size} domains from cache`);
-    // Refresh if stale
-    if (Date.now() - sbLastFetch > SB_REFRESH_INTERVAL_MS) await fetchSafeBrowsingLists();
-  } catch (e) {
-    logEvent('safe-browsing', 'warn', `Cache load failed: ${e.message}`);
-  }
-}
-
-async function fetchSafeBrowsingLists() {
-  _startKeepAlive('fetchSafeBrowsingLists');
-  try {
-    const sources = [
-    {
-      url: 'https://urlhaus.abuse.ch/downloads/text_recent/',
-      parse: (text) => {
-        const domains = new Set();
-        for (const line of text.split('\n')) {
-          const t = line.trim();
-          if (!t || t.startsWith('#')) continue;
-          try { domains.add(new URL(t).hostname.replace(/^www\./, '')); } catch (_) {}
-        }
-        return domains;
-      },
-    },
-    {
-      url: 'https://openphish.com/feed.txt',
-      parse: (text) => {
-        const domains = new Set();
-        for (const line of text.split('\n')) {
-          const t = line.trim();
-          if (!t || t.startsWith('#')) continue;
-          try { domains.add(new URL(t).hostname.replace(/^www\./, '')); } catch (_) {}
-        }
-        return domains;
-      },
-    },
-  ];
-
-  const merged = new Set();
-  for (const source of sources) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 15000);
-      const res = await fetch(source.url, { cache: 'no-store', signal: ctrl.signal });
-      clearTimeout(timer);
-      if (!res.ok) continue;
-      const text = await res.text();
-      for (const d of source.parse(text)) merged.add(d);
-    } catch (e) {
-      logEvent('safe-browsing', 'warn', `Fetch failed (${source.url}): ${e.message}`);
-    }
-  }
-
-  if (merged.size > 0) {
-    _safeBrowsingDomains = merged;
-    await chrome.storage.local.set({ sbDomains: [...merged], sbLastFetch: Date.now() });
-    logEvent('safe-browsing', 'info', `Updated: ${merged.size} malicious domains`);
-  }
-  } finally { _stopKeepAlive(); }
-}
-
-function checkSafeBrowsing(url) {
-  if (!_safeBrowsingDomains.size) return false;
-  try {
-    const hostname = new URL(url).hostname.replace(/^www\./, '');
-    if (_safeBrowsingDomains.has(hostname)) return true;
-    // Check parent domains (e.g. sub.evil.com → evil.com)
-    const parts = hostname.split('.');
-    for (let i = 1; i < parts.length - 1; i++) {
-      if (_safeBrowsingDomains.has(parts.slice(i).join('.'))) return true;
-    }
-  } catch (_) {}
-  return false;
-}
 
 // ── Referrer stripping ─────────────────────────────────────────────────────
 // Remove the Referer header from all cross-origin requests via DNR modifyHeaders.
@@ -2031,12 +1902,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else warn('Cosmetics', `${cosmeticSelectors.length} selectors — low, sync may be needed`);
         } catch (e) { warn('Cosmetics', e.message); }
 
-        // 5. Safe browsing domains loaded
-        if (_safeBrowsingDomains.size > 0)
-          pass('Safe browsing', `${_safeBrowsingDomains.size} threat domains in memory`);
-        else warn('Safe browsing', 'No threat domains loaded');
-
-        // 6. Removeparam rules active
+        // 5. Removeparam rules active
         try {
           const allRules = await chrome.declarativeNetRequest.getDynamicRules();
           const rpRules  = allRules.filter(r => r.id >= REMOVEPARAM_BASE && r.id < MATRIX_BASE);
@@ -2381,29 +2247,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(sorted);
         break;
       }
-      // ── Safe browsing ──────────────────────────────────────────────────────
-      case 'GET_SAFE_BROWSING_STATUS':
-        sendResponse({
-          active: true,
-          domainCount: _safeBrowsingDomains.size,
-          threatsBlocked: _sbBlockCount,
-        });
-        break;
-      case 'SAFE_BROWSING_BYPASS': {
-        // User explicitly chose to proceed past the blocked.html warning.
-        // Add a 30-second bypass window so the subsequent navigation isn't re-blocked.
-        try {
-          const bypassHostname = new URL(msg.url).hostname.replace(/^www\./, '');
-          _sbBypassedHostnames.set(bypassHostname, Date.now() + 30000);
-          logEvent('safe-browsing', 'info', `User bypassed: ${bypassHostname}`);
-        } catch (_) {}
-        sendResponse({ ok: true });
-        break;
-      }
-      case 'REFRESH_SAFE_BROWSING':
-        fetchSafeBrowsingLists().catch(() => {});
-        sendResponse({ ok: true });
-        break;
       case 'PAUSE_ALL': {
         const paMins = Math.min(msg.minutes ?? 30, 1440); // cap at 24 h
         const expiry = Date.now() + paMins * 60000;
@@ -2600,7 +2443,6 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
 chrome.alarms.onAlarm.addListener(async ({ name }) => {
   if (name === 'filterSync') { syncFilterLists(false).catch(e => logEvent('filter-sync', 'error', `Sync alarm error: ${e.message}`)); return; }
   if (name === 'retrySync') { await _retryFailedLists().catch(e => logEvent('filter-sync', 'error', `Retry alarm error: ${e.message}`)); return; }
-  if (name === 'safeBrowsingRefresh') { fetchSafeBrowsingLists().catch(() => {}); return; }
   if (name === 'timeSavedSync') {
     // Flush any in-memory pending stats so timeSaved in storage is up-to-date
     if (_pendingTimeSaved > 0 || _pendingCount > 0) _flushStats();
@@ -2725,7 +2567,6 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     applyReferrerRule(_s.referrerStrip !== false),
     applyHttpsUpgradeRule(_s.httpsUpgrade !== false),
     applyPrivacyHeadersRule(_s.privacyHeaders !== false),
-    loadSafeBrowsingCache(),
     computeStaticRuleCount(),
   ]);
 
@@ -2842,7 +2683,6 @@ chrome.runtime.onStartup.addListener(async () => {
     applyReferrerRule(_ss.referrerStrip !== false),
     applyHttpsUpgradeRule(_ss.httpsUpgrade !== false),
     applyPrivacyHeadersRule(_ss.privacyHeaders !== false),
-    loadSafeBrowsingCache(),
     computeStaticRuleCount(),
   ]);
 

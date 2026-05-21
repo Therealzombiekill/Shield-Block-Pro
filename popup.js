@@ -205,25 +205,9 @@ async function refreshPageLog() {
 // ── Top blocked domains (session) ─────────────────────────────────────────────
 async function refreshTopDomains() {
   const list = $('top-domains-list');
-  const sbBadge = $('sb-indicator');
   if (!list) return;
   try {
-    const [domains, sbStatus] = await Promise.all([
-      msg('GET_TOP_DOMAINS').then(r => r ?? []),
-      msg('GET_SAFE_BROWSING_STATUS').then(r => r ?? {}),
-    ]);
-
-    // Safe browsing indicator badge (top-domains header)
-    if (sbBadge && sbStatus.domainCount > 0) {
-      sbBadge.style.display = '';
-      sbBadge.title = `Safe browsing active — ${sbStatus.domainCount.toLocaleString()} threat domains`;
-    }
-
-    // Threats blocked stat row
-    if ($('stat-threats')) {
-      const n = sbStatus.threatsBlocked ?? 0;
-      $('stat-threats').textContent = n > 0 ? `${fmt(n)} site${n === 1 ? '' : 's'}` : '0 sites';
-    }
+    const domains = await msg('GET_TOP_DOMAINS').then(r => r ?? []);
 
     if (!domains.length) { list.textContent = 'No blocks recorded yet'; return; }
     const max = domains[0]?.count || 1;

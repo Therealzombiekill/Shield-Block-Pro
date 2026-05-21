@@ -362,7 +362,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 /* ── Stats lists & chart ─────────────────────────────────────────── */
 #page-log-list{font-family:var(--mono);font-size:9px;max-height:80px;overflow-y:auto;color:var(--muted)}
 #top-domains-list{font-family:var(--mono);font-size:9px;max-height:72px;overflow-y:auto;color:var(--muted)}
-#sb-indicator{font-size:9px}
 #spark-chart{width:100%;display:block;border-radius:4px;image-rendering:pixelated}
 .ss-chart{padding-bottom:6px}
 
@@ -526,10 +525,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <span class="info-val" id="stat-net-dom">—</span>
       </div>
       <div class="info-row">
-        <span class="info-label">Threats blocked</span>
-        <span class="info-val red" id="stat-threats">0 sites</span>
-      </div>
-      <div class="info-row">
         <span class="info-label">Filters synced</span>
         <span class="info-val" id="stat-last-sync">—</span>
       </div>
@@ -544,7 +539,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <div class="ss">
       <div class="ss-hd-row">
         <span class="ss-hd">Top blocked this session</span>
-        <span id="sb-indicator" title="Safe browsing status" style="display:none">🛡 Safe Browsing</span>
       </div>
       <div id="top-domains-list">No blocks recorded yet</div>
     </div>
@@ -717,16 +711,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </label>
 
       <div class="sec-hd">Privacy & Advanced</div>
-
-      <label class="tr" for="t-sb">
-        <div class="tr-info">
-          <div class="ti ti-sbs">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#f87171"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 14l-3-3 1.41-1.41L11 12.17l4.59-4.58L17 9l-6 6z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Safe Browsing</strong><span>Block malware &amp; phishing URLs</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-sb" data-s="safeBrowsing" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
 
       <label class="tr" for="t-dnt">
         <div class="tr-info">

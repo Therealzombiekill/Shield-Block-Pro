@@ -74,6 +74,10 @@
       if (video) { wasMuted = video.muted; video.muted = true; }
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'kick' }).catch(() => {});
       _sbLog('info', 'Ad start — video muted (SSAI stream)', { channel: location.pathname.replace('/', '') });
+    } else if (hasAd && adActive) {
+      // Ad still playing — re-enforce mute in case the player unmuted itself
+      const video = document.querySelector('video');
+      if (video && !video.muted) video.muted = true;
     } else if (!hasAd && adActive) {
       const dur = `${((Date.now() - _adStartTime) / 1000).toFixed(1)}s`;
       adActive = false;
@@ -83,29 +87,49 @@
     }
   }
 
+  // ── Safety timeout: force-recover if muted for > 90s ─────────────────────────
+  let _safetyInt = setInterval(() => {
+    if (adActive && Date.now() - _adStartTime > 90000) {
+      adActive = false;
+      const video = document.querySelector('video');
+      if (video) video.muted = wasMuted;
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+    }
+  }, 5000);
+
   let _kickDeb = null;
   const _kickObs = new MutationObserver(() => { clearTimeout(_kickDeb); _kickDeb = setTimeout(tick, 300); });
   _kickObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
   let _kickInt = setInterval(tick, 1000);
 
   window.addEventListener('beforeunload', () => {
-    _kickObs.disconnect(); clearInterval(_kickInt); clearTimeout(_kickDeb);
+    _kickObs.disconnect(); clearInterval(_kickInt); clearInterval(_safetyInt); clearTimeout(_kickDeb);
   }, { once: true });
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.kick === false) {
       _kickObs.disconnect();
       clearInterval(_kickInt);
+      clearInterval(_safetyInt);
       clearTimeout(_kickDeb);
       if (adActive) {
         const video = document.querySelector('video');
         if (video) video.muted = wasMuted;
         adActive = false;
       }
+      removeAdUI();
     } else if (changes.settings?.newValue?.kick === true &&
                changes.settings?.oldValue?.kick === false) {
       _kickObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
-      _kickInt = setInterval(tick, 1000);
+      _kickInt   = setInterval(tick, 1000);
+      _safetyInt = setInterval(() => {
+        if (adActive && Date.now() - _adStartTime > 90000) {
+          adActive = false;
+          const video = document.querySelector('video');
+          if (video) video.muted = wasMuted;
+          _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+        }
+      }, 5000);
       tick();
     }
   });

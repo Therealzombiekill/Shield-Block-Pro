@@ -114,6 +114,10 @@
       handleAdStart();
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'hulu' }).catch(() => {});
       _sbLog('info', 'Ad start — video muted (SSAI stream)');
+    } else if (hasAd && adActive) {
+      // Ad still in progress — re-enforce mute in case the player unmuted itself
+      const video = document.querySelector('video');
+      if (video && !video.muted) video.muted = true;
     } else if (!hasAd && adActive) {
       const dur = `${((Date.now() - _adStartTime) / 1000).toFixed(1)}s`;
       adActive = false;
@@ -122,6 +126,15 @@
     }
     removeHuluAdUI();
   }
+
+  // ── Safety timeout: force-recover if muted for > 90s ─────────────────────────
+  let _safetyInt = setInterval(() => {
+    if (adActive && Date.now() - _adStartTime > 90000) {
+      adActive = false;
+      restoreAfterAd();
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+    }
+  }, 5000);
 
   let _huluDebounce = null;
   const _huluObserver = new MutationObserver(() => {
@@ -137,6 +150,7 @@
   window.addEventListener('beforeunload', () => {
     _huluObserver.disconnect();
     clearInterval(_huluInterval);
+    clearInterval(_safetyInt);
     clearTimeout(_huluDebounce);
   }, { once: true });
 
@@ -144,12 +158,21 @@
     if (changes.settings?.newValue?.hulu === false) {
       _huluObserver.disconnect();
       clearInterval(_huluInterval);
+      clearInterval(_safetyInt);
       clearTimeout(_huluDebounce);
       if (adActive) { restoreAfterAd(); adActive = false; }
+      removeHuluAdUI();
     } else if (changes.settings?.newValue?.hulu === true &&
                changes.settings?.oldValue?.hulu === false) {
       _huluObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
       _huluInterval = setInterval(tick, 1000);
+      _safetyInt    = setInterval(() => {
+        if (adActive && Date.now() - _adStartTime > 90000) {
+          adActive = false;
+          restoreAfterAd();
+          _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+        }
+      }, 5000);
       tick();
     }
   });

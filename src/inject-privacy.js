@@ -27,6 +27,10 @@
 (function () {
   'use strict';
 
+  // Idempotency guard — prevents double-patching on SPA navigation re-injection
+  if (window._sbPrivacyPatched) return;
+  window._sbPrivacyPatched = true;
+
   // ── Shared session seed — consistent within a tab, unique across tabs ────────
   const SESSION_SEED = (() => {
     try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0].toString(16); }
@@ -212,7 +216,7 @@
   // Modern Chrome already limits plugins to the built-in PDF viewer; we normalize Firefox
   // and older contexts to the same single-entry baseline.
   try {
-    if (navigator.plugins && navigator.plugins.length > 1) {
+    if (navigator.plugins != null && navigator.plugins.length !== 1) {
       const _fakePlugin = { name: 'PDF Viewer', filename: 'internal-pdf-viewer',
         description: '', length: 0, item: () => null, namedItem: () => null };
       const _fakePlugins = Object.assign(Object.create(PluginArray.prototype), {
@@ -244,14 +248,15 @@
     const roundTo = (n, step) => Math.round(n / step) * step;
     const fw = roundTo(screen.width,  100);
     const fh = roundTo(screen.height, 100);
-    if (fw !== screen.width)  Object.defineProperty(screen, 'width',  { get: () => fw, configurable: true });
-    if (fh !== screen.height) Object.defineProperty(screen, 'height', { get: () => fh, configurable: true });
-    // availWidth/availHeight expose taskbar size — normalize to full screen dimensions
-    if (screen.availWidth  !== screen.width)  Object.defineProperty(screen, 'availWidth',  { get: () => fw, configurable: true });
-    if (screen.availHeight !== screen.height) Object.defineProperty(screen, 'availHeight', { get: () => fh, configurable: true });
-    // colorDepth is always 24 on modern hardware — normalize to remove edge cases
-    Object.defineProperty(screen, 'colorDepth', { get: () => 24, configurable: true });
-    Object.defineProperty(screen, 'pixelDepth', { get: () => 24, configurable: true });
+    const aw = screen.availWidth;
+    const ah = screen.availHeight;
+    // Each property wrapped individually — one non-configurable property must not block others
+    if (fw !== screen.width)  try { Object.defineProperty(screen, 'width',      { get: () => fw, configurable: true }); } catch (_) {}
+    if (fh !== screen.height) try { Object.defineProperty(screen, 'height',     { get: () => fh, configurable: true }); } catch (_) {}
+    if (aw !== fw)            try { Object.defineProperty(screen, 'availWidth',  { get: () => fw, configurable: true }); } catch (_) {}
+    if (ah !== fh)            try { Object.defineProperty(screen, 'availHeight', { get: () => fh, configurable: true }); } catch (_) {}
+    try { Object.defineProperty(screen, 'colorDepth', { get: () => 24, configurable: true }); } catch (_) {}
+    try { Object.defineProperty(screen, 'pixelDepth', { get: () => 24, configurable: true }); } catch (_) {}
   } catch (_) {}
 
 

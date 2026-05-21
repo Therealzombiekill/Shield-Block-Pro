@@ -152,8 +152,13 @@ _qs.textContent = `
         batch++;
       }
     });
-    // Text-based scan: find "Sponsored" labels Amazon injects
-    document.querySelectorAll('.s-label-popover-default, .a-color-secondary').forEach(el => {
+    // Text-based scan: find "Sponsored" labels Amazon injects.
+    // Restrict to within search-result cards — .a-color-secondary is a generic helper
+    // class used throughout the page for prices, dates, etc.
+    document.querySelectorAll(
+      '[data-component-type="s-search-result"] .s-label-popover-default, ' +
+      '[data-component-type="s-search-result"] .a-color-secondary'
+    ).forEach(el => {
       const _t = el.textContent.trim();
       if (AMZN_SPONSORED.has(_t)) {
         const card = el.closest('[data-asin]') || el.closest('[data-component-type]')

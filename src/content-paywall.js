@@ -118,7 +118,9 @@
         if (hasBlur)  { el.style.filter = 'none'; el.style.webkitFilter = 'none'; clearedStyles.push('blur'); }
         if (hasMask)  { el.style.webkitMaskImage = 'none'; el.style.maskImage = 'none'; clearedStyles.push('mask'); }
         if (hasMaxH)  { el.style.maxHeight = 'none'; clearedStyles.push(`maxHeight(was ${cs.maxHeight})`); }
-        if (hasOverH) { el.style.overflow = 'visible'; clearedStyles.push('overflow:hidden'); }
+        // Only lift overflow:hidden when another paywall signal is also present — prevents
+        // breaking legitimate article menus and image carousels that use overflow:hidden.
+        if (hasOverH && (hasBlur || hasMask || hasMaxH)) { el.style.overflow = 'visible'; clearedStyles.push('overflow:hidden'); }
       });
     } catch (_) {}
 

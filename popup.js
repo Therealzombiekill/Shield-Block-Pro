@@ -924,6 +924,7 @@ $('cl-add-btn')?.addEventListener('click', async () => {
   const name   = $('cl-name')?.value?.trim();
   const status = $('cl-status');
   if (!url) { if (status) { status.style.color = 'var(--red, #f87171)'; status.textContent = 'Enter a URL first'; setTimeout(()=>{status.textContent='';},2500); } return; }
+  if (!url.startsWith('http')) { if (status) { status.style.color = 'var(--red, #f87171)'; status.textContent = 'URL must start with http:// or https://'; setTimeout(()=>{status.textContent='';},3000); } return; }
   if (status) status.textContent = 'Adding…';
   const r = await msg('ADD_CUSTOM_LIST', { url, name });
   if (r?.ok) {

@@ -7,174 +7,337 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#09090f;--s1:#0e0e18;--s2:#141420;--border:#1e1e2e;
-  --accent:#7c6aff;--accent2:#a78bfa;--glow:rgba(124,106,255,.2);
-  --green:#00d97e;--text:#e2e2f0;--sub:#9090b0;--muted:#5a5a78;
+  --accent:#7c6aff;--accent2:#a78bfa;--glow:rgba(124,106,255,.18);
+  --green:#00d97e;--green-bg:rgba(0,217,126,.08);--green-border:rgba(0,217,126,.2);
+  --red:#f87171;--text:#e2e2f0;--sub:#9090b0;--muted:#5a5a78;
   --mono:'JetBrains Mono','Fira Code',monospace;
-  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
-body{background:var(--bg);color:var(--text);font-family:var(--sans);
-  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}
-.wrap{max-width:600px;width:100%}
-.logo{display:flex;align-items:center;gap:14px;margin-bottom:40px}
-.icon{width:52px;height:52px;border-radius:14px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--sans);
+  min-height:100vh;display:flex;align-items:flex-start;justify-content:center;
+  padding:48px 20px 60px;
+}
+.wrap{max-width:640px;width:100%}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:44px}
+.logo{display:flex;align-items:center;gap:14px}
+.icon{
+  width:50px;height:50px;border-radius:13px;flex-shrink:0;
+  background:linear-gradient(140deg,var(--accent),var(--accent2));
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 32px var(--glow)}
-.logo-name{font-family:var(--mono);font-size:22px;font-weight:700;color:#fff}
+  box-shadow:0 0 28px var(--glow);
+}
+.logo-name{font-family:var(--mono);font-size:18px;font-weight:700;color:#fff;line-height:1.2}
 .logo-name em{color:var(--accent2);font-style:normal}
-.logo-tag{font-size:13px;color:var(--muted);margin-top:2px}
-h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px;line-height:1.2}
-h1 span{color:var(--accent2)}
-.sub{font-size:15px;color:var(--sub);line-height:1.6;margin-bottom:36px}
-.section-label{font-family:var(--mono);font-size:10px;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px}
-.features{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
-.features.two{grid-template-columns:1fr 1fr;margin-bottom:28px}
-.feat{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px}
-.feat-icon{font-size:18px;margin-bottom:8px}
-.feat-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
-.feat-desc{font-size:11px;color:var(--muted);line-height:1.5}
-.platforms{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
-.plat{display:flex;align-items:center;gap:6px;background:var(--s1);
-  border:1px solid var(--border);border-radius:8px;padding:7px 12px}
+.logo-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--green-bg);border:1px solid var(--green-border);
+  border-radius:20px;padding:5px 12px;
+  font-family:var(--mono);font-size:10px;color:var(--green);
+  white-space:nowrap;
+}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Hero ──────────────────────────────────────────────────────────────────── */
+.hero{margin-bottom:40px}
+.hero h1{font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-bottom:10px}
+.hero h1 span{color:var(--accent2)}
+.hero p{font-size:14px;color:var(--sub);line-height:1.65;max-width:500px}
+
+/* ── Section labels ────────────────────────────────────────────────────────── */
+.section-label{
+  font-family:var(--mono);font-size:10px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.12em;margin-bottom:12px;
+}
+
+/* ── Stats bar ─────────────────────────────────────────────────────────────── */
+.stats-bar{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--border);border-radius:12px;overflow:hidden;
+  border:1px solid var(--border);margin-bottom:32px;
+}
+.stat-cell{background:var(--s1);padding:16px;text-align:center}
+.stat-val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent2);line-height:1}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:5px}
+
+/* ── Platforms ─────────────────────────────────────────────────────────────── */
+.platforms{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:32px}
+.plat{
+  display:flex;align-items:center;gap:7px;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:8px;padding:7px 12px;
+}
 .plat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .plat-name{font-size:12px;font-weight:600;color:var(--text)}
-.plat-note{font-size:10px;color:var(--muted);margin-left:2px}
-.shortcuts{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:28px}
-.shortcuts h3{font-family:var(--mono);font-size:10px;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px}
-.sc-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.sc-row:last-child{margin-bottom:0}
-.sc-label{font-size:12px;color:var(--sub)}
-.sc-key{font-family:var(--mono);font-size:10px;background:var(--s2);
-  border:1px solid var(--border);border-radius:5px;padding:3px 8px;color:var(--accent2)}
+.plat-note{font-size:10px;color:var(--muted);margin-left:1px}
+
+/* ── Feature grid ──────────────────────────────────────────────────────────── */
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:32px}
+.feat{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:16px 15px}
+.feat-row{display:flex;align-items:flex-start;gap:10px}
+.feat-icon{
+  width:30px;height:30px;border-radius:8px;flex-shrink:0;
+  background:rgba(124,106,255,.12);border:1px solid rgba(124,106,255,.18);
+  display:flex;align-items:center;justify-content:center;
+}
+.feat-icon svg{width:14px;height:14px}
+.feat-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.feat-desc{font-size:11px;color:var(--muted);line-height:1.5}
+
+/* ── Opt-in callout ────────────────────────────────────────────────────────── */
+.optin{
+  background:rgba(124,106,255,.06);border:1px solid rgba(124,106,255,.18);
+  border-radius:10px;padding:16px 18px;margin-bottom:32px;
+}
+.optin-head{font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.optin-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.optin-list li{display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--sub);line-height:1.5}
+.optin-list li::before{
+  content:'';display:block;width:16px;height:16px;border-radius:4px;flex-shrink:0;
+  background:rgba(124,106,255,.12);border:1px solid rgba(124,106,255,.2);
+  margin-top:1px;
+}
+.optin-list strong{color:var(--text)}
+
+/* ── Tips ──────────────────────────────────────────────────────────────────── */
+.tips{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:32px}
+.tips-head{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px}
+.tip-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.tip-row:last-child{margin-bottom:0}
+.tip-txt{font-size:12px;color:var(--sub)}
+.tip-kbd{
+  font-family:var(--mono);font-size:10px;background:var(--s2);
+  border:1px solid var(--border);border-radius:5px;padding:3px 8px;
+  color:var(--accent2);white-space:nowrap;flex-shrink:0;
+}
+.tip-txt2{font-size:11px;color:var(--sub);line-height:1.55}
+.tip-txt2 strong{color:var(--text);font-weight:600}
+.tip-divider{height:1px;background:var(--border);margin:10px 0}
+
+/* ── Privacy promise ───────────────────────────────────────────────────────── */
+.privacy{
+  display:flex;align-items:flex-start;gap:12px;
+  background:var(--green-bg);border:1px solid var(--green-border);
+  border-radius:10px;padding:14px 16px;margin-bottom:32px;
+}
+.privacy-icon{flex-shrink:0;margin-top:1px}
+.privacy-text{font-size:12px;color:var(--sub);line-height:1.6}
+.privacy-text strong{color:var(--green)}
+
+/* ── CTA ───────────────────────────────────────────────────────────────────── */
 .cta{display:flex;gap:10px}
-.btn-primary{flex:1;padding:13px;background:var(--accent);border:none;border-radius:9px;
+.btn-primary{
+  flex:1;padding:14px;background:var(--accent);border:none;border-radius:9px;
   color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);
-  transition:opacity .15s}
-.btn-primary:hover{opacity:.9}
-.btn-secondary{padding:13px 20px;background:var(--s1);border:1px solid var(--border);
-  border-radius:9px;color:var(--muted);font-size:14px;cursor:pointer;font-family:var(--sans);
-  transition:border-color .15s}
+  transition:opacity .15s;letter-spacing:.01em;
+}
+.btn-primary:hover{opacity:.88}
+.btn-secondary{
+  padding:14px 20px;background:var(--s1);border:1px solid var(--border);
+  border-radius:9px;color:var(--muted);font-size:14px;cursor:pointer;
+  font-family:var(--sans);transition:border-color .15s,color .15s;
+}
 .btn-secondary:hover{border-color:var(--accent);color:var(--text)}
-.tip{font-size:11px;color:var(--muted);text-align:center;margin-top:16px}
-.tip a{color:var(--accent2);text-decoration:none}
-.badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,217,126,.08);
-  border:1px solid rgba(0,217,126,.2);border-radius:20px;padding:3px 10px;
-  font-family:var(--mono);font-size:10px;color:var(--green);margin-bottom:20px}
+.footer-note{font-size:11px;color:var(--muted);text-align:center;margin-top:14px}
+.footer-note a{color:var(--accent2);text-decoration:none}
+.footer-note a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="logo">
-    <div class="icon">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-        <path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6L12 2z"
-              stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-        <path d="M9 12l2 2 4-4" stroke="white" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6L12 2z"
+                stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M9 12l2 2 4-4" stroke="white" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-name">SHIELD<em>BLOCK</em> <em style="font-size:13px;color:var(--muted)">PRO</em></div>
+        <div class="logo-sub" id="ver-label">Free forever &middot; Open source</div>
+      </div>
+    </div>
+    <div class="badge"><div class="badge-dot"></div>ACTIVE</div>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>You're protected.<br><span>Ads blocked. Privacy secured.</span></h1>
+    <p>ShieldBlock Pro is running automatically — no configuration needed. Everything below is already working. Open the popup to see live stats, manage filter lists, or tweak any setting.</p>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-cell">
+      <div class="stat-val" id="sw-rule-count">—</div>
+      <div class="stat-lbl">Blocking rules</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val">30+</div>
+      <div class="stat-lbl">Filter lists</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val">6</div>
+      <div class="stat-lbl">Streaming platforms</div>
+    </div>
+  </div>
+
+  <!-- Platforms -->
+  <p class="section-label">Streaming ad blocking</p>
+  <div class="platforms">
+    <div class="plat"><div class="plat-dot" style="background:#ff0000"></div><span class="plat-name">YouTube</span><span class="plat-note">API-level</span></div>
+    <div class="plat"><div class="plat-dot" style="background:#9146ff"></div><span class="plat-name">Twitch</span><span class="plat-note">GQL + mute</span></div>
+    <div class="plat"><div class="plat-dot" style="background:#1db954"></div><span class="plat-name">Spotify</span><span class="plat-note">muted + skip</span></div>
+    <div class="plat"><div class="plat-dot" style="background:#1ce783"></div><span class="plat-name">Hulu</span><span class="plat-note">muted</span></div>
+    <div class="plat"><div class="plat-dot" style="background:#53fc18"></div><span class="plat-name">Kick</span><span class="plat-note">muted</span></div>
+    <div class="plat"><div class="plat-dot" style="background:#ff9900"></div><span class="plat-name">Amazon</span><span class="plat-note">sponsored</span></div>
+    <div class="plat"><div class="plat-dot" style="background:var(--accent2)"></div><span class="plat-name">All other sites</span><span class="plat-note">network + cosmetic</span></div>
+  </div>
+
+  <!-- Features -->
+  <p class="section-label">Active protections</p>
+  <div class="feature-grid">
+    <div class="feat">
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>
+          </svg>
+        </div>
+        <div>
+          <div class="feat-title">Cookie Banner Rejection</div>
+          <div class="feat-desc">60+ consent management platforms auto-rejected — banners dismissed, not just hidden</div>
+        </div>
+      </div>
+    </div>
+    <div class="feat">
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="1.8" stroke-linecap="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="feat-title">Anti-Fingerprinting</div>
+          <div class="feat-desc">Canvas, WebGL, AudioContext, screen size, battery, and plugins all normalized</div>
+        </div>
+      </div>
+    </div>
+    <div class="feat">
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="1.8" stroke-linecap="round">
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+          </svg>
+        </div>
+        <div>
+          <div class="feat-title">URL Tracking Removal</div>
+          <div class="feat-desc">80+ tracking parameters stripped — fbclid, utm_*, gclid, ttclid, and more, on every page load and SPA navigation</div>
+        </div>
+      </div>
+    </div>
+    <div class="feat">
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="1.8" stroke-linecap="round">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+          </svg>
+        </div>
+        <div>
+          <div class="feat-title">Social Media Ads</div>
+          <div class="feat-desc">Sponsored posts removed from Facebook, Instagram, Reddit, X, LinkedIn, and TikTok</div>
+        </div>
+      </div>
+    </div>
+    <div class="feat">
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="1.8" stroke-linecap="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="feat-title">Safe Browsing</div>
+          <div class="feat-desc">Malware, phishing, and cryptomining domains blocked before the page loads</div>
+        </div>
+      </div>
+    </div>
+    <div class="feat">
+      <div class="feat-row">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="1.8" stroke-linecap="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="feat-title">Live Stats &amp; Logs</div>
+          <div class="feat-desc">Per-platform block counts, time saved, threat counter, and a full debug log in the popup</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Opt-in features -->
+  <div class="optin">
+    <div class="optin-head">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Two features are off by default — enable them in Settings
+    </div>
+    <ul class="optin-list">
+      <li><div><strong>Paywall Bypass</strong> — Removes CSS-overlay soft paywalls on news sites. Disabled by default since users may have paid subscriptions.</div></li>
+      <li><div><strong>Timezone Spoofing</strong> — Reports UTC to all sites to prevent timezone-based fingerprinting. Disabled by default as it breaks calendar apps like Google Calendar.</div></li>
+    </ul>
+  </div>
+
+  <!-- Tips -->
+  <div class="tips">
+    <div class="tips-head">Quick tips</div>
+    <div class="tip-row">
+      <span class="tip-txt">Open ShieldBlock popup</span>
+      <span class="tip-kbd">Alt + Shift + S</span>
+    </div>
+    <div class="tip-row">
+      <span class="tip-txt">Pause blocking on this site</span>
+      <span class="tip-kbd">Alt + Shift + B</span>
+    </div>
+    <div class="tip-row">
+      <span class="tip-txt">Pick an element to hide</span>
+      <span class="tip-kbd">Alt + Shift + P</span>
+    </div>
+    <div class="tip-divider"></div>
+    <p class="tip-txt2">Found an ad that slipped through? <strong>Right-click it</strong> and choose <strong>ShieldBlock: Hide this element</strong> — your selection syncs across sessions.</p>
+  </div>
+
+  <!-- Privacy promise -->
+  <div class="privacy">
+    <div class="privacy-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <polyline points="9 12 11 14 15 10"/>
       </svg>
     </div>
-    <div>
-      <div class="logo-name">SHIELD<em>BLOCK</em> <em style="font-size:14px;color:var(--muted)">PRO</em></div>
-      <div class="logo-tag">v2.10.1 · Free forever</div>
-    </div>
+    <p class="privacy-text"><strong>Zero data collection.</strong> ShieldBlock Pro processes everything locally on your device. No browsing history, no personal data, and no telemetry is ever sent to any server. Filter lists are fetched directly from their public sources.</p>
   </div>
 
-  <div class="badge"><div style="width:6px;height:6px;border-radius:50%;background:currentColor"></div>ACTIVE & BLOCKING</div>
-
-  <h1>You're protected.<br><span>Ads blocked. Privacy secured.</span></h1>
-  <p class="sub">ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.</p>
-
-  <p class="section-label">Platform ad blocking</p>
-  <div class="platforms">
-    <div class="plat">
-      <div class="plat-dot" style="background:#ff0000"></div>
-      <span class="plat-name">YouTube</span><span class="plat-note">API-level</span>
-    </div>
-    <div class="plat">
-      <div class="plat-dot" style="background:#9146ff"></div>
-      <span class="plat-name">Twitch</span><span class="plat-note">GQL+mute</span>
-    </div>
-    <div class="plat">
-      <div class="plat-dot" style="background:#1db954"></div>
-      <span class="plat-name">Spotify</span><span class="plat-note">muted</span>
-    </div>
-    <div class="plat">
-      <div class="plat-dot" style="background:#1ce783"></div>
-      <span class="plat-name">Hulu</span><span class="plat-note">muted</span>
-    </div>
-    <div class="plat">
-      <div class="plat-dot" style="background:#53fc18"></div>
-      <span class="plat-name">Kick</span><span class="plat-note">muted</span>
-    </div>
-    <div class="plat">
-      <div class="plat-dot" style="background:#ff9900"></div>
-      <span class="plat-name">Amazon</span><span class="plat-note">sponsored</span>
-    </div>
-    <div class="plat">
-      <div class="plat-dot" style="background:var(--accent2)"></div>
-      <span class="plat-name">Everywhere else</span><span class="plat-note">30+ filter lists</span>
-    </div>
-  </div>
-
-  <p class="section-label">Privacy & web protection</p>
-  <div class="features" style="margin-bottom:28px">
-    <div class="feat">
-      <div class="feat-icon">🍪</div>
-      <div class="feat-title">Cookie Auto-Reject</div>
-      <div class="feat-desc">60+ consent platforms rejected automatically — banners gone, not just hidden</div>
-    </div>
-    <div class="feat">
-      <div class="feat-icon">👁</div>
-      <div class="feat-title">Anti-Fingerprinting</div>
-      <div class="feat-desc">Canvas, WebGL, AudioContext, Battery API, and Screen all spoofed</div>
-    </div>
-    <div class="feat">
-      <div class="feat-icon">🔗</div>
-      <div class="feat-title">URL Cleaning</div>
-      <div class="feat-desc">80+ tracking params stripped — fbclid, utm_*, gclid, ttclid, and more</div>
-    </div>
-    <div class="feat">
-      <div class="feat-icon">📱</div>
-      <div class="feat-title">Social Media</div>
-      <div class="feat-desc">Sponsored posts removed from Facebook, Instagram, Reddit, X, LinkedIn, TikTok</div>
-    </div>
-    <div class="feat">
-      <div class="feat-icon">📰</div>
-      <div class="feat-title">Paywall Bypass</div>
-      <div class="feat-desc">CSS-overlay paywalls removed from news sites (enable in Settings)</div>
-    </div>
-    <div class="feat">
-      <div class="feat-icon">📊</div>
-      <div class="feat-title">Live Stats & Logs</div>
-      <div class="feat-desc">Per-platform ad counts, time saved, and a full debug log — all in the popup</div>
-    </div>
-  </div>
-
-  <div class="shortcuts">
-    <h3>Keyboard shortcuts</h3>
-    <div class="sc-row">
-      <span class="sc-label">Open ShieldBlock</span>
-      <span class="sc-key">Alt + Shift + S</span>
-    </div>
-    <div class="sc-row">
-      <span class="sc-label">Toggle blocking on current site</span>
-      <span class="sc-key">Alt + Shift + B</span>
-    </div>
-    <div class="sc-row">
-      <span class="sc-label">Activate element picker</span>
-      <span class="sc-key">Alt + Shift + P</span>
-    </div>
-  </div>
-
+  <!-- CTA -->
   <div class="cta">
-    <button class="btn-primary">Start browsing →</button>
-    <button class="btn-secondary">Settings</button>
+    <button class="btn-primary">Start browsing &rarr;</button>
+    <button class="btn-secondary">Open Settings</button>
   </div>
+  <p class="footer-note">
+    Questions or feedback? <a href="https://github.com/therealzombiekill/shield-block-pro/issues" target="_blank" rel="noopener noreferrer">Open an issue on GitHub</a>
+  </p>
 
-  <p class="tip">Found a missed ad? Right-click it → <strong>ShieldBlock: Hide this element</strong><br>
-  Or tip the developer: <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener noreferrer">paypal.me/BronsonBissell</a></p>
 </div>
 <script src="src/welcome.js"></script>
 </body>

@@ -140,7 +140,10 @@ function parseLine(line, idCounter) {
 
   // ── Network (DNR) rules ────────────────────────────────────────────────────
   let filter = line;
-  let resourceTypes = null;
+  let resourceTypes  = null;
+  let domainType     = null; // 'thirdParty' | null
+  let ruleDomains    = null; // initiatorDomains from $domain=
+  let ruleExclDomains = null; // excludedInitiatorDomains from $domain=~
 
   const optIdx = filter.lastIndexOf('$');
   if (optIdx !== -1) {
@@ -148,10 +151,30 @@ function parseLine(line, idCounter) {
     filter = filter.slice(0, optIdx);
     const types = [];
     for (const opt of opts.split(',')) {
-      const t = RESOURCE_TYPE_MAP[opt.trim().replace(/^~/, '')];
-      if (t && !opt.startsWith('~')) types.push(t);
+      const trimmed = opt.trim();
+      // Resource types
+      const t = RESOURCE_TYPE_MAP[trimmed.replace(/^~/, '')];
+      if (t && !trimmed.startsWith('~')) types.push(t);
+      // Third-party modifier — only block cross-origin requests
+      if (trimmed === 'third-party' || trimmed === '3p') domainType = 'thirdParty';
+      // First-party-only rules block a site's own resources — always skip
+      if (trimmed === '~third-party' || trimmed === '~3p' ||
+          trimmed === 'first-party'  || trimmed === '1p')  domainType = 'firstParty';
+      // Domain restrictions — scope rule to specific initiator sites
+      if (trimmed.startsWith('domain=')) {
+        ruleDomains = []; ruleExclDomains = [];
+        for (const d of trimmed.slice(7).split('|')) {
+          const dom = d.trim();
+          if (dom.startsWith('~')) ruleExclDomains.push(dom.slice(1));
+          else if (dom) ruleDomains.push(dom);
+        }
+      }
     }
     if (types.length) resourceTypes = types;
+
+    // Skip first-party-only rules — these would block a site's own resources
+    if (domainType === 'firstParty') return null;
+
     // $removeparam — extract param name and domain constraints, handle separately
     // Format: $removeparam=paramname or $removeparam=paramname,domain=x.com
     const rpOpt = opts.split(',').find(o => o.trim().startsWith('removeparam'));
@@ -192,18 +215,30 @@ function parseLine(line, idCounter) {
 
   if (urlFilter.length < 4 || urlFilter.length > 512) return null;
 
+  // Build DNR condition — combine rule-level domain restrictions with hardcoded
+  // YouTube exclusions. When initiatorDomains is set, the rule is already scoped
+  // to those sites so YouTube exclusions are redundant and are omitted.
+  const YT_EXCL = ['youtube.com', 'youtu.be', 'youtube-nocookie.com'];
+  const condition = {
+    urlFilter,
+    resourceTypes: resourceTypes ?? DEFAULT_RESOURCE_TYPES,
+  };
+  if (ruleDomains && ruleDomains.length) {
+    condition.initiatorDomains = ruleDomains;
+  } else {
+    const excl = new Set(YT_EXCL);
+    if (ruleExclDomains) ruleExclDomains.forEach(d => excl.add(d));
+    condition.excludedInitiatorDomains = [...excl];
+  }
+  if (domainType) condition.domainType = domainType;
+
   return {
     type: 'dnr',
     rule: {
       id: idCounter,
       priority: 2,
       action: { type: 'block' },
-      condition: {
-        urlFilter,
-        resourceTypes: resourceTypes ?? DEFAULT_RESOURCE_TYPES,
-        // Never block resources when the initiator is YouTube
-        excludedInitiatorDomains: ['youtube.com', 'youtu.be', 'youtube-nocookie.com'],
-      },
+      condition,
     },
   };
   } catch (_) { return null; }

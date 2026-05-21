@@ -82,7 +82,7 @@
       "css": [
         "src/cosmetic.css"
       ],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     },
     {
       "matches": [
@@ -289,6 +289,7 @@
       "resources": [
         "blocked.html",
         "welcome.html",
+        "src/blank.js",
         "rules/base.json",
         "rules/extended.json",
         "rules/tracking.json",

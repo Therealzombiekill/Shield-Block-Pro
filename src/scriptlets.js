@@ -144,12 +144,24 @@
 
     'no-fetch-if': ([urlPattern]) => {
       const re = toRe(urlPattern);
+      // Sentinel: accumulate patterns into one wrapper rather than chaining wrappers
+      if (window.fetch._sbFetchPatterns) {
+        if (re) window.fetch._sbFetchPatterns.push(re);
+        return;
+      }
+      const patterns = re ? [re] : [];
       const _fetch = window.fetch;
       window.fetch = function (resource, init) {
-        const url = typeof resource === 'string' ? resource : (resource?.url ?? '');
-        if (re && re.test(url)) return Promise.resolve(new Response('', { status: 200 }));
+        const raw = typeof resource === 'string' ? resource : (resource?.url ?? '');
+        // Resolve relative URLs so patterns like 'ads.example.com' match correctly
+        let url = raw;
+        try { url = new URL(raw, location.href).href; } catch (_) {}
+        if (patterns.length > 0 && patterns.some(p => p.test(url))) {
+          return Promise.resolve(new Response('', { status: 200 }));
+        }
         return _fetch.apply(this, arguments);
       };
+      window.fetch._sbFetchPatterns = patterns;
       try { window.fetch.toString = () => _fetch.toString(); } catch (_) {}
     },
 

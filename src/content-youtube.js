@@ -67,7 +67,9 @@
       // Restore volume if we muted for an ad
       if (_muted) {
         const vid = document.querySelector('video');
-        if (vid && _origVol !== null) { vid.muted = false; vid.volume = _origVol; }
+        // Only restore muted state — do NOT restore volume, the user may have
+        // manually adjusted it while the ad was playing.
+        if (vid) vid.muted = false;
         _sbLog('info', 'Ad cleared — audio restored');
         _muted = false;
         _origVol = null;
@@ -220,6 +222,7 @@
     } else if (changes.settings?.newValue?.youtube === true &&
                changes.settings?.oldValue?.youtube === false) {
       window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
+      _skipObserver.disconnect(); // ensure clean reconnect
       _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
       _tickInterval = setInterval(tick, 750);
       _statInterval = setInterval(() => {

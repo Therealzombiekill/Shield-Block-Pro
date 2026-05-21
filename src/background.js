@@ -347,7 +347,7 @@ function _flushStats() {
         const { settings: badgeSettings } = await chrome.storage.local.get('settings');
         if (badgeSettings?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
       } catch (e) { logEvent('badge', 'warn', `Badge update failed: ${e.message}`); }
-    } catch (_) {}
+    } catch (e) { logEvent('storage', 'warn', `Stats flush failed: ${e?.message ?? e}`); }
   });
 }
 
@@ -685,7 +685,7 @@ async function countNetworkBlocks(tabId, url) {
     });
     if (count === 0) return;
 
-    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
+    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
     ps.total   = (ps.total   | 0) + count;
     ps.network = (ps.network | 0) + count;
     const cat = url?.includes('twitch.tv')  ? 'twitch'
@@ -710,7 +710,7 @@ async function countNetworkBlocks(tabId, url) {
           const { settings: _bs } = await chrome.storage.local.get('settings');
           if (_bs?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
         } catch (_) {}
-      } catch (_) {}
+      } catch (e) { logEvent('storage', 'warn', `Network stats write failed: ${e?.message ?? e}`); }
     });
   } catch (_) {}
   finally { _navCounting.delete(tabId); }
@@ -843,7 +843,7 @@ async function applyRemoveParamRules() {
           type: 'redirect',
           redirect: {
             transform: {
-              queryTransform: { removeParams: [...globalParams].sort() },
+              queryTransform: { removeParams: [...globalParams] }, // pre-sorted at sync time
             },
           },
         },
@@ -988,6 +988,15 @@ const SB_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 // the bypass doesn't persist if the user closes the tab without navigating.
 const _sbBypassedHostnames = new Map(); // hostname → expiry timestamp
 let _sbBlockCount = 0; // in-memory threat-block counter (persisted in sbBlocks)
+
+// Periodic sweep of expired bypass entries (lazy cleanup at lookup handles the common
+// case; this sweep handles domains the user bypassed but never revisited).
+setInterval(() => {
+  const now = Date.now();
+  for (const [h, expiry] of _sbBypassedHostnames) {
+    if (now >= expiry) _sbBypassedHostnames.delete(h);
+  }
+}, 60000);
 
 async function loadSafeBrowsingCache() {
   try {
@@ -1472,7 +1481,10 @@ async function syncFilterLists(force = false) {
         );
 
         for (const result of customResults) {
-          if (result.status === 'rejected') continue;
+          if (result.status === 'rejected') {
+            logEvent('filter-sync', 'warn', `Custom list fetch failed: ${result.reason?.message ?? result.reason}`);
+            continue;
+          }
           const val = result.value;
 
           if (val.notModified) {
@@ -1531,7 +1543,7 @@ async function syncFilterLists(force = false) {
       syncDuration:      Date.now() - _syncStart,
       syncListStatus:    _syncListStatus,
       removeParamData:   {
-        global: [...allRemoveParams.global],
+        global: [...allRemoveParams.global].sort(), // sorted once at write, not on every apply
         domain: allRemoveParams.domain,
       },
     });
@@ -2110,7 +2122,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           await chrome.storage.local.set({ pausedSites, whitelist, pauseWhitelisted });
           // Alarm fires even if the service worker is killed and restarted
-          chrome.alarms.create(`pauseExpiry:${pd}`, { delayInMinutes: minutes });
+          try { await chrome.alarms.create(`pauseExpiry:${pd}`, { delayInMinutes: minutes }); }
+          catch (e) { logEvent('pause', 'warn', `Pause alarm creation failed: ${e?.message ?? e}`); }
           logEvent('pause', 'info', `Paused ${pd} for ${minutes}m`);
         }
         sendResponse({ ok: true });

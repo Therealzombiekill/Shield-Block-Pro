@@ -74,6 +74,8 @@
   });
 
   // ── 2. fetch hook — SPA navigations re-request /player via InnerTube API ─────
+  // Guard: prevent double-wrapping if script somehow re-runs (extension update, re-inject)
+  if (!window.fetch._sbYouTubeHooked) {
   const _origFetch = window.fetch;
   window.fetch = async function (...args) {
     const res = await _origFetch.apply(this, args);
@@ -96,5 +98,7 @@
     return res;
   };
   try { window.fetch.toString = () => _origFetch.toString(); } catch (_) {}
+  window.fetch._sbYouTubeHooked = true;
+  } // end idempotency guard
 
 })();

@@ -27,6 +27,8 @@
   });
 
   // ── Main-thread fetch hook ────────────────────────────────────────────────────
+  // Guard: prevent double-wrapping if script re-runs after extension update
+  if (!window.fetch._sbTwitchHooked) {
   const _fetch = window.fetch;
   window.fetch = async function (resource, init) {
     if (_disabled) return _fetch.apply(this, arguments);
@@ -82,5 +84,7 @@
 
     return _fetch.apply(this, arguments);
   };
+  window.fetch._sbTwitchHooked = true;
+  } // end idempotency guard
 
 })();

@@ -450,15 +450,17 @@
     }
   }
   window.addEventListener('popstate', onUrlChange);
-  const _origPush    = history.pushState;
-  const _origReplace = history.replaceState;
-  history.pushState = function () {
-    _origPush.apply(this, arguments);
-    setTimeout(onUrlChange, 0);
-  };
-  history.replaceState = function () {
-    _origReplace.apply(this, arguments);
-    setTimeout(onUrlChange, 0);
-  };
+  try {
+    const _origPush    = history.pushState;
+    const _origReplace = history.replaceState;
+    history.pushState = function () {
+      try { _origPush.apply(this, arguments); } catch (_e) { throw _e; }
+      setTimeout(onUrlChange, 0);
+    };
+    history.replaceState = function () {
+      try { _origReplace.apply(this, arguments); } catch (_e) { throw _e; }
+      setTimeout(onUrlChange, 0);
+    };
+  } catch (_) {} // sandboxed frames may restrict history access
 
 })().catch(e => console.warn('[SB:social] script error:', e?.message ?? e));

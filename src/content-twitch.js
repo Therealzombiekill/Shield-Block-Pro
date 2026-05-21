@@ -250,6 +250,7 @@
     } else if (changes.settings?.newValue?.twitch === true &&
                changes.settings?.oldValue?.twitch === false) {
       window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
+      observer.disconnect(); // ensure clean reconnect
       observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
       interval        = setInterval(domTick,    1000);
       safetyInterval  = setInterval(_safetyCb,  5000);

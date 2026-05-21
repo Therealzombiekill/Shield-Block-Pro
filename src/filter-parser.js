@@ -269,8 +269,8 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
   let id = startId;
 
   for (const line of lines) {
-    if (rules.length >= maxRules &&
-        cosmetics.size >= MAX_COSMETICS &&
+    if (rules.length >= maxRules) break; // respect per-cap limits individually
+    if (cosmetics.size >= MAX_COSMETICS &&
         domainCosmeticCount >= MAX_DOMAIN_COSMETICS &&
         scriptletCount >= MAX_SCRIPTLETS) break;
 

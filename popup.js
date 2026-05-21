@@ -166,8 +166,8 @@ async function refreshStats() {
       $('stat-page').textContent = '—';
     }
 
-    // Also draw the sparkline when stats refresh
-    drawSparkline();
+    // Pass already-fetched daily data to avoid a second GET_DAILY_STATS round-trip
+    drawSparkline(dailyData);
   } catch (_) {
     $('stat-total').textContent = '—';
   }
@@ -1120,10 +1120,10 @@ $('import-btn')?.addEventListener('change', async (e) => {
 });
 
 // ── 7-day sparkline chart ──────────────────────────────────────────────────────
-async function drawSparkline() {
+async function drawSparkline(prefetched) {
   const canvas = document.getElementById('spark-chart');
   if (!canvas) return;
-  const days = await msg('GET_DAILY_STATS') ?? [];
+  const days = prefetched ?? await msg('GET_DAILY_STATS') ?? [];
   const ctx  = canvas.getContext('2d');
   const W = canvas.offsetWidth || 300;
   const H = 36;

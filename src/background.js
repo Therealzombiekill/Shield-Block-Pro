@@ -328,9 +328,13 @@ function _flushStats() {
       const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
       const lt = lifetime ?? { total:0 };
       for (const [type, count] of Object.entries(pending)) {
-        s.total  = (s.total  | 0) + count;
-        s[type]  = (s[type]  | 0) + count;
-        lt.total = (lt.total | 0) + count;
+        s[type] = (s[type] | 0) + count;
+        // 'dom' and 'network' are sub-counters — already counted via the
+        // type-specific key (e.g. 'general'). Don't double-add to total.
+        if (type !== 'dom' && type !== 'network') {
+          s.total  = (s.total  | 0) + count;
+          lt.total = (lt.total | 0) + count;
+        }
       }
       await chrome.storage.local.set({
         stats: s, lifetime: lt,

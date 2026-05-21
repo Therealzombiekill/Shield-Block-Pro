@@ -40,13 +40,16 @@
     );
     if (!confirmed) return;
     // Register the bypass BEFORE navigating so onBeforeNavigate doesn't
-    // immediately redirect back to this warning page.
+    // immediately redirect back to this warning page. The failsafe timeout
+    // ensures navigation happens even if the SW callback never fires
+    // (e.g. service worker killed mid-flight).
+    let _navigated = false;
+    const _go = () => { if (!_navigated) { _navigated = true; location.href = blocked; } };
+    setTimeout(_go, 600); // failsafe
     try {
-      chrome.runtime.sendMessage({ type: 'SAFE_BROWSING_BYPASS', url: blocked }, () => {
-        location.href = blocked;
-      });
+      chrome.runtime.sendMessage({ type: 'SAFE_BROWSING_BYPASS', url: blocked }, _go);
     } catch (_) {
-      location.href = blocked;
+      _go();
     }
   });
 })();

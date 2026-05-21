@@ -86,9 +86,10 @@ let _lastTotal = 0;
 
 async function refreshStats() {
   try {
-    const [s, lt, ps, stored] = await Promise.all([
+    const [s, lt, ps, stored, dailyData] = await Promise.all([
       msg('GET_STATS'), msg('GET_LIFETIME'), msg('GET_PAGE_STATS'),
       chrome.storage.local.get(['timeSaved','filterSyncedAt']),
+      msg('GET_DAILY_STATS'),
     ]);
     const stats = s  ?? { total:0, amazon:0, general:0, social:0, cookies:0 };
     const life  = lt ?? { total:0 };
@@ -116,6 +117,24 @@ async function refreshStats() {
     $('s-wb').textContent = fmt(stats.general  || 0);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
+
+    // Daily average from last 7 days of data
+    if ($('stat-daily-avg') && Array.isArray(dailyData) && dailyData.length > 0) {
+      const daySum = dailyData.reduce((a, d) => a + (d.count || 0), 0);
+      const avg = Math.round(daySum / dailyData.length);
+      $('stat-daily-avg').textContent = fmt(avg) + ' / day';
+    }
+
+    // Network vs cosmetic breakdown
+    if ($('stat-net-dom')) {
+      const net = stats.network || 0;
+      const dom = stats.dom || 0;
+      if (net > 0 || dom > 0) {
+        $('stat-net-dom').textContent = `${fmt(net)} network · ${fmt(dom)} cosmetic`;
+      } else {
+        $('stat-net-dom').textContent = '—';
+      }
+    }
 
     const syncedAt = stored?.filterSyncedAt;
     if ($('stat-last-sync')) {
@@ -194,10 +213,16 @@ async function refreshTopDomains() {
       msg('GET_SAFE_BROWSING_STATUS').then(r => r ?? {}),
     ]);
 
-    // Safe browsing indicator
+    // Safe browsing indicator badge (top-domains header)
     if (sbBadge && sbStatus.domainCount > 0) {
       sbBadge.style.display = '';
       sbBadge.title = `Safe browsing active — ${sbStatus.domainCount.toLocaleString()} threat domains`;
+    }
+
+    // Threats blocked stat row
+    if ($('stat-threats')) {
+      const n = sbStatus.threatsBlocked ?? 0;
+      $('stat-threats').textContent = n > 0 ? `${fmt(n)} site${n === 1 ? '' : 's'}` : '0 sites';
     }
 
     if (!domains.length) { list.textContent = 'No blocks recorded yet'; return; }

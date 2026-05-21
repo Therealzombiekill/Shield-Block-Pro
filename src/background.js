@@ -629,6 +629,7 @@ function incrementStat(type, tabId) {
   }
   // Accumulate — flush to storage in a single write after 500ms idle
   _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
+  _pendingStats.dom   = (_pendingStats.dom   ?? 0) + 1; // cosmetic/JS block counter
   _pendingCount++;
   _pendingTimeSaved  += TIME_SAVED_SECONDS[type] ?? 2;
   if (_pendingCount >= 20) {
@@ -694,9 +695,10 @@ async function countNetworkBlocks(tabId, url) {
         const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
         const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
         const lt = lifetime ?? { total:0 };
-        s.total  = (s.total  | 0) + count;
-        s[cat]   = (s[cat]   | 0) + count;
-        lt.total = (lt.total | 0) + count;
+        s.total   = (s.total   | 0) + count;
+        s.network = (s.network | 0) + count; // network block counter
+        s[cat]    = (s[cat]    | 0) + count;
+        lt.total  = (lt.total  | 0) + count;
         await chrome.storage.local.set({ stats: s, lifetime: lt });
         try {
           chrome.action.setBadgeText({ text: formatBadge(s.total) });
@@ -724,10 +726,23 @@ chrome.webNavigation.onBeforeNavigate.addListener(async ({ tabId, frameId, url }
   try {
     const s = await getSettings();
     if (!s.safeBrowsing) return;
+
+    // Skip if the user explicitly chose to proceed past this warning
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    const bypassExpiry = _sbBypassedHostnames.get(hostname);
+    if (bypassExpiry) {
+      if (Date.now() < bypassExpiry) return; // still within bypass window
+      _sbBypassedHostnames.delete(hostname); // expired — clean up
+    }
+
     if (checkSafeBrowsing(url)) {
       const warningUrl = chrome.runtime.getURL('blocked.html') + '?url=' + encodeURIComponent(url);
       await chrome.tabs.update(tabId, { url: warningUrl });
-      logEvent('safe-browsing', 'warn', `Blocked malicious URL: ${new URL(url).hostname}`);
+      _sbBlockCount++;
+      chrome.storage.local.get('sbBlocks', ({ sbBlocks = 0 }) => {
+        chrome.storage.local.set({ sbBlocks: sbBlocks + 1 }).catch(() => {});
+      });
+      logEvent('safe-browsing', 'warn', `Blocked malicious URL: ${hostname}`);
     }
   } catch (_) {}
 });
@@ -965,10 +980,17 @@ async function setMatrixRule(hostname, ruleKey, action) {
 let _safeBrowsingDomains = new Set(); // in-memory for fast synchronous lookup
 const SB_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
+// Hostnames the user explicitly chose to bypass. Entries expire after 30 s so
+// the bypass doesn't persist if the user closes the tab without navigating.
+const _sbBypassedHostnames = new Map(); // hostname → expiry timestamp
+let _sbBlockCount = 0; // in-memory threat-block counter (persisted in sbBlocks)
+
 async function loadSafeBrowsingCache() {
   try {
-    const { sbDomains = [], sbLastFetch = 0 } = await chrome.storage.local.get(['sbDomains', 'sbLastFetch']);
+    const { sbDomains = [], sbLastFetch = 0, sbBlocks = 0 } =
+      await chrome.storage.local.get(['sbDomains', 'sbLastFetch', 'sbBlocks']);
     _safeBrowsingDomains = new Set(sbDomains);
+    _sbBlockCount = sbBlocks;
     logEvent('safe-browsing', 'info', `Loaded ${_safeBrowsingDomains.size} domains from cache`);
     // Refresh if stale
     if (Date.now() - sbLastFetch > SB_REFRESH_INTERVAL_MS) await fetchSafeBrowsingLists();
@@ -1865,7 +1887,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'GET_STATS': {
         const { stats } = await chrome.storage.local.get('stats');
-        sendResponse(stats ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 });
+        sendResponse(stats ?? { total:0, network:0, dom:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 });
         break;
       }
       case 'GET_LIFETIME': {
@@ -1874,7 +1896,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'RESET_STATS':
-        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
+        await chrome.storage.local.set({ stats: { total:0, network:0, dom:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
         try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
         sendResponse({ ok: true });
         break;
@@ -2347,8 +2369,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({
           active: true,
           domainCount: _safeBrowsingDomains.size,
+          threatsBlocked: _sbBlockCount,
         });
         break;
+      case 'SAFE_BROWSING_BYPASS': {
+        // User explicitly chose to proceed past the blocked.html warning.
+        // Add a 30-second bypass window so the subsequent navigation isn't re-blocked.
+        try {
+          const bypassHostname = new URL(msg.url).hostname.replace(/^www\./, '');
+          _sbBypassedHostnames.set(bypassHostname, Date.now() + 30000);
+          logEvent('safe-browsing', 'info', `User bypassed: ${bypassHostname}`);
+        } catch (_) {}
+        sendResponse({ ok: true });
+        break;
+      }
       case 'REFRESH_SAFE_BROWSING':
         fetchSafeBrowsingLists().catch(() => {});
         sendResponse({ ok: true });

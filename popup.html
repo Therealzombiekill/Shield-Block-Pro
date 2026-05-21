@@ -118,6 +118,7 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 .info-label{font-size:11px;color:var(--muted)}
 .info-val{font-family:var(--mono);font-size:11px;color:var(--text)}
 .info-val.green{color:var(--green);font-weight:600}
+.info-val.red{color:var(--red);font-weight:600}
 
 /* Filter bar */
 .fbar{
@@ -513,8 +514,20 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <span class="info-val" id="stat-lifetime">0</span>
       </div>
       <div class="info-row">
+        <span class="info-label">Daily average</span>
+        <span class="info-val" id="stat-daily-avg">—</span>
+      </div>
+      <div class="info-row">
         <span class="info-label">Time saved</span>
         <span class="info-val green" id="stat-time-saved">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Network / cosmetic</span>
+        <span class="info-val" id="stat-net-dom">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Threats blocked</span>
+        <span class="info-val red" id="stat-threats">0 sites</span>
       </div>
       <div class="info-row">
         <span class="info-label">Filters synced</span>

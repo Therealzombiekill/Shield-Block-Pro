@@ -210,7 +210,7 @@
       if (!inlineStyle.includes('fixed') && !inlineStyle.includes('z-index')) continue;
       // Quick class/id check before touching computed style
       const cls = ((el.className || '') + ' ' + (el.id || '')).toLowerCase();
-      if (!/ad|promo|interstitial|popup|overlay|modal|newsletter|subscribe|sponsor/i.test(cls)) continue;
+      if (!/\b(ad|promo|interstitial|popup|overlay|modal|newsletter|subscribe|sponsor|banner|splash)\b/i.test(cls)) continue;
       try {
         const cs = window.getComputedStyle(el);
         if (cs.position !== 'fixed') continue;

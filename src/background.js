@@ -2158,7 +2158,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (uboData.whitelist && typeof uboData.whitelist === 'string') {
             const domains = uboData.whitelist.split('\n')
               .map(l => l.replace(/^@@\|\|/, '').replace(/\^.*/, '').trim())
-              .filter(d => d && !d.startsWith('!') && d.includes('.'));
+              .filter(d => d && /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(d));
             if (domains.length) updates.whitelist = domains;
           }
           if (Object.keys(updates).length) await chrome.storage.local.set(updates);
@@ -2354,7 +2354,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
       case 'PAUSE_ALL': {
-        const { minutes: paMins = 30 } = msg;
+        const paMins = Math.min(msg.minutes ?? 30, 1440); // cap at 24 h
         const expiry = Date.now() + paMins * 60000;
         await chrome.storage.local.set({ globalPause: { until: expiry } });
 
@@ -2541,7 +2541,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ── Tab events ─────────────────────────────────────────────────────────────
 
 chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
-  if (frameId === 0) injectCosmetics(tabId, url);
+  if (frameId === 0) injectCosmetics(tabId, url).catch(e => logEvent('cosmetic', 'error', `Injection error: ${e?.message ?? e}`));
 });
 
 // ── Alarms ─────────────────────────────────────────────────────────────────

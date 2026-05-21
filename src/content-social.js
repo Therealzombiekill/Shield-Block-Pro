@@ -425,6 +425,7 @@
   let _interval = setInterval(clean, 3000);
   clean();
 
+  let _spaTimeout = null;
   chrome.storage.onChanged.addListener((changes) => {
     const _nv = changes.settings?.newValue;
     const _ov = changes.settings?.oldValue;
@@ -432,6 +433,7 @@
       clearInterval(_interval);
       _observer.disconnect();
       clearTimeout(_debounce);
+      clearTimeout(_spaTimeout);
     } else if (_nv?.social === true && _ov?.social === false) {
       _observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
       _interval = setInterval(clean, 3000);

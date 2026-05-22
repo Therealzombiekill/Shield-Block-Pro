@@ -219,10 +219,10 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
   let id = startId;
 
   for (const line of lines) {
-    if (rules.length >= maxRules &&
-        cosmetics.size >= MAX_COSMETICS &&
-        domainCosmeticCount >= MAX_DOMAIN_COSMETICS &&
-        scriptletCount >= MAX_SCRIPTLETS) break;
+    // Break as soon as the DNR rule cap is reached — Chrome enforces this as a
+    // hard limit and filter lists are dominated by network rules, so continuing
+    // past this point wastes significant parse time for negligible cosmetic gain.
+    if (rules.length >= maxRules) break;
 
     const result = parseLine(line, id);
     if (!result) continue;

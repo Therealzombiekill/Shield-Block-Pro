@@ -267,22 +267,35 @@
     });
   }
 
+  let _cosmeticDisabled = false;
+  let _globalPaused = false;
+
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.cosmetic === false) {
+      _cosmeticDisabled = true;
       _observer.disconnect();
       clearTimeout(_debounce);
+    } else if (changes.settings?.newValue?.cosmetic === true && !_globalPaused) {
+      _cosmeticDisabled = false;
+      if (_target) _observer.observe(_target, { childList: true, subtree: true });
+      tick();
     }
   });
 
   // Handle global pause/resume messages from background
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'GLOBAL_PAUSE') {
+      _globalPaused = true;
       _observer.disconnect();
       clearTimeout(_debounce);
     }
     if (msg.type === 'GLOBAL_RESUME') {
-      if (_target) _observer.observe(_target, { childList: true, subtree: true });
-      tick();
+      _globalPaused = false;
+      // Only reconnect if cosmetic wasn't independently disabled via settings
+      if (!_cosmeticDisabled && _target) {
+        _observer.observe(_target, { childList: true, subtree: true });
+        tick();
+      }
     }
   });
 

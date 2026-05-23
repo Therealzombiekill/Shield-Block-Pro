@@ -19,11 +19,11 @@ html{width:360px}
 body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
   font-family:var(--sans);font-size:13px;overflow-x:hidden}
 
-/* ── App wrapper ────────────────────────────────────────────────────── */
+/* ── App wrapper ──────────────────────────────────────────────────────────────── */
 #app{display:none;flex-direction:column;min-height:480px}
 #app.ready{display:flex}
 
-/* ── Header ─────────────────────────────────────────────────────────── */
+/* ── Header ─────────────────────────────────────────────────────────────────── */
 .hdr{
   padding:11px 14px 10px;
   display:flex;align-items:center;justify-content:space-between;
@@ -52,7 +52,7 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 .dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 
-/* ── Nav ─────────────────────────────────────────────────────────────── */
+/* ── Nav ─────────────────────────────────────────────────────────────────────── */
 .nav{
   display:flex;background:var(--s1);border-bottom:1px solid var(--border);
   flex-shrink:0;
@@ -69,11 +69,11 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
   height:2px;background:var(--accent2);border-radius:2px;
 }
 
-/* ── Panels ──────────────────────────────────────────────────────────── */
+/* ── Panels ──────────────────────────────────────────────────────────────────── */
 .panel{display:none;flex:1;overflow-y:auto;max-height:400px}
 .panel.active{display:block}
 
-/* ── Stats panel ─────────────────────────────────────────────────────── */
+/* ── Stats panel ──────────────────────────────────────────────────────────────── */
 .hero{
   padding:18px 16px 14px;background:var(--s1);
   border-bottom:1px solid var(--border);
@@ -151,7 +151,7 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 .ghost.paused:hover{background:rgba(245,158,11,.2)}
 
 
-/* ── Blockers panel ──────────────────────────────────────────────────── */
+/* ── Blockers panel ──────────────────────────────────────────────────────────────── */
 .blockers{padding:10px 14px 14px}
 .sec-hd{
   font-family:var(--mono);font-size:9px;font-weight:700;
@@ -179,7 +179,7 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 .sw input:checked+.sw-t{background:var(--accent)}
 .sw input:checked+.sw-t .sw-k{transform:translateX(16px);background:#fff}
 
-/* ── Whitelist panel ─────────────────────────────────────────────────── */
+/* ── Whitelist panel ───────────────────────────────────────────────────────────────── */
 .wl-wrap{padding:12px 14px}
 .site-card{
   background:var(--s1);border:1px solid var(--border);border-radius:9px;
@@ -212,7 +212,7 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 }
 .wl-rm:hover{color:var(--red)}
 
-/* ── Support panel ───────────────────────────────────────────────────── */
+/* ── Support panel ─────────────────────────────────────────────────────────────────── */
 .sup{padding:14px;display:flex;flex-direction:column;gap:10px}
 .sup-card{
   background:var(--s2);border:1px solid var(--border2);border-radius:10px;
@@ -238,7 +238,7 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 }
 .dev-btn:hover{border-color:rgba(124,106,255,.4)}
 
-/* ── Footer ──────────────────────────────────────────────────────────── */
+/* ── Footer ──────────────────────────────────────────────────────────────────────── */
 .ftr{
   display:flex;align-items:center;justify-content:space-between;
   padding:8px 14px 10px;border-top:1px solid var(--border);
@@ -278,17 +278,17 @@ letter-spacing:.05em;margin-right:4px;flex-shrink:0}
 textarea:focus{border-color:var(--accent)!important}
 .pause-active { color: var(--yellow) !important; border-color: var(--yellow) !important; }
 
-/* ── Popup fade-in ───────────────────────────────────────────────── */
+/* ── Popup fade-in ───────────────────────────────────────────────────────────────── */
 @keyframes sbFadeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
 #app.ready{animation:sbFadeIn .14s ease}
 
-/* ── Custom scrollbars ───────────────────────────────────────────── */
+/* ── Custom scrollbars ───────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:var(--faint)}
 
-/* ── Select elements ─────────────────────────────────────────────── */
+/* ── Select elements ───────────────────────────────────────────────────────────────── */
 select{
   font-family:var(--mono);font-size:10px;height:22px;padding:0 4px;
   background:var(--s1);color:var(--text);
@@ -298,14 +298,14 @@ select{
 }
 select:hover,select:focus{border-color:var(--accent2)}
 
-/* ── Focus ring ──────────────────────────────────────────────────── */
+/* ── Focus ring ────────────────────────────────────────────────────────────────────── */
 :focus-visible{outline:2px solid rgba(124,106,255,.55);outline-offset:1px;border-radius:3px}
 
-/* ── Nav underline transition ────────────────────────────────────── */
+/* ── Nav underline transition ──────────────────────────────────────────────────────────────── */
 .nb::after{transition:opacity .12s}
 .nb:not(.active)::after{opacity:0}
 
-/* ── Stats panel sections ────────────────────────────────────────── */
+/* ── Stats panel sections ──────────────────────────────────────────────────────────────── */
 .ss{border-top:1px solid var(--border);padding:8px 16px}
 .ss-hd{
   font-family:var(--mono);font-size:9px;color:var(--muted);
@@ -315,7 +315,7 @@ select:hover,select:focus{border-color:var(--accent2)}
   display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;
 }
 
-/* ── Matrix section ──────────────────────────────────────────────── */
+/* ── Matrix section ──────────────────────────────────────────────────────────────────── */
 .matrix-sec{
   border-top:1px solid var(--border);background:var(--s1);
   padding:8px 14px 10px;flex-shrink:0;
@@ -328,14 +328,14 @@ select:hover,select:focus{border-color:var(--accent2)}
   text-transform:uppercase;letter-spacing:.1em;
 }
 
-/* ── Input transitions ───────────────────────────────────────────── */
+/* ── Input transitions ─────────────────────────────────────────────────────────────────── */
 input[type="text"],input[type="url"]{transition:border-color .15s}
 
-/* ── Ghost button variants ───────────────────────────────────────── */
+/* ── Ghost button variants ───────────────────────────────────────────────────────────────── */
 .ghost-bd{border:1px solid var(--border2)}
 .ghost-accent{border:1px solid var(--accent);color:var(--accent2)}
 
-/* ── Blocker icon backgrounds ────────────────────────────────────── */
+/* ── Blocker icon backgrounds ──────────────────────────────────────────────────────────────── */
 .ti-az{background:rgba(240,165,0,.1)}
 .ti-net{background:rgba(124,106,255,.1)}
 .ti-soc{background:rgba(236,72,153,.1)}
@@ -353,19 +353,19 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 .ti-tz{background:rgba(167,139,250,.1)}
 .ti-pw{background:rgba(251,191,36,.1)}
 
-/* ── Matrix ──────────────────────────────────────────────────────── */
+/* ── Matrix ──────────────────────────────────────────────────────────────────────────── */
 #matrix-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px}
 #matrix-status{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;min-height:12px}
 .matrix-sec .ghost{font-size:9px;padding:1px 5px}
 
-/* ── Stats lists & chart ─────────────────────────────────────────── */
+/* ── Stats lists & chart ──────────────────────────────────────────────────────────────── */
 #page-log-list{font-family:var(--mono);font-size:9px;max-height:80px;overflow-y:auto;color:var(--muted)}
 #top-domains-list{font-family:var(--mono);font-size:9px;max-height:72px;overflow-y:auto;color:var(--muted)}
 #sb-indicator{font-size:9px}
 #spark-chart{width:100%;display:block;border-radius:4px;image-rendering:pixelated}
 .ss-chart{padding-bottom:6px}
 
-/* ── Support panel ───────────────────────────────────────────────── */
+/* ── Support panel ─────────────────────────────────────────────────────────────────── */
 .sup-card-sm{padding:11px 13px}
 .sup-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .sup-ghost-sm{font-size:9px;padding:2px 8px;border:1px solid var(--border2)}
@@ -382,7 +382,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 .sup-ghost-full{flex:1;text-align:center}
 .sup-info{font-size:11px;color:var(--muted);line-height:1.7}
 
-/* ── Filters panel ───────────────────────────────────────────────── */
+/* ── Filters panel ─────────────────────────────────────────────────────────────────── */
 .fil-sec{padding:10px 14px 6px}
 .fil-divider{padding:0 14px 10px;border-top:1px solid var(--border);margin-top:2px}
 .fil-sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -402,13 +402,13 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 .fil-types{font-size:10px;color:var(--muted);line-height:1.8;font-family:var(--mono)}
 .fil-types span{color:var(--text)}
 
-/* ── Log panel ───────────────────────────────────────────────────── */
+/* ── Log panel ──────────────────────────────────────────────────────────────────────── */
 .log-hdr{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:6px}
 .log-hdr-btns{display:flex;gap:4px;flex-shrink:0}
 #log-filters{display:flex;gap:3px;flex-wrap:wrap}
 #log-list{max-height:340px;overflow-y:auto;font-family:var(--mono);font-size:10px}
 
-/* ── Inline overrides cleanup ────────────────────────────────────── */
+/* ── Inline overrides cleanup ──────────────────────────────────────────────────────────────── */
 .ss-hd-row .ss-hd{margin-bottom:0}
 #filters-text{width:100%;height:180px;background:var(--s2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:10px;padding:8px;resize:vertical;outline:none;line-height:1.5;box-sizing:border-box}
 #import-url-input{flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:10px;padding:6px 8px;outline:none}
@@ -455,7 +455,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <button class="nb" data-panel="support">Support</button>
   </div>
 
-  <!-- ── STATS PANEL ──────────────────────────────────────────────── -->
+  <!-- ── STATS PANEL ────────────────────────────────────────────────────────────────────── -->
   <div class="panel active" id="panel-stats">
 
     <div class="hero">
@@ -521,13 +521,13 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <span class="info-val" id="stat-last-sync">—</span>
       </div>
     </div>
-    <!-- ── Per-page blocked requests ──────────────────────────────── -->
+    <!-- ── Per-page blocked requests ───────────────────────────────────────────────────── -->
     <div class="ss">
       <div class="ss-hd">Blocked on this page</div>
       <div id="page-log-list">—</div>
     </div>
 
-    <!-- ── Top blocked domains ─────────────────────────────────────── -->
+    <!-- ── Top blocked domains ─────────────────────────────────────────────────────────────── -->
     <div class="ss">
       <div class="ss-hd-row">
         <span class="ss-hd">Top blocked this session</span>
@@ -536,7 +536,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       <div id="top-domains-list">No blocks recorded yet</div>
     </div>
 
-    <!-- ── 7-day chart ─────────────────────────────────────────────── -->
+    <!-- ── 7-day chart ─────────────────────────────────────────────────────────────────────────── -->
     <div class="ss ss-chart">
       <div class="ss-hd">7-day activity</div>
       <canvas id="spark-chart" height="36"></canvas>
@@ -564,7 +564,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
     </div>
 
-    <!-- ── Domain filtering matrix ──────────────────────────────────── -->
+    <!-- ── Domain filtering matrix ─────────────────────────────────────────────────────────────────────── -->
     <div class="matrix-sec">
       <div class="matrix-sec-hd">
         <span class="matrix-sec-label">3rd-party blocking</span>
@@ -576,11 +576,11 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 
   </div>
 
-  <!-- ── BLOCKERS PANEL ────────────────────────────────────────────── -->
+  <!-- ── BLOCKERS PANEL ───────────────────────────────────────────────────────────────────────── -->
   <div class="panel" id="panel-blockers">
     <div class="blockers">
 
-      <div class="sec-hd">Network & Web</div>
+      <div class="sec-hd">Network &amp; Web</div>
 
       <label class="tr" for="t-az">
         <div class="tr-info">
@@ -597,7 +597,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-net">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1 17.9c-4-.5-7-3.9-7-7.9 0-.6.1-1.2.2-1.8L9 15v1c0 1.1.9 2 2 2v1.9zm6.9-2.5c-.3-.8-1-1.4-1.9-1.4h-1v-3c0-.6-.4-1-1-1H8V8h2c.6 0 1-.5 1-1V5h2c1.1 0 2-.9 2-2v-.4c2.9 1.2 5 4.1 5 7.4 0 2.1-.8 4-2.1 5.4z"/></svg>
           </div>
-          <div class="ttxt"><strong>Network Block</strong><span id="rules-desc">EasyList + 12 filter lists</span></div>
+          <div class="ttxt"><strong>Network Block</strong><span id="rules-desc">32 filter lists</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-wb" data-s="general" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -636,7 +636,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-url">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#f5c542"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
           </div>
-          <div class="ttxt"><strong>URL Tracker Removal</strong><span>Strip UTM, fbclid, ttclid, 40+ params</span></div>
+          <div class="ttxt"><strong>URL Tracker Removal</strong><span>Strip UTM, fbclid, ttclid, 80+ params</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-tr" data-s="tracking" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -703,7 +703,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div class="sw"><input type="checkbox" id="t-kk" data-s="kick" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
 
-      <div class="sec-hd">Privacy & Advanced</div>
+      <div class="sec-hd">Privacy &amp; Advanced</div>
 
       <label class="tr" for="t-sb">
         <div class="tr-info">
@@ -758,7 +758,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     </div>
   </div>
 
-  <!-- ── WHITELIST PANEL ───────────────────────────────────────────── -->
+  <!-- ── WHITELIST PANEL ─────────────────────────────────────────────────────────────────────── -->
   <div class="panel" id="panel-whitelist">
     <div class="wl-wrap">
       <div class="site-card">
@@ -776,11 +776,11 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     </div>
   </div>
 
-  <!-- ── SUPPORT PANEL ─────────────────────────────────────────────── -->
+  <!-- ── SUPPORT PANEL ───────────────────────────────────────────────────────────────────────── -->
   <div class="panel" id="panel-support">
     <div class="sup">
 
-      <!-- ── Health check ─────────────────────────────────────────────── -->
+      <!-- ── Health check ───────────────────────────────────────────────────────────────────── -->
       <div class="sup-card sup-card-sm">
         <div class="sup-hd">
           <div class="sup-label">Extension Health</div>
@@ -870,7 +870,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     </div>
   </div>
 
-  <!-- ── MY FILTERS PANEL ───────────────────────────────────────────── -->
+  <!-- ── MY FILTERS PANEL ─────────────────────────────────────────────────────────────────────────── -->
    <div class="panel" id="panel-filters">
      <div class="fil-sec">
        <div class="fil-sec-hd">
@@ -893,7 +893,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
        <div id="filters-status"></div>
      </div>
 
-     <!-- ── Import from URL ──────────────────────────────────────────── -->
+     <!-- ── Import from URL ─────────────────────────────────────────────────────────────────────── -->
      <div class="fil-divider">
        <div class="fil-label fil-label-top">Import from URL</div>
        <div class="fil-input-row">
@@ -932,7 +932,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       <div id="cl-status"></div>
     </div>
 
-    <!-- ── Per-list sync status ───────────────────────────────────────── -->
+    <!-- ── Per-list sync status ──────────────────────────────────────────────────────────────────────────── -->
     <div class="fil-divider">
       <div class="fil-label fil-label-top">
         Last Sync Status
@@ -942,7 +942,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     </div>
   </div>
 
-  <!-- ── LOG PANEL ─────────────────────────────────────────────────── -->
+  <!-- ── LOG PANEL ───────────────────────────────────────────────────────────────────────────── -->
   <div class="panel" id="panel-log">
     <div class="log-hdr">
       <div id="log-filters">

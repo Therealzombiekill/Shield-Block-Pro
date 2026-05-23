@@ -267,22 +267,43 @@
     });
   }
 
+  // Track cosmetic-disabled and global-paused states independently so that
+  // GLOBAL_RESUME does not reconnect the observer when cosmetic is off, and
+  // re-enabling cosmetic reconnects correctly even if globally paused.
+  let _cosmeticDisabled = false;
+  let _globalPaused = false;
+
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.cosmetic === false) {
+    if (!changes.settings) return; // only act on settings changes
+    const newCosmetic = changes.settings.newValue?.cosmetic ?? true;
+    if (newCosmetic === false && !_cosmeticDisabled) {
+      _cosmeticDisabled = true;
       _observer.disconnect();
       clearTimeout(_debounce);
+    } else if (newCosmetic !== false && _cosmeticDisabled) {
+      _cosmeticDisabled = false;
+      if (!_globalPaused && _target) {
+        _observer.observe(_target, { childList: true, subtree: true });
+        tick();
+      }
     }
   });
 
   // Handle global pause/resume messages from background
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'GLOBAL_PAUSE') {
+      if (_globalPaused) return;
+      _globalPaused = true;
       _observer.disconnect();
       clearTimeout(_debounce);
     }
     if (msg.type === 'GLOBAL_RESUME') {
-      if (_target) _observer.observe(_target, { childList: true, subtree: true });
-      tick();
+      if (!_globalPaused) return;
+      _globalPaused = false;
+      if (!_cosmeticDisabled && _target) {
+        _observer.observe(_target, { childList: true, subtree: true });
+        tick();
+      }
     }
   });
 

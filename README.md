@@ -1,29 +1,29 @@
 # ShieldBlock Pro
 
-Block ads, trackers, and cookie banners on every website — automatically, no setup required.
+ShieldBlock Pro automatically blocks ads, trackers, and cookie banners across every website — no configuration required.
 
-## Features
+## What it does
 
-**Ad blocking powered by 32 filter lists**  
-Includes EasyList, EasyPrivacy, uBlock Origin filters, AdGuard tracking protection, and regional lists for a dozen languages. Filter lists are updated automatically every 12 hours.
+**Network-level ad blocking**
+Powered by 32 curated filter lists updated every 12 hours. Ads are stopped before they load, not hidden after the fact.
 
-**Cookie banner auto-reject**  
-Over 60 consent management platforms are handled automatically. Banners are rejected at the source — not just hidden.
+**Cookie banner auto-reject**
+Over 60 consent management platforms are handled automatically. Banners are rejected at the source — not just dismissed.
 
-**Anti-fingerprinting**  
-Canvas, WebGL, AudioContext, Battery API, and screen properties are spoofed to prevent cross-site tracking while keeping normal browsing intact.
+**Anti-fingerprinting**
+Canvas, WebGL, AudioContext, Battery API, and screen properties are spoofed to prevent invisible cross-site tracking.
 
-**Social media ad removal**  
-Sponsored and promoted posts are removed across major social platforms in 30+ languages using cosmetic filtering rules.
+**URL tracker cleaning**
+80+ tracking parameters are stripped from every URL you visit, cutting off the data trail left by ad click IDs and campaign tags.
 
-**URL tracker cleaning**  
-80+ tracking parameters are stripped from every URL — including Google Ads parameters, Meta pixels, Microsoft Ads, campaign UTM values, and platform-specific click IDs.
+**Sponsored content removal**
+Promoted and sponsored posts are detected and removed from social media feeds using cosmetic filtering rules in 30+ languages.
 
-**Scriptlet injection**  
-Anti-adblock bypass scripts neutralize detection mechanisms on sites that attempt to block ad blockers.
+**Platform ad suppression**
+Dedicated handlers stop ads on major streaming and video platforms — skipping, muting, and removing overlays automatically.
 
-**Platform-specific blocking**  
-Dedicated handlers for YouTube, Twitch, Spotify, Hulu, and Kick stop ads even when platforms try to detect and circumvent blockers.
+**Scriptlet injection**
+Anti-adblock bypass scripts neutralize detection mechanisms on sites that fight back.
 
 ## Privacy
 

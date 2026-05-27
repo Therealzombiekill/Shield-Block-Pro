@@ -117,7 +117,7 @@ function adGuardUrl(filterId) {
 // ── Filter list registry ──────────────────────────────────────────────────────
 // Rules are pulled from each list up to `max` entries.
 // ID ranges MUST NOT overlap — each list's [start, start+max-1] must be disjoint.
-// Chrome hard-caps updateDynamicRules at 5,000 total; filter lists must stay within the reserved filter budget.
+// Chrome hard-caps updateDynamicRules at 5,000 total; sync truncates lists to the reserved filter budget.
 //
 //   List                │ start  │ max  │ end (exclusive)
 //   ────────────────────┼────────┼──────┼────────────────
@@ -194,8 +194,6 @@ const FILTER_LISTS = [
       }
     }
   }
-  const total = FILTER_LISTS.reduce((s, l) => s + l.max, 0);
-  if (total > MAX_FILTER_RULES) logEvent('system', 'error', `Total filter list capacity ${total} exceeds filter rule budget ${MAX_FILTER_RULES} - lower-priority rules will be truncated`);
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours

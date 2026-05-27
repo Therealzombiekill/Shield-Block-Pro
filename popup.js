@@ -16,14 +16,16 @@ let _logInterval = null;
 let _catalog     = null;      // curated filter catalog (lazy-loaded)
 let _catalogCat  = 'ads';     // active catalog category
 let _catalogOpen = false;     // catalog panel visibility state
-function refreshStatsPanel() {
-  refreshStats();
-  drawSparkline();
-  checkPauseStatus();
-  checkGlobalPause();
-  refreshMatrix();
-  refreshPageLog();
-  refreshTopDomains();
+async function refreshStatsPanel() {
+  await Promise.all([
+    refreshStats(),
+    drawSparkline(),
+    checkPauseStatus(),
+    checkGlobalPause(),
+    refreshMatrix(),
+    refreshPageLog(),
+    refreshTopDomains()
+  ]);
 }
 document.querySelectorAll('.nb').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1083,7 +1085,6 @@ $('import-btn')?.addEventListener('change', async (e) => {
       if (status) status.textContent = '✓ Imported successfully — reload tabs to apply';
       await loadSettings(); // refresh toggle states immediately
       await Promise.all([refreshWhitelist(), refreshCustomRules(), refreshFilterStatus(), checkGlobalPause()]);
-      await Promise.all([refreshWhitelist(), refreshCustomRules(), refreshFilterStatus(), checkGlobalPause()]);
     } else {
       if (status) status.textContent = '✗ Import failed';
     }
@@ -1237,7 +1238,6 @@ $('cloud-restore-btn')?.addEventListener('click', async () => {
   if (r?.ok) {
     _cloudStatus(`✓ Restored: ${r.keys?.join(', ')}`);
     await loadSettings();
-    await Promise.all([refreshWhitelist(), refreshCustomRules(), refreshFilterStatus(), checkGlobalPause()]);
     await Promise.all([refreshWhitelist(), refreshCustomRules(), refreshFilterStatus(), checkGlobalPause()]);
   } else {
     _cloudStatus('✗ ' + (r?.error || 'Nothing saved'), true);

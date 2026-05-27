@@ -6,6 +6,7 @@ import './browser-compat.js';
 import { parseFilterList } from './filter-parser.js';
 
 const MAX_DYNAMIC_RULES = 5000;
+const MAX_FILTER_RULES = 4300; // reserve dynamic-rule headroom for pause, whitelist, matrix, and privacy rules
 // Dynamic DNR ID ranges. Keep these disjoint from static bundled rules and
 // from each other; Chrome rejects duplicate IDs across active rule pools.
 const FILTER_DYNAMIC_START = 10000;
@@ -1220,7 +1221,7 @@ async function syncFilterLists(force = false) {
     // ── Separate fresh (cached) lists from stale (needs fetch) ────────────────
     const staleLists = [];
     for (const list of FILTER_LISTS) {
-      const budget = MAX_DYNAMIC_RULES - allRules.length;
+      const budget = MAX_FILTER_RULES - allRules.length;
       if (budget <= 0) break;
       const limit = Math.min(list.max, budget);
 
@@ -1412,7 +1413,7 @@ async function syncFilterLists(force = false) {
 
     // Hard-cap at MAX_DYNAMIC_RULES — the DNR API rejects any batch that would push
     // the total over 5000, so excess rules must be dropped before we start adding.
-    if (deduped.length > MAX_DYNAMIC_RULES) deduped = deduped.slice(0, MAX_DYNAMIC_RULES);
+    if (deduped.length > MAX_FILTER_RULES) deduped = deduped.slice(0, MAX_FILTER_RULES);
 
     // Atomic swap: remove old rules and add new ones in one call per batch.
     // This eliminates the window where no rules are active.

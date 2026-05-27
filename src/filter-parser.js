@@ -146,9 +146,11 @@ function parseLine(line, idCounter) {
       if (optName === 'third-party') domainType = negated ? 'firstParty' : 'thirdParty';
       if (opt.startsWith('domain=')) {
         for (const d of opt.slice(7).split('|')) {
-          const domain = d.trim().replace(/^www\./, '');
+          const rawDomain = d.trim();
+          const negatedDomain = rawDomain.startsWith('~');
+          const domain = (negatedDomain ? rawDomain.slice(1) : rawDomain).replace(/^www\./, '');
           if (!domain) continue;
-          if (domain.startsWith('~')) excludedInitiatorDomains.push(domain.slice(1));
+          if (negatedDomain) excludedInitiatorDomains.push(domain);
           else initiatorDomains.push(domain);
         }
       }

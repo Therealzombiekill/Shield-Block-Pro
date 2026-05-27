@@ -149,18 +149,8 @@
   } catch (_) {}
 
   // ── 4. WebRTC IP leak prevention ─────────────────────────────────────────────
-  // Strips iceServers from RTCPeerConnection config so STUN requests don't
-  // reveal the real IP address through VPNs/proxies.
-  try {
-    const _RPC = window.RTCPeerConnection;
-    if (_RPC) {
-      window.RTCPeerConnection = function (config, constraints) {
-        if (config?.iceServers) config = { ...config, iceServers: [] };
-        return new _RPC(config, constraints);
-      };
-      window.RTCPeerConnection.prototype = _RPC.prototype;
-    }
-  } catch (_) {}
+  // Do not strip RTCPeerConnection. Removing ICE servers globally breaks Meet,
+  // Discord, Zoom, Twitch low-latency playback, and other legitimate WebRTC apps.
 
   // ── 5. Navigator API normalization ───────────────────────────────────────────
   // Round hardwareConcurrency and deviceMemory to reduce fingerprint uniqueness.
@@ -235,8 +225,8 @@
       /wss?:\/\/.*\.(adsrvr|casalemedia|openx|appnexus)\./, 
       /wss?:\/\/(spade|collector)\.(twitch|mixpanel|amplitude)\./,
     ];
-    // Never interfere with YouTube or Google WebSockets
-    const WS_SAFE = /youtube\.com|googlevideo\.com|googleapis\.com|ytimg\.com/;
+    // Never interfere with video platform playback / heartbeat WebSockets.
+    const WS_SAFE = /youtube\.com|googlevideo\.com|googleapis\.com|ytimg\.com|twitch\.tv|ttvnw\.net|jtvnw\.net|twitchsvc\.net/;
     const _WS = window.WebSocket;
     window.WebSocket = function (url, protocols) {
       const urlStr = String(url);
@@ -580,7 +570,7 @@
   // ── 13. Chat widget removal ───────────────────────────────────────────────────
   const CHAT_SEL = [
     '#intercom-frame', '#intercom-container', '.intercom-lightweight-app',
-    '#launcher', '#webWidget', '#ze-snippet', '.zEWidget-launcher',
+    '#webWidget', '#ze-snippet', '.zEWidget-launcher',
     '#drift-widget', '#drift-frame-controller', '#drift-widget-container',
     '.crisp-client', '#crisp-chatbox',
     '#hubspot-messages-iframe-container', '.hs-messages-widget',

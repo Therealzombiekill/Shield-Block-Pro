@@ -6,15 +6,23 @@ import './browser-compat.js';
 import { parseFilterList } from './filter-parser.js';
 
 const MAX_DYNAMIC_RULES = 5000;
-// ID reserved for the global pause-all DNR allow rule. Must be outside all filter
-// ID ranges: static rules 1–9999, dynamic filter rules 10000–20250.
+// Dynamic DNR ID ranges. Keep these disjoint from static bundled rules and
+// from each other; Chrome rejects duplicate IDs across active rule pools.
+const FILTER_DYNAMIC_START = 10000;
+const FILTER_DYNAMIC_END   = 29999;
+const WHITELIST_BASE       = 48000; // 48000-48998: two allow rules per whitelisted domain
+// ID reserved for the global pause-all DNR allow rule. Must be outside all other ranges.
 const PAUSE_ALL_RULE_ID = 49999;
 
 // ── Feature rule ID ranges ─────────────────────────────────────────────────
-// These ranges sit between filter rules (10000-20250) and pause-all (49999),
+// These ranges sit between filter rules (10000-29999) and pause-all (49999),
 // so they never collide with either.
 const REMOVEPARAM_BASE  = 30000; // 30000-30999: global + domain-scoped removeparam rules
 const MATRIX_BASE       = 31000; // 31000-31999: per-domain filtering matrix rules
+const DNR_RESOURCE_TYPES = [
+  'main_frame','sub_frame','script','image','stylesheet','object',
+  'xmlhttprequest','ping','media','websocket','font','other',
+];
 // ── Hardcoded tracking parameter list ─────────────────────────────────────
 // These are applied REGARDLESS of what filter lists contain. Updated independently
 // of the 12-hour filter sync cycle — they never change in structure, just grow.
@@ -163,16 +171,16 @@ const FILTER_LISTS = [
   // Anti-cryptomining
   { name: 'NoCoin',                   url: 'https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt',                                               key: 'nocoin',        max:   80, start: 19900 },
   // ── Regional language lists ──────────────────────────────────────────────
-  { name: 'EasyList Spanish',       url: 'https://easylist-downloads.adblockplus.org/easylistspanish.txt',           key: 'easylist_es',  max:  30, start: 19980 },
-  { name: 'EasyList Italian',       url: 'https://easylist-downloads.adblockplus.org/easylistitaly.txt',             key: 'easylist_it',  max:  30, start: 20010 },
-  { name: 'EasyList Dutch',         url: 'https://easylist-downloads.adblockplus.org/easylistdutch.txt',             key: 'easylist_nl',  max:  30, start: 20040 },
-  { name: 'AdGuard Japanese',       url: adGuardUrl(7),                                                                                                                  key: 'adguard_ja',   max:  30, start: 20070 },
-  { name: 'Liste AR Arabic',        url: 'https://easylist-downloads.adblockplus.org/Liste_AR.txt',                  key: 'liste_ar',     max:  25, start: 20100 },
-  { name: 'Czech and Slovak',       url: 'https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt', key: 'easylist_cs',  max:  25, start: 20125 },
-  { name: 'ABP Indonesian',         url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                   key: 'abp_id',       max:  25, start: 20150 },
-  { name: 'Hebrew List',            url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt', key: 'hebrew_il',    max:  25, start: 20175 },
-  { name: 'ABPVN Vietnamese',       url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',    key: 'abp_vn',       max:  25, start: 20200 },
-  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NordicFiltersABP-Inclusion.txt',                key: 'nordic', max: 25, start: 20225 },
+  { name: 'EasyList Spanish',       url: 'https://easylist-downloads.adblockplus.org/easylistspanish.txt',           key: 'easylist_es',  max:  30, start: 22000 },
+  { name: 'EasyList Italian',       url: 'https://easylist-downloads.adblockplus.org/easylistitaly.txt',             key: 'easylist_it',  max:  30, start: 22030 },
+  { name: 'EasyList Dutch',         url: 'https://easylist-downloads.adblockplus.org/easylistdutch.txt',             key: 'easylist_nl',  max:  30, start: 22060 },
+  { name: 'AdGuard Japanese',       url: adGuardUrl(7),                                                                                                                  key: 'adguard_ja',   max:  30, start: 22090 },
+  { name: 'Liste AR Arabic',        url: 'https://easylist-downloads.adblockplus.org/Liste_AR.txt',                  key: 'liste_ar',     max:  25, start: 22120 },
+  { name: 'Czech and Slovak',       url: 'https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt', key: 'easylist_cs',  max:  25, start: 22145 },
+  { name: 'ABP Indonesian',         url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                   key: 'abp_id',       max:  25, start: 22170 },
+  { name: 'Hebrew List',            url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt', key: 'hebrew_il',    max:  25, start: 22195 },
+  { name: 'ABPVN Vietnamese',       url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',    key: 'abp_vn',       max:  25, start: 22220 },
+  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NordicFiltersABP-Inclusion.txt',                key: 'nordic', max: 25, start: 22245 },
 ];
 
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
@@ -717,6 +725,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async ({ tabId, frameId, url }
   try {
     const s = await getSettings();
     if (!s.safeBrowsing) return;
+    if (await isSafeBrowsingAllowed(url)) return;
     if (checkSafeBrowsing(url)) {
       const warningUrl = chrome.runtime.getURL('blocked.html') + '?url=' + encodeURIComponent(url);
       await chrome.tabs.update(tabId, { url: warningUrl });
@@ -808,8 +817,16 @@ async function applyRemoveParamRules() {
     const newRules = [];
     let idCursor = REMOVEPARAM_BASE;
 
-    // Global rule — strip tracking params from ALL navigations
-    if (globalParams.size > 0) {
+    const chunkParams = (params, max = 80) => {
+      const sorted = [...new Set(params)].sort();
+      const chunks = [];
+      for (let i = 0; i < sorted.length; i += max) chunks.push(sorted.slice(i, i + max));
+      return chunks;
+    };
+
+    // Global rules — split large lists so one oversized queryTransform does not
+    // make Chrome reject every removeparam rule in the batch.
+    for (const params of chunkParams(globalParams)) {
       newRules.push({
         id: idCursor++,
         priority: 3, // above filter block rules (priority 2) so param strip runs first
@@ -817,7 +834,7 @@ async function applyRemoveParamRules() {
           type: 'redirect',
           redirect: {
             transform: {
-              queryTransform: { removeParams: [...globalParams].sort() },
+              queryTransform: { removeParams: params },
             },
           },
         },
@@ -826,27 +843,31 @@ async function applyRemoveParamRules() {
           resourceTypes: ['main_frame', 'sub_frame'],
         },
       });
+      if (idCursor > REMOVEPARAM_BASE + 999) break;
     }
 
     // Domain-scoped rules (e.g. remove 'ref' only on amazon.com)
     for (const group of domainGroups) {
       if (!group.params?.length) continue;
-      const condition = {
-        urlFilter: '|http',
-        resourceTypes: ['main_frame', 'sub_frame'],
-      };
-      if (group.initDomains?.length) condition.initiatorDomains = group.initDomains;
-      if (group.exclDomains?.length) condition.excludedInitiatorDomains = group.exclDomains;
-      newRules.push({
-        id: idCursor++,
-        priority: 4, // domain-specific beats global
-        action: {
-          type: 'redirect',
-          redirect: { transform: { queryTransform: { removeParams: [...group.params].sort() } } },
-        },
-        condition,
-      });
-      if (idCursor > REMOVEPARAM_BASE + 999) break; // safety cap
+      for (const params of chunkParams(group.params)) {
+        const condition = {
+          urlFilter: '|http',
+          resourceTypes: ['main_frame', 'sub_frame'],
+        };
+        if (group.initDomains?.length) condition.initiatorDomains = group.initDomains;
+        if (group.exclDomains?.length) condition.excludedInitiatorDomains = group.exclDomains;
+        newRules.push({
+          id: idCursor++,
+          priority: 4, // domain-specific beats global
+          action: {
+            type: 'redirect',
+            redirect: { transform: { queryTransform: { removeParams: params } } },
+          },
+          condition,
+        });
+        if (idCursor > REMOVEPARAM_BASE + 999) break; // safety cap
+      }
+      if (idCursor > REMOVEPARAM_BASE + 999) break;
     }
 
     // Swap: only remove rule IDs that are actually present — avoids sending
@@ -957,6 +978,7 @@ async function setMatrixRule(hostname, ruleKey, action) {
 
 let _safeBrowsingDomains = new Set(); // in-memory for fast synchronous lookup
 const SB_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const SB_ALLOW_TTL_MS = 10 * 60 * 1000;
 
 async function loadSafeBrowsingCache() {
   try {
@@ -1035,6 +1057,37 @@ function checkSafeBrowsing(url) {
     }
   } catch (_) {}
   return false;
+}
+
+
+async function isSafeBrowsingAllowed(url) {
+  try {
+    const { safeBrowsingAllow = {} } = await chrome.storage.local.get('safeBrowsingAllow');
+    const now = Date.now();
+    let changed = false;
+    for (const [allowedUrl, expiry] of Object.entries(safeBrowsingAllow)) {
+      if (!expiry || expiry <= now) {
+        delete safeBrowsingAllow[allowedUrl];
+        changed = true;
+      }
+    }
+    if (changed) await chrome.storage.local.set({ safeBrowsingAllow });
+    return (safeBrowsingAllow[url] ?? 0) > now;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function allowSafeBrowsingUrl(url) {
+  if (!url || !/^https?:\/\//.test(url)) return false;
+  try {
+    const { safeBrowsingAllow = {} } = await chrome.storage.local.get('safeBrowsingAllow');
+    safeBrowsingAllow[url] = Date.now() + SB_ALLOW_TTL_MS;
+    await chrome.storage.local.set({ safeBrowsingAllow });
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 // ── Referrer stripping ─────────────────────────────────────────────────────
@@ -1135,7 +1188,10 @@ async function syncFilterLists(force = false) {
   _startKeepAlive('syncFilterLists'); // prevent SW kill during fetch
   try {
     const s = await getSettings();
-    if (!s.general) return;
+    if (!s.general) {
+      await clearFilterDynamicRules();
+      return;
+    }
 
     // ── Connectivity gate ────────────────────────────────────────────────────
     // Skip sync (don't record failures) if the device appears offline.
@@ -1232,7 +1288,30 @@ async function syncFilterLists(force = false) {
           _lastSyncError = failMsg;
           syncFailureCount++;
           const failKey = failedEntry?.list?.key ?? 'unknown';
-          _syncListStatus[failKey] = { status: 'error', error: failMsg };
+          const cached = failedEntry ? (stored[`fr_${failKey}`] ?? []) : [];
+          if (failedEntry && cached.length) {
+            allRules.push(...cached.slice(0, failedEntry.limit));
+            const cachedCosmetics = stored[`fc_${failKey}`] ?? [];
+            allCosmetics.push(...cachedCosmetics);
+            const cachedDomCos = stored[`fd_${failKey}`] ?? {};
+            for (const [dom, sels] of Object.entries(cachedDomCos)) {
+              if (!allDomainCosmetics[dom]) allDomainCosmetics[dom] = [];
+              allDomainCosmetics[dom].push(...sels);
+            }
+            const cachedScriptlets = stored[`fs_${failKey}`] ?? {};
+            for (const [dom, rules] of Object.entries(cachedScriptlets)) {
+              if (!allScriptletRules[dom]) allScriptletRules[dom] = [];
+              allScriptletRules[dom].push(...rules);
+            }
+            const cachedRp = stored[`frp_${failKey}`];
+            if (cachedRp) {
+              for (const param of cachedRp.global ?? []) allRemoveParams.global.add(param);
+              allRemoveParams.domain.push(...(cachedRp.domain ?? []));
+            }
+            _syncListStatus[failKey] = { status: 'cached', ruleCount: cached.length, error: failMsg };
+          } else {
+            _syncListStatus[failKey] = { status: 'error', error: failMsg };
+          }
           // Queue for a single retry in 5 minutes — recovers from transient network blips
           if (failedEntry) _retryQueue.push({ list: failedEntry.list, limit: failedEntry.limit });
           continue;
@@ -1338,22 +1417,30 @@ async function syncFilterLists(force = false) {
     // Atomic swap: remove old rules and add new ones in one call per batch.
     // This eliminates the window where no rules are active.
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
-    const removeIds = existing.map(r => r.id);
+    const removeIds = existing
+      .filter(r => r.id >= FILTER_DYNAMIC_START && r.id <= FILTER_DYNAMIC_END)
+      .map(r => r.id);
 
     if (deduped.length > 0 || removeIds.length > 0) {
       // First batch removes old + adds first 500 new rules atomically
       const firstBatch = deduped.slice(0, 500);
+      let swapOk = true;
       try {
         await chrome.declarativeNetRequest.updateDynamicRules({
           removeRuleIds: removeIds,
           addRules: firstBatch,
         });
-      } catch (e) { logEvent('filter-sync', 'error', `DNR rule swap failed: ${e.message}`); }
+      } catch (e) {
+        swapOk = false;
+        logEvent('filter-sync', 'error', `DNR rule swap failed: ${e.message}`);
+      }
       // Remaining batches are add-only (old rules already removed)
-      for (let i = 500; i < deduped.length; i += 500) {
-        try {
-          await chrome.declarativeNetRequest.updateDynamicRules({ addRules: deduped.slice(i, i + 500) });
-        } catch (e) { logEvent('filter-sync', 'error', `DNR batch failed at offset ${i}: ${e.message}`); }
+      if (swapOk) {
+        for (let i = 500; i < deduped.length; i += 500) {
+          try {
+            await chrome.declarativeNetRequest.updateDynamicRules({ addRules: deduped.slice(i, i + 500) });
+          } catch (e) { logEvent('filter-sync', 'error', `DNR batch failed at offset ${i}: ${e.message}`); }
+        }
       }
     }
 
@@ -1506,6 +1593,8 @@ async function syncFilterLists(force = false) {
       applyReferrerRule(_reapplySettings.referrerStrip !== false),
       applyHttpsUpgradeRule(_reapplySettings.httpsUpgrade !== false),
       applyPrivacyHeadersRule(_reapplySettings.privacyHeaders !== false),
+      applyWhitelistRules(),
+      restoreGlobalPauseRule(),
     ]);
 
     // Schedule a retry in 5 minutes for any lists that failed
@@ -1530,6 +1619,142 @@ async function getWhitelist() {
 
 function domainMatchesWhitelist(domain, whitelist) {
   return whitelist.some(d => domain === d || domain.endsWith('.' + d));
+}
+
+function _globalPauseRule() {
+  return {
+    id: PAUSE_ALL_RULE_ID,
+    priority: 10000,
+    action: { type: 'allow' },
+    condition: {
+      urlFilter: '*',
+      resourceTypes: DNR_RESOURCE_TYPES,
+    },
+  };
+}
+
+async function notifyCompleteTabs(message) {
+  try {
+    const tabs = await chrome.tabs.query({ status: 'complete' });
+    for (const tab of tabs) {
+      if (tab?.id != null) chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+    }
+  } catch (_) {}
+}
+
+async function restoreGlobalPauseRule() {
+  try {
+    const { globalPause = false } = await chrome.storage.local.get('globalPause');
+    const active = globalPause && globalPause.until > Date.now();
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [PAUSE_ALL_RULE_ID],
+      addRules: active ? [_globalPauseRule()] : [],
+    });
+    if (!active && globalPause) await chrome.storage.local.set({ globalPause: false });
+    return active;
+  } catch (e) {
+    logEvent('pause', 'warn', `Global pause rule restore failed: ${e.message}`);
+    return false;
+  }
+}
+
+async function applyWhitelistRules() {
+  try {
+    const { whitelist = [] } = await chrome.storage.local.get('whitelist');
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const removeRuleIds = existing
+      .filter(r => r.id >= WHITELIST_BASE && r.id < PAUSE_ALL_RULE_ID)
+      .map(r => r.id);
+
+    const domains = [...new Set(whitelist)]
+      .map(d => String(d).trim().toLowerCase().replace(/^www\./, ''))
+      .filter(d => d && d.includes('.') && /^[a-z0-9.-]+$/.test(d))
+      .slice(0, Math.floor((PAUSE_ALL_RULE_ID - WHITELIST_BASE) / 2));
+
+    const addRules = [];
+    let id = WHITELIST_BASE;
+    for (const domain of domains) {
+      addRules.push({
+        id: id++,
+        priority: 10000,
+        action: { type: 'allow' },
+        condition: {
+          requestDomains: [domain],
+          resourceTypes: ['main_frame', 'sub_frame'],
+        },
+      });
+      addRules.push({
+        id: id++,
+        priority: 10000,
+        action: { type: 'allow' },
+        condition: {
+          initiatorDomains: [domain],
+          resourceTypes: DNR_RESOURCE_TYPES.filter(t => t !== 'main_frame'),
+        },
+      });
+    }
+
+    if (removeRuleIds.length || addRules.length) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
+    }
+  } catch (e) {
+    logEvent('settings', 'warn', `Whitelist DNR apply failed: ${e.message}`);
+  }
+}
+
+async function clearFilterDynamicRules() {
+  try {
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const removeRuleIds = existing
+      .filter(r => r.id >= FILTER_DYNAMIC_START && r.id <= FILTER_DYNAMIC_END)
+      .map(r => r.id);
+    if (removeRuleIds.length) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules: [] });
+    }
+    await chrome.storage.local.set({ filterRuleCount: 0 });
+  } catch (e) {
+    logEvent('filter-sync', 'warn', `Clearing filter rules failed: ${e.message}`);
+  }
+}
+
+async function parseAndStoreUserFilterText(text) {
+  if (typeof text !== 'string') return;
+  const { cosmetics, domainCosmetics, scriptletRules } =
+    parseFilterList(text, 90000, 500);
+  await chrome.storage.local.set({
+    userCosmetics:        cosmetics,
+    userDomainCosmetics:  domainCosmetics,
+    userScriptletRules:   scriptletRules,
+    userFilterText:       text,
+  });
+}
+
+async function applySettingsSideEffects(settings, { syncFilters = false } = {}) {
+  const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+  try {
+    const en = [], dis = [];
+    if (merged.general) en.push('base_rules','extended_rules','hosts_rules');
+    else dis.push('base_rules','extended_rules','hosts_rules');
+    if (merged.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
+    if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
+    if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
+  } catch (e) {
+    logEvent('settings', 'warn', `Settings apply failed: ${e.message}`);
+  }
+
+  await Promise.all([
+    applyReferrerRule(merged.referrerStrip !== false),
+    applyHttpsUpgradeRule(merged.httpsUpgrade !== false),
+    applyPrivacyHeadersRule(merged.privacyHeaders !== false),
+    applyWhitelistRules(),
+    restoreGlobalPauseRule(),
+  ]);
+
+  if (merged.general) {
+    if (syncFilters) syncFilterLists(false);
+  } else {
+    await clearFilterDynamicRules();
+  }
 }
 
 // ── Cloud Sync Push ────────────────────────────────────────────────────────
@@ -1718,14 +1943,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Always REPLACE (not merge) — accumulating means deleted rules silently persist.
         const { text } = msg;
         if (text && typeof text === 'string') {
-          const { cosmetics, domainCosmetics, scriptletRules } =
-            parseFilterList(text, 90000, 500);
-          await chrome.storage.local.set({
-            userCosmetics:        cosmetics,
-            userDomainCosmetics:  domainCosmetics,
-            userScriptletRules:   scriptletRules,
-            userFilterText: text,
-          });
+          await parseAndStoreUserFilterText(text);
         }
         sendResponse({ ok: true });
         break;
@@ -1786,6 +2004,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (customFilterLists.some(l => l.url === clUrl)) { sendResponse({ ok: false, error: 'Already added' }); break; }
         customFilterLists.push({ url: clUrl, name: clName || clUrl, key: clKey, enabled: true });
         await chrome.storage.local.set({ customFilterLists });
+        syncFilterLists(true).catch(e => logEvent('filter-sync', 'warn', `Custom list sync failed: ${e.message}`));
         sendResponse({ ok: true });
         break;
       }
@@ -1797,6 +2016,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Clean up cached data for this list
         const keysToRemove = [`cfc_${rlKey}`,`cfdc_${rlKey}`,`cfsc_${rlKey}`,`cfm_${rlKey}`,`cfe_${rlKey}`];
         await chrome.storage.local.remove(keysToRemove);
+        syncFilterLists(true).catch(e => logEvent('filter-sync', 'warn', `Custom list removal sync failed: ${e.message}`));
         sendResponse({ ok: true });
         break;
       }
@@ -1861,18 +2081,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const merged = { ...(await getSettings()), ...msg.settings };
         await chrome.storage.local.set({ settings: merged });
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
-        try {
-          const en = [], dis = [];
-          if (merged.general) en.push('base_rules','extended_rules'); else dis.push('base_rules','extended_rules');
-          if (merged.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
-          if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
-          if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
-        } catch (e) { logEvent('settings', 'warn', `Settings apply failed: ${e.message}`); }
-        if (msg.settings?.general === true) syncFilterLists(false);
-        // Apply rule-backed settings whenever they change
-        if ('referrerStrip'   in msg.settings) applyReferrerRule(merged.referrerStrip !== false);
-        if ('httpsUpgrade'    in msg.settings) applyHttpsUpgradeRule(merged.httpsUpgrade !== false);
-        if ('privacyHeaders'  in msg.settings) applyPrivacyHeadersRule(merged.privacyHeaders !== false);
+        await applySettingsSideEffects(merged, { syncFilters: 'general' in msg.settings && merged.general });
         // Auto-push updated settings to chrome.storage.sync (fire-and-forget)
         pushToCloud().catch(() => {});
         sendResponse({ ok: true });
@@ -2049,6 +2258,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (!pauseWhitelisted.includes(pd)) pauseWhitelisted.push(pd);
           }
           await chrome.storage.local.set({ pausedSites, whitelist, pauseWhitelisted });
+          await applyWhitelistRules();
+          await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist });
           // Alarm fires even if the service worker is killed and restarted
           chrome.alarms.create(`pauseExpiry:${pd}`, { delayInMinutes: minutes });
           logEvent('pause', 'info', `Paused ${pd} for ${minutes}m`);
@@ -2070,6 +2281,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (wlIdx !== -1) whitelist.splice(wlIdx, 1);
           }
           await chrome.storage.local.set({ pausedSites, whitelist, pauseWhitelisted });
+          await applyWhitelistRules();
+          await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist });
           try { await chrome.alarms.clear(`pauseExpiry:${rd}`); } catch (_) {}
         }
         sendResponse({ ok: true });
@@ -2093,7 +2306,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             changed = true;
           }
         }
-        if (changed) await chrome.storage.local.set({ pausedSites, whitelist, pauseWhitelisted });
+        if (changed) {
+          await chrome.storage.local.set({ pausedSites, whitelist, pauseWhitelisted });
+          await applyWhitelistRules();
+          await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist });
+        }
         sendResponse(pausedSites);
         break;
       }
@@ -2146,6 +2363,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (!Object.keys(synced).length) { sendResponse({ ok: false, error: 'Nothing usable in cloud data' }); break; }
           await chrome.storage.local.set(synced);
           invalidateSettingsCache();
+          if (typeof synced.userFilterText === 'string') await parseAndStoreUserFilterText(synced.userFilterText);
+          if (synced.settings) await applySettingsSideEffects({ ...(await getSettings()), ...synced.settings }, { syncFilters: true });
+          else await applyWhitelistRules();
           logEvent('system', 'info', `Cloud restore: ${Object.keys(synced).join(', ')}`);
           sendResponse({ ok: true, keys: Object.keys(synced) });
         } catch (e) {
@@ -2156,6 +2376,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'WHITELIST_UPDATED': {
         const wl = msg.whitelist ?? [];
         await chrome.storage.local.set({ whitelist: wl });
+        await applyWhitelistRules();
+        await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
         // Auto-push whitelist changes to cloud (fire-and-forget)
         pushToCloud().catch(() => {});
         sendResponse({ ok: true });
@@ -2292,15 +2514,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       // ── Safe browsing ──────────────────────────────────────────────────────
-      case 'GET_SAFE_BROWSING_STATUS':
+      case 'GET_SAFE_BROWSING_STATUS': {
+        const s = await getSettings();
         sendResponse({
-          active: true,
+          active: s.safeBrowsing !== false,
           domainCount: _safeBrowsingDomains.size,
         });
         break;
+      }
       case 'REFRESH_SAFE_BROWSING':
         fetchSafeBrowsingLists().catch(() => {});
         sendResponse({ ok: true });
+        break;
+      case 'ALLOW_SAFE_BROWSING_URL':
+        sendResponse({ ok: await allowSafeBrowsingUrl(msg.url) });
         break;
       case 'PAUSE_ALL': {
         const { minutes: paMins = 30 } = msg;
@@ -2314,18 +2541,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           await chrome.declarativeNetRequest.updateDynamicRules({
             removeRuleIds: [PAUSE_ALL_RULE_ID], // idempotent — no-op if not present
-            addRules: [{
-              id: PAUSE_ALL_RULE_ID,
-              priority: 10000,
-              action: { type: 'allow' },
-              condition: {
-                urlFilter: '*',
-                resourceTypes: [
-                  'main_frame','sub_frame','script','image','stylesheet',
-                  'object','xmlhttprequest','ping','media','websocket','other',
-                ],
-              },
-            }],
+            addRules: [_globalPauseRule()],
           });
         } catch (e) {
           logEvent('pause', 'warn', `DNR pause rule failed: ${e.message}`);
@@ -2335,13 +2551,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Content scripts handle DOM hiding and platform-specific ad removal.
         // They won't receive this unless they register a GLOBAL_PAUSE listener,
         // but sending it is cheap and forward-compatible.
-        try {
-          const tabs = await chrome.tabs.query({ status: 'complete' });
-          for (const tab of tabs) {
-            chrome.tabs.sendMessage(tab.id, { type: 'GLOBAL_PAUSE', until: expiry })
-              .catch(() => {}); // ignore tabs with no content script
-          }
-        } catch (_) {}
+        await notifyCompleteTabs({ type: 'GLOBAL_PAUSE', until: expiry });
 
         try { await chrome.alarms.create('pauseAll', { delayInMinutes: paMins }); } catch (_) {}
         logEvent('pause', 'info', `Global pause activated for ${paMins}m (rule ID ${PAUSE_ALL_RULE_ID})`);
@@ -2361,12 +2571,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try { await chrome.alarms.clear('pauseAll'); } catch (_) {}
 
         // Notify content scripts to resume
-        try {
-          const tabs = await chrome.tabs.query({ status: 'complete' });
-          for (const tab of tabs) {
-            chrome.tabs.sendMessage(tab.id, { type: 'GLOBAL_RESUME' }).catch(() => {});
-          }
-        } catch (_) {}
+        await notifyCompleteTabs({ type: 'GLOBAL_RESUME' });
 
         logEvent('pause', 'info', 'Global pause manually resumed');
         sendResponse({ ok: true });
@@ -2449,6 +2654,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           await chrome.storage.local.set(safe);
           invalidateSettingsCache(); // settings may have changed
+          if (typeof safe.userFilterText === 'string') await parseAndStoreUserFilterText(safe.userFilterText);
+          if (safe.settings) await applySettingsSideEffects({ ...(await getSettings()), ...safe.settings }, { syncFilters: true });
+          else if (safe.whitelist) await applyWhitelistRules();
         }
         sendResponse({ ok: true });
         break;
@@ -2497,6 +2705,7 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
         removeRuleIds: [PAUSE_ALL_RULE_ID],
         addRules: [],
       });
+      await notifyCompleteTabs({ type: 'GLOBAL_RESUME' });
       logEvent('pause', 'info', 'Global pause expired — blocking resumed');
     } catch (e) {
       logEvent('pause', 'warn', `pauseAll alarm cleanup failed: ${e.message}`);
@@ -2517,6 +2726,8 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
         if (wlIdx !== -1) whitelist.splice(wlIdx, 1);
       }
       await chrome.storage.local.set({ pausedSites, whitelist, pauseWhitelisted });
+      await applyWhitelistRules();
+      await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist });
       logEvent('pause', 'info', `Auto-resumed ${domain}`);
     } catch (e) { logEvent('pause', 'warn', `Pause expiry cleanup failed for ${domain}: ${e.message}`); }
   }
@@ -2556,6 +2767,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const idx = wl.indexOf(domain);
     if (idx !== -1) wl.splice(idx, 1); else wl.push(domain);
     await chrome.storage.local.set({ whitelist: wl });
+    await applyWhitelistRules();
+    await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
     pushToCloud().catch(() => {}); // keep cloud in sync (fire-and-forget)
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
     const whitelisted = domainMatchesWhitelist(domain, wl);
@@ -2605,6 +2818,8 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     applyPrivacyHeadersRule(_s.privacyHeaders !== false),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
+    applyWhitelistRules(),
+    restoreGlobalPauseRule(),
   ]);
 
   // Show welcome page on fresh install
@@ -2627,6 +2842,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
         if ('customFilterLists' in synced && !Array.isArray(synced.customFilterLists)) delete synced.customFilterLists;
         await chrome.storage.local.set(synced);
         invalidateSettingsCache();
+        if (typeof synced.userFilterText === 'string') await parseAndStoreUserFilterText(synced.userFilterText);
         logEvent('system', 'info', `Restored ${Object.keys(synced).join(', ')} from cloud sync`);
       }
     } catch (e) {
@@ -2662,6 +2878,8 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     await chrome.storage.local.set({ settings: merged });
   }
 
+  await applySettingsSideEffects(await getSettings(), { syncFilters: false });
+
   // Fetch filter lists immediately — without this, a fresh install or update
   // has NO dynamic rules until the next browser restart triggers onStartup.
   setTimeout(() => syncFilterLists(true).catch(() => {}), 1000);
@@ -2679,6 +2897,8 @@ chrome.commands.onCommand.addListener(async (command) => {
     const idx = wl.indexOf(domain);
     if (idx !== -1) wl.splice(idx, 1); else wl.push(domain);
     await chrome.storage.local.set({ whitelist: wl });
+    await applyWhitelistRules();
+    await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
     pushToCloud().catch(() => {}); // sync whitelist change to cloud (fire-and-forget)
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
@@ -2711,6 +2931,8 @@ chrome.runtime.onStartup.addListener(async () => {
     applyPrivacyHeadersRule(_ss.privacyHeaders !== false),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
+    applyWhitelistRules(),
+    restoreGlobalPauseRule(),
   ]);
 
   const existing = await chrome.alarms.get('filterSync');

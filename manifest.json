@@ -73,6 +73,11 @@
       "matches": [
         "<all_urls>"
       ],
+      "exclude_matches": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*",
+        "*://music.youtube.com/*"
+      ],
       "js": [
         "src/browser-compat.js",
         "src/content-general.js"

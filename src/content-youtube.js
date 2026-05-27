@@ -24,18 +24,23 @@
     catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   const _wl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return; // global pause active — skip all processing
+  const _host = location.hostname.replace(/^www\./, '');
+  if (settings?.globalPause) {
+    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    return; // global pause active — skip all processing
+  }
 
   if (!settings?.youtube) {
     // Signal MAIN world to stop intercepting
     window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
     return;
   }
+  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) {
+    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    return;
+  }
   // Signal MAIN world to ensure interception is active (handles re-enable after toggle)
   window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
-
-  const _host = location.hostname.replace(/^www\./, '');
-  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
   _sbLog('info', `Init — ${_host}`, { ytMusic: _host.includes('music.') });
 
@@ -205,17 +210,36 @@
     clearInterval(_statInterval);
     _skipObserver.disconnect();
   }
+  function _restoreAudio() {
+    if (_muted || _ytmAdActive) {
+      const media = document.querySelector('video') || document.querySelector('audio');
+      try { if (media) media.muted = false; } catch (_) {}
+      _muted = false; _ytmAdActive = false;
+    }
+  }
+  let _stopped = false;
+  function _disableNow() {
+    if (!_stopped) {
+      _cleanup();
+      _restoreAudio();
+      _stopped = true;
+    }
+    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+  }
   window.addEventListener('beforeunload', _cleanup, { once: true });
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.youtube === false) {
-      _cleanup();
-      // Restore audio if we muted it for an ad
-      if (_muted || _ytmAdActive) {
-        const media = document.querySelector('video') || document.querySelector('audio');
-        try { if (media) media.muted = false; } catch (_) {}
-        _muted = false; _ytmAdActive = false;
-      }
-      window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (changes.settings?.newValue?.youtube === false || isWhitelisted || paused) {
+      _disableNow();
+    }
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') _disableNow();
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => _host === d || _host.endsWith('.' + d))) _disableNow();
     }
   });
 })().catch(e => {

@@ -192,13 +192,25 @@
     clearTimeout(debounce);
   }, { once: true });
 
-  // Cleanup on toggle-off — restore audio and disconnect
+  function stopSpotifyBlocking() {
+    _spotObserver.disconnect();
+    clearInterval(_spotInterval);
+    clearTimeout(debounce);
+    if (adActive) { muteAudio(wasMuted); hideOverlay(); adActive = false; }
+  }
+
+  // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.spotify === false) {
-      _spotObserver.disconnect();
-      clearInterval(_spotInterval);
-      clearTimeout(debounce);
-      if (adActive) { muteAudio(wasMuted); hideOverlay(); adActive = false; }
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (changes.settings?.newValue?.spotify === false || isWhitelisted || paused) stopSpotifyBlocking();
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') stopSpotifyBlocking();
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) stopSpotifyBlocking();
     }
   });
 

@@ -16,6 +16,15 @@ let _logInterval = null;
 let _catalog     = null;      // curated filter catalog (lazy-loaded)
 let _catalogCat  = 'ads';     // active catalog category
 let _catalogOpen = false;     // catalog panel visibility state
+function refreshStatsPanel() {
+  refreshStats();
+  drawSparkline();
+  checkPauseStatus();
+  checkGlobalPause();
+  refreshMatrix();
+  refreshPageLog();
+  refreshTopDomains();
+}
 document.querySelectorAll('.nb').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.nb').forEach(b => b.classList.remove('active'));
@@ -29,13 +38,7 @@ document.querySelectorAll('.nb').forEach(btn => {
 
     switch (btn.dataset.panel) {
       case 'stats':
-        refreshStats();
-        drawSparkline();
-        checkPauseStatus();
-        checkGlobalPause();
-        refreshMatrix();
-        refreshPageLog();
-        refreshTopDomains();
+        refreshStatsPanel();
         _pauseCheckInterval = setInterval(() => { checkPauseStatus(); checkGlobalPause(); }, 10000);
         break;
       case 'whitelist':
@@ -54,6 +57,7 @@ document.querySelectorAll('.nb').forEach(btn => {
         break;
       case 'support':
         refreshFilterStatus(); // update rule count in the fbar
+        refreshCustomRules();
         break;
     }
   });
@@ -195,9 +199,11 @@ async function refreshTopDomains() {
     ]);
 
     // Safe browsing indicator
-    if (sbBadge && sbStatus.domainCount > 0) {
+    if (sbBadge && sbStatus.active && sbStatus.domainCount > 0) {
       sbBadge.style.display = '';
       sbBadge.title = `Safe browsing active — ${sbStatus.domainCount.toLocaleString()} threat domains`;
+    } else if (sbBadge) {
+      sbBadge.style.display = 'none';
     }
 
     if (!domains.length) { list.textContent = 'No blocks recorded yet'; return; }
@@ -411,7 +417,7 @@ const _intervals = [];
 async function boot() {
   _intervals.forEach(clearInterval);
   _intervals.length = 0;
-  await Promise.all([loadSettings(), refreshStats(), refreshFilterStatus(), refreshWhitelist()]);
+  await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules()]);
   $('app').classList.add('ready');
   _intervals.push(setInterval(refreshStats, 3000));
   _intervals.push(setInterval(refreshFilterStatus, 8000));
@@ -610,9 +616,11 @@ $('export-stats-csv')?.addEventListener('click', async () => {
       [],
       ['=== SESSION BREAKDOWN ==='],
       ['Category',    'Count'],
-      ['Network',     stats.network  ?? 0],
-      ['DOM cosmetic',stats.dom      ?? 0],
       ['YouTube',     stats.youtube  ?? 0],
+      ['Twitch',      stats.twitch   ?? 0],
+      ['Spotify',     stats.spotify  ?? 0],
+      ['Hulu',        stats.hulu     ?? 0],
+      ['Kick',        stats.kick     ?? 0],
       ['Amazon',      stats.amazon   ?? 0],
       ['Social',      stats.social   ?? 0],
       ['Cookies',     stats.cookies  ?? 0],
@@ -1074,6 +1082,8 @@ $('import-btn')?.addEventListener('change', async (e) => {
     if (result?.ok) {
       if (status) status.textContent = '✓ Imported successfully — reload tabs to apply';
       await loadSettings(); // refresh toggle states immediately
+      await Promise.all([refreshWhitelist(), refreshCustomRules(), refreshFilterStatus(), checkGlobalPause()]);
+      await Promise.all([refreshWhitelist(), refreshCustomRules(), refreshFilterStatus(), checkGlobalPause()]);
     } else {
       if (status) status.textContent = '✗ Import failed';
     }
@@ -1227,6 +1237,8 @@ $('cloud-restore-btn')?.addEventListener('click', async () => {
   if (r?.ok) {
     _cloudStatus(`✓ Restored: ${r.keys?.join(', ')}`);
     await loadSettings();
+    await Promise.all([refreshWhitelist(), refreshCustomRules(), refreshFilterStatus(), checkGlobalPause()]);
+    await Promise.all([refreshWhitelist(), refreshCustomRules(), refreshFilterStatus(), checkGlobalPause()]);
   } else {
     _cloudStatus('✗ ' + (r?.error || 'Nothing saved'), true);
   }

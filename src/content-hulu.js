@@ -140,13 +140,25 @@
     clearTimeout(_huluDebounce);
   }, { once: true });
 
-  // Cleanup on toggle-off — restore audio and disconnect
+  function stopHuluBlocking() {
+    _huluObserver.disconnect();
+    clearInterval(_huluInterval);
+    clearTimeout(_huluDebounce);
+    if (adActive) { restoreAfterAd(); adActive = false; }
+  }
+
+  // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.hulu === false) {
-      _huluObserver.disconnect();
-      clearInterval(_huluInterval);
-      clearTimeout(_huluDebounce);
-      if (adActive) { restoreAfterAd(); adActive = false; }
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (changes.settings?.newValue?.hulu === false || isWhitelisted || paused) stopHuluBlocking();
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') stopHuluBlocking();
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) stopHuluBlocking();
     }
   });
 

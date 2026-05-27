@@ -32,12 +32,16 @@
     }
   });
 
-  document.getElementById('proceed-btn').addEventListener('click', () => {
+  document.getElementById('proceed-btn').addEventListener('click', async () => {
     if (!blocked) return;
     const confirmed = confirm(
       'This site may contain malware or phishing content.\n\n' +
       'Are you absolutely sure you want to continue to:\n' + blocked
     );
-    if (confirmed) location.href = blocked;
+    if (!confirmed) return;
+    try {
+      await chrome.runtime.sendMessage({ type: 'ALLOW_SAFE_BROWSING_URL', url: blocked });
+    } catch (_) {}
+    location.href = blocked;
   });
 })();

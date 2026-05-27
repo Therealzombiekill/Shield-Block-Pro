@@ -9,11 +9,11 @@
  *   could remove legitimate product content. Replaced with safer selectors.
  */
 
-// Instant CSS — injected at document_start before content loads
-if (!document.getElementById('_sb_amazon_css')) {
-const _qs = document.createElement('style');
-_qs.id = '_sb_amazon_css';
-_qs.textContent = `
+function injectAmazonCSS() {
+  if (document.getElementById('_sb_amazon_css')) return;
+  const _qs = document.createElement('style');
+  _qs.id = '_sb_amazon_css';
+  _qs.textContent = `
   /* Sponsored products everywhere */
   [data-component-type="sp-sponsored-result"],
   [data-cel-widget*="sp-sponsored"],
@@ -56,7 +56,7 @@ _qs.textContent = `
   .a-sponsored-label, [data-ad-details]
   { display:none!important; }
 `;
-(document.head || document.documentElement).appendChild(_qs);
+  (document.head || document.documentElement).appendChild(_qs);
 }
 
 (async () => {
@@ -79,6 +79,7 @@ _qs.textContent = `
   if (!settings?.amazon) return;
   if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
 
+  injectAmazonCSS();
 
   const AD_SELECTORS = [
     '[data-component-type="sp-sponsored-result"]',

@@ -74,10 +74,14 @@
         const json = await res.clone().json();
         const stripped = stripAds(json);
         if (stripped) _sbLog('info', 'InnerTube fetch: stripped ad placements', { path: url.split('?')[0].split('/').slice(-3).join('/') });
+        const headers = new Headers(res.headers);
+        headers.delete('content-encoding');
+        headers.delete('content-length');
+        headers.set('content-type', 'application/json; charset=utf-8');
         return new Response(JSON.stringify(json), {
           status:     res.status,
           statusText: res.statusText,
-          headers:    res.headers,
+          headers,
         });
       }
     } catch (e) {

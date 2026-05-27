@@ -293,7 +293,7 @@ $('sync-btn')?.addEventListener('click', async () => {
   const poll = setInterval(async () => {
     await refreshFilterStatus();
     const s = await msg('GET_FILTER_STATUS');
-    if ((s?.activeRules ?? 0) > 0 || ++tries > 20) {
+    if (s && !s.syncInProgress || ++tries > 20) {
       clearInterval(poll);
       $('sync-btn').textContent = '↺ sync';
       _syncing = false;
@@ -403,6 +403,10 @@ async function refreshWhitelist() {
       }
       await chrome.storage.local.set({ whitelist: wl });
       await msg('WHITELIST_UPDATED', { whitelist: wl });
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id && tab.url?.startsWith('http')) await chrome.tabs.reload(tab.id);
+      } catch (_) {}
       await refreshWhitelist();
     };
   } else {

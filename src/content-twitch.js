@@ -28,16 +28,21 @@
   }
 
   const _wl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return;
+  const _hostname = location.hostname.replace(/^www\./, '');
+  if (settings?.globalPause) {
+    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
+    return;
+  }
 
   if (!settings?.twitch) {
     window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
     return;
   }
+  if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) {
+    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
+    return;
+  }
   window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
-
-  const _hostname = location.hostname.replace(/^www\./, '');
-  if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
 
   _sbLog('info', `Init — ${_hostname}`);
 

@@ -1806,12 +1806,13 @@ async function injectCosmetics(tabId, tabUrl) {
   if (!tabUrl || !/^https?:\/\//.test(tabUrl)) return;
   // Merge both storage reads into one so all variables are available before use
   const { cosmeticSelectors, domainCosmetics = {}, scriptletRules = {},
-          settings: s, whitelist: wl = [],
+          settings: s, whitelist: wl = [], globalPause = false,
           userCosmetics = [], userDomainCosmetics = {}, userScriptletRules = {} } =
     await chrome.storage.local.get([
-      'cosmeticSelectors','domainCosmetics','scriptletRules','settings','whitelist',
+      'cosmeticSelectors','domainCosmetics','scriptletRules','settings','whitelist','globalPause',
       'userCosmetics','userDomainCosmetics','userScriptletRules',
     ]);
+  if (globalPause && globalPause.until > Date.now()) return;
   if (!s?.cosmetic) return;
 
   let domain;
@@ -2081,6 +2082,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await chrome.storage.local.set({ settings: merged });
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
         await applySettingsSideEffects(merged, { syncFilters: 'general' in msg.settings && merged.general });
+        if (msg.settings.safeBrowsing === true && _safeBrowsingDomains.size === 0) fetchSafeBrowsingLists().catch(() => {});
         // Auto-push updated settings to chrome.storage.sync (fire-and-forget)
         pushToCloud().catch(() => {});
         sendResponse({ ok: true });
@@ -2231,6 +2233,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           syncError:    _lastSyncError,
           syncFailures: d.syncFailures ?? 0,
           syncDuration: d.syncDuration ?? null,
+          syncInProgress: _syncLock,
           listStatus:   d.syncListStatus ?? _syncListStatus,
         });
         break;
@@ -2627,7 +2630,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'IMPORT_SETTINGS': {
         const { data } = msg;
         if (data && typeof data === 'object') {
-          const allowed = ['settings','whitelist','customHideRules','userFilterText','customFilterLists'];
+          const allowed = ['settings','whitelist','customHideRules','userFilterText','customFilterLists','stats','lifetime'];
           const safe = {};
           for (const k of allowed) {
             if (!(k in data)) continue;
@@ -2647,15 +2650,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               if (Array.isArray(data[k])) safe[k] = data[k].filter(v => typeof v === 'string');
             } else if (k === 'customFilterLists') {
               if (Array.isArray(data[k])) safe[k] = data[k];
+            } else if (k === 'stats') {
+              if (data[k] && typeof data[k] === 'object' && !Array.isArray(data[k])) {
+                const numeric = {};
+                for (const [sk, sv] of Object.entries(data[k])) if (typeof sv === 'number' && Number.isFinite(sv)) numeric[sk] = sv;
+                if (Object.keys(numeric).length) safe[k] = numeric;
+              }
+            } else if (k === 'lifetime') {
+              if (data[k] && typeof data[k] === 'object' && !Array.isArray(data[k])) {
+                const total = data[k].total;
+                if (typeof total === 'number' && Number.isFinite(total)) safe[k] = { total };
+              }
             } else {
               safe[k] = data[k];
             }
           }
+          if (!Object.keys(safe).length) { sendResponse({ ok: false, error: 'No valid backup data' }); break; }
           await chrome.storage.local.set(safe);
           invalidateSettingsCache(); // settings may have changed
           if (typeof safe.userFilterText === 'string') await parseAndStoreUserFilterText(safe.userFilterText);
           if (safe.settings) await applySettingsSideEffects({ ...(await getSettings()), ...safe.settings }, { syncFilters: true });
           else if (safe.whitelist) await applyWhitelistRules();
+          if (safe.customFilterLists) syncFilterLists(true).catch(e => logEvent('filter-sync', 'warn', `Imported custom list sync failed: ${e.message}`));
         }
         sendResponse({ ok: true });
         break;
@@ -2806,6 +2822,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   await chrome.storage.local.set({ licenseValid: true });
 
   chrome.alarms.create('filterSync', { periodInMinutes: 720 });
+  chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   setupContextMenus();
 
   // Init all feature engines on install/update
@@ -2936,6 +2953,8 @@ chrome.runtime.onStartup.addListener(async () => {
 
   const existing = await chrome.alarms.get('filterSync');
   if (!existing) chrome.alarms.create('filterSync', { periodInMinutes: 720 });
+  const sbAlarm = await chrome.alarms.get('safeBrowsingRefresh');
+  if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
     if (sbRulesVersion !== '2.10.1') {

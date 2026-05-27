@@ -92,9 +92,6 @@
         "src/browser-compat.js",
         "src/content-general.js"
       ],
-      "css": [
-        "src/cosmetic.css"
-      ],
       "run_at": "document_start"
     },
     {

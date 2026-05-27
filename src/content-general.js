@@ -44,6 +44,21 @@
   if (_host.includes('youtube.com') || _host.includes('youtu.be')) return;
   if (_genWl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
+  async function injectBundledCosmeticCSS() {
+    if (document.getElementById('_sb_cosmetic_css')) return;
+    try {
+      const res = await fetch(chrome.runtime.getURL('src/cosmetic.css'));
+      if (!res.ok) return;
+      const css = await res.text();
+      const style = document.createElement('style');
+      style.id = '_sb_cosmetic_css';
+      style.textContent = css;
+      (document.head || document.documentElement).appendChild(style);
+    } catch (_) {}
+  }
+
+  injectBundledCosmeticCSS();
+
   // ── Ad selectors ────────────────────────────────────────────────────────────
   // Combined into a single string for one querySelectorAll call per tick.
   // safeToRemove() guards against removing legitimate content containers.
@@ -284,6 +299,7 @@
     if (changes.settings?.newValue?.cosmetic === false || isWhitelisted) {
       _observer.disconnect();
       clearTimeout(_debounce);
+      document.getElementById('_sb_cosmetic_css')?.remove();
     }
   });
 
@@ -292,9 +308,11 @@
     if (msg.type === 'GLOBAL_PAUSE') {
       _observer.disconnect();
       clearTimeout(_debounce);
+      document.getElementById('_sb_cosmetic_css')?.remove();
     }
     if (msg.type === 'GLOBAL_RESUME') {
       if (_target) _observer.observe(_target, { childList: true, subtree: true });
+      injectBundledCosmeticCSS();
       tick();
     }
     if (msg.type === 'WHITELIST_CHANGED') {
@@ -302,6 +320,7 @@
       if (wl.some(d => _host === d || _host.endsWith('.' + d))) {
         _observer.disconnect();
         clearTimeout(_debounce);
+        document.getElementById('_sb_cosmetic_css')?.remove();
       }
     }
   });

@@ -426,12 +426,24 @@
   clean();
 
   // Teardown
+  function stopSocialBlocking() {
+    clearInterval(_interval);
+    _observer.disconnect();
+    clearTimeout(_debounce);
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
     const _nv = changes.settings?.newValue;
-    if (_nv?.social === false) {
-      clearInterval(_interval);
-      _observer.disconnect();
-      clearTimeout(_debounce);
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => host === d || host.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (_nv?.social === false || isWhitelisted || paused) stopSocialBlocking();
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') stopSocialBlocking();
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => host === d || host.endsWith('.' + d))) stopSocialBlocking();
     }
   });
 

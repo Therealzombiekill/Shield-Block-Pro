@@ -13,12 +13,15 @@
  *   8.  Battery API fake data
  *   9.  URL tracking parameter cleanup (initial + SPA pushState/replaceState)
  *   10. Click redirect bypass (Google, Facebook, Twitter t.co, LinkedIn, Bing, Yahoo, DuckDuckGo)
- *   11. Notification + Push permission auto-deny
- *   12. Popup ad blocker (window.open)
- *   13. Chat widget removal
- *   14. Anti-adblock wall bypass
+  // ── 11. Notifications / Push ─────────────────────────────────────────────────
+  // Leave browser permission prompts intact. Hard-denying these APIs globally
+  // breaks legitimate web apps and makes the privacy toggle possible to honor.
+
  *   15. Global Privacy Control (GPC) signal — navigator.globalPrivacyControl = true
- *   16. Geolocation auto-deny
+  // ── 16. Geolocation ───────────────────────────────────────────────────────────
+  // Leave geolocation under the browser's native permission prompt. Hard-denying
+  // globally broke maps, delivery, and local-search flows.
+
  *   17. Font enumeration protection
  *   18. Sensor API blocking (DeviceMotion, DeviceOrientation, IdleDetector)
  *   19. document.referrer stripping (cross-origin)
@@ -148,9 +151,9 @@
     }
   } catch (_) {}
 
-  // ── 4. WebRTC IP leak prevention ─────────────────────────────────────────────
-  // Do not strip RTCPeerConnection. Removing ICE servers globally breaks Meet,
-  // Discord, Zoom, Twitch low-latency playback, and other legitimate WebRTC apps.
+  // ── 4. WebRTC ────────────────────────────────────────────────────────────────
+  // Do not strip RTCPeerConnection/ICE servers globally. That broke legitimate
+  // calls and live playback on Meet, Discord, Zoom, Twitch, and similar apps.
 
   // ── 5. Navigator API normalization ───────────────────────────────────────────
   // Round hardwareConcurrency and deviceMemory to reduce fingerprint uniqueness.
@@ -473,21 +476,9 @@
     } catch (_) {}
   }, true);
 
-  // ── 11. Notification + Push permission auto-deny ──────────────────────────────
-  try {
-    Notification.requestPermission = (cb) => {
-      if (typeof cb === 'function') cb('denied');
-      return Promise.resolve('denied');
-    };
-    Object.defineProperty(Notification, 'permission', { get: () => 'denied', configurable: true });
-  } catch (_) {}
-
-  if (typeof PushManager !== 'undefined') {
-    try {
-      PushManager.prototype.subscribe = () =>
-        Promise.reject(Object.assign(new Error('NotAllowedError'), { name: 'NotAllowedError' }));
-    } catch (_) {}
-  }
+  // ── 11. Notifications / Push ─────────────────────────────────────────────────
+  // Leave browser permission prompts intact. Hard-denying these APIs globally
+  // breaks legitimate web apps and makes the privacy toggle possible to honor.
 
   // ── 15. Global Privacy Control (GPC) ─────────────────────────────────────────
   // Legally significant in California (CCPA), Colorado (CPA), Connecticut, and EU (GDPR).
@@ -499,17 +490,9 @@
     });
   } catch (_) {}
 
-  // ── 16. Geolocation auto-deny ─────────────────────────────────────────────────
-  // Sites frequently request precise location for ad targeting.
-  // Override to immediately return a PermissionDeniedError — same as if user clicks "Block".
-  try {
-    const _GEO_ERR = Object.assign(
-      new Error('User denied Geolocation'),
-      { code: 1, PERMISSION_DENIED: 1 }
-    );
-    const _fakegeo = { getCurrentPosition: (_, err) => err?.(_GEO_ERR), watchPosition: (_, err) => { err?.(_GEO_ERR); return 0; }, clearWatch: () => {} };
-    Object.defineProperty(navigator, 'geolocation', { get: () => _fakegeo, configurable: true });
-  } catch (_) {}
+  // ── 16. Geolocation ───────────────────────────────────────────────────────────
+  // Leave geolocation under the browser's native permission prompt. Hard-denying
+  // globally broke maps, delivery, and local-search flows.
 
   // ── 17. Font enumeration protection ───────────────────────────────────────────
   // document.fonts.check() reveals which fonts are installed — a unique fingerprint.
@@ -672,31 +655,40 @@
   // coordinator when the user enables the setting.
   // NOTE: This uses a postMessage from the isolated-world content script
   // because we can't read chrome.storage in MAIN world directly.
+  let _timezoneSpoofEnabled = false;
+  let _timezonePatched = false;
   window.addEventListener('message', (e) => {
     if (e.source !== window || e.data?.type !== 'SB_TIMEZONE_SPOOF') return;
-    if (!e.data.enabled) return;
+    _timezoneSpoofEnabled = !!e.data.enabled;
+    if (!_timezoneSpoofEnabled || _timezonePatched) return;
+    _timezonePatched = true;
     try {
       const _OrigDTF = Intl.DateTimeFormat;
-      // Override Intl.DateTimeFormat to always resolve to UTC
+      const _origOffset = Date.prototype.getTimezoneOffset;
+      const _origLocaleString = Date.prototype.toLocaleString;
+      const _origLocaleDateString = Date.prototype.toLocaleDateString;
+      const _origLocaleTimeString = Date.prototype.toLocaleTimeString;
+      // Override Intl.DateTimeFormat to resolve to UTC only while the setting is enabled.
       const PatchedDTF = function (locale, opts) {
-        return new _OrigDTF(locale, { ...opts, timeZone: 'UTC' });
+        return new _OrigDTF(locale, _timezoneSpoofEnabled ? { ...opts, timeZone: 'UTC' } : opts);
       };
       PatchedDTF.prototype          = _OrigDTF.prototype;
       PatchedDTF.supportedLocalesOf = _OrigDTF.supportedLocalesOf.bind(_OrigDTF);
-      // Best-effort — some envs protect Intl
       try { Object.defineProperty(Intl, 'DateTimeFormat', { value: PatchedDTF, writable: true, configurable: true }); } catch (_) {}
 
-      // getTimezoneOffset returns minutes behind UTC — 0 for UTC itself
-      Date.prototype.getTimezoneOffset = function () { return 0; };
-      // toLocaleString / toLocaleDateString / toLocaleTimeString
+      Date.prototype.getTimezoneOffset = function () {
+        return _timezoneSpoofEnabled ? 0 : _origOffset.apply(this, arguments);
+      };
       const _patchLocale = (fn) => function (...args) {
-        if (!args[1]) args[1] = {};
-        args[1].timeZone = 'UTC';
+        if (_timezoneSpoofEnabled) {
+          if (!args[1]) args[1] = {};
+          args[1].timeZone = 'UTC';
+        }
         return fn.apply(this, args);
       };
-      Date.prototype.toLocaleString     = _patchLocale(Date.prototype.toLocaleString);
-      Date.prototype.toLocaleDateString = _patchLocale(Date.prototype.toLocaleDateString);
-      Date.prototype.toLocaleTimeString = _patchLocale(Date.prototype.toLocaleTimeString);
+      Date.prototype.toLocaleString     = _patchLocale(_origLocaleString);
+      Date.prototype.toLocaleDateString = _patchLocale(_origLocaleDateString);
+      Date.prototype.toLocaleTimeString = _patchLocale(_origLocaleTimeString);
     } catch (_) {}
   });
 

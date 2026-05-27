@@ -447,10 +447,28 @@
     setTimeout(handleBanners, delay);
   }
 
+  function stopCookieBlocking() {
+    observer.disconnect();
+    clearTimeout(_debounce);
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.cookies === false) {
-      observer.disconnect();
-      clearTimeout(_debounce);
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (changes.settings?.newValue?.cookies === false || isWhitelisted || paused) {
+      stopCookieBlocking();
+    }
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') {
+      stopCookieBlocking();
+    }
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => _host === d || _host.endsWith('.' + d))) {
+        stopCookieBlocking();
+      }
     }
   });
 

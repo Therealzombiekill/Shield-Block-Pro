@@ -176,11 +176,23 @@
     clearTimeout(_pwDeb);
   }, { once: true });
 
-  // Cleanup on toggle-off
+  function stopPaywallBypass() {
+    _pwObserver.disconnect();
+    clearTimeout(_pwDeb);
+  }
+
+  // Cleanup on toggle-off, pause, or whitelist updates
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.paywall === false) {
-      _pwObserver.disconnect();
-      clearTimeout(_pwDeb);
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => host === d || host.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (changes.settings?.newValue?.paywall === false || isWhitelisted || paused) stopPaywallBypass();
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') stopPaywallBypass();
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => host === d || host.endsWith('.' + d))) stopPaywallBypass();
     }
   });
 

@@ -24,23 +24,18 @@
     catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   const _wl = settings?.whitelist ?? [];
-  const _host = location.hostname.replace(/^www\./, '');
-  if (settings?.globalPause) {
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return; // global pause active — skip all processing
-  }
+  if (settings?.globalPause) return; // global pause active — skip all processing
 
   if (!settings?.youtube) {
     // Signal MAIN world to stop intercepting
     window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
     return;
   }
-  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) {
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return;
-  }
   // Signal MAIN world to ensure interception is active (handles re-enable after toggle)
   window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
+
+  const _host = location.hostname.replace(/^www\./, '');
+  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
   _sbLog('info', `Init — ${_host}`, { ytMusic: _host.includes('music.') });
 

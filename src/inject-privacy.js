@@ -27,6 +27,11 @@
 (function () {
   'use strict';
 
+  let _privacyInstalled = false;
+  function installPrivacyPatches() {
+    if (_privacyInstalled) return;
+    _privacyInstalled = true;
+
   // ── Shared session seed — consistent within a tab, unique across tabs ────────
   const SESSION_SEED = (() => {
     try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0].toString(16); }
@@ -776,4 +781,10 @@
   // itself before each request and cannot be spoofed. No action needed here.
   // (Documented so future maintainers don't spend time attempting to override them.)
 
+  } // installPrivacyPatches
+
+  window.addEventListener('message', function (e) {
+    if (e.source !== window) return;
+    if (e.data?.type === 'SB_PRIVACY_ENABLE') installPrivacyPatches();
+  });
 })();

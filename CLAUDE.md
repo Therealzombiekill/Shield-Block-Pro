@@ -16,7 +16,7 @@ There are no automated tests. Manual testing workflow:
 4. Check `chrome://extensions` → "Inspect views: service worker" for background console output
 5. For popup changes, right-click the extension icon → "Inspect Popup" opens DevTools on the popup
 
-To verify filter parsing changes, open the popup → Filters tab → "Run check" health check, or check the Log tab for sync errors.
+To verify filter parsing changes, open the popup → **Support** tab → "Run check" health check, or check the Log tab for sync errors.
 
 ## Architecture
 

@@ -20,6 +20,10 @@
   const _genWl = settings?.whitelist ?? [];
   if (settings?.globalPause) return; // global pause active — skip all processing
 
+  if (settings?.privacy !== false) {
+    window.postMessage({ type: 'SB_PRIVACY_ENABLE' }, '*');
+  }
+
   // Signal inject-privacy.js (MAIN world) to activate timezone spoofing if enabled.
   // Can't read storage in MAIN world, so isolated world posts the signal.
   if (settings?.timezoneSpoof) {
@@ -240,6 +244,7 @@
   // NOTE: Soft paywall bypass is handled by content-paywall.js (separate content
   // script with its own MutationObserver). Do not duplicate it here.
   function tick() {
+    if (globalThis.__sbGlobalPause) return;
     cleanAds();
     cleanNewsletters();
     cleanAntiAdblock();

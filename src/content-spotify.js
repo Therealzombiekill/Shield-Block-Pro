@@ -144,6 +144,7 @@
   let wasMuted = false;
 
   function tick() {
+    if (globalThis.__sbGlobalPause) return;
     const hasAd = isAdPlaying();
     removeSpotifyAdUI();
 

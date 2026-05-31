@@ -402,6 +402,7 @@
 
   // ── Dispatch ───────────────────────────────────────────────────────────────
   function clean() {
+    if (globalThis.__sbGlobalPause) return;
     blocked = 0; // reset counter each cycle so report() fires correctly
     if (host.includes('facebook.com'))                    cleanFacebook();
     else if (host.includes('instagram.com'))              cleanInstagram();

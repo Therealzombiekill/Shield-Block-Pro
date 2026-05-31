@@ -77,9 +77,6 @@
         "src/browser-compat.js",
         "src/content-general.js"
       ],
-      "css": [
-        "src/cosmetic.css"
-      ],
       "run_at": "document_start"
     },
     {
@@ -287,6 +284,7 @@
       "resources": [
         "blocked.html",
         "welcome.html",
+        "src/blank.js",
         "rules/base.json",
         "rules/extended.json",
         "rules/tracking.json",

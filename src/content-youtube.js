@@ -174,7 +174,8 @@
   }
 
   // ── Main loop ─────────────────────────────────────────────────────────────────
-  function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); }
+  function tick() {
+    if (globalThis.__sbGlobalPause) return; handleAd(); removeOverlays(); handleYTMusicAd(); }
 
   const _tickInterval = setInterval(tick, 750);
   tick();

@@ -107,6 +107,7 @@
 
   let _adStartTime = 0;
   function tick() {
+    if (globalThis.__sbGlobalPause) return;
     const hasAd = isAdPlaying();
     if (hasAd && !adActive) {
       adActive = true;

@@ -16,11 +16,10 @@
   // ── Disable flag ──────────────────────────────────────────────────────────────
   // MAIN world can't call chrome APIs. content-youtube.js reads settings and
   // posts SB_YOUTUBE_DISABLE / SB_YOUTUBE_ENABLE here.
-  // Default true — catches ytInitialPlayerResponse on first page load before
-  // content-youtube.js has had a chance to run.
+  // Starts disabled until content-youtube.js sends SB_YOUTUBE_ENABLE. Starts disabled until ENABLE.
   // NOTE: NOT using {once:true} — the user may toggle the youtube setting on/off
   // within the same session and we need to respond to both messages.
-  let _disabled = false;
+  let _disabled = true;
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     if (e.data?.type === 'SB_YOUTUBE_DISABLE') _disabled = true;

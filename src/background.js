@@ -15,6 +15,8 @@ const PAUSE_ALL_RULE_ID = 49999;
 // so they never collide with either.
 const REMOVEPARAM_BASE  = 30000; // 30000-30999: global + domain-scoped removeparam rules
 const MATRIX_BASE       = 31000; // 31000-31999: per-domain filtering matrix rules
+const USER_DNR_BASE     = 48000; // 48000-48499: user-typed network block rules
+const USER_DNR_END      = 48499;
 // ── Hardcoded tracking parameter list ─────────────────────────────────────
 // These are applied REGARDLESS of what filter lists contain. Updated independently
 // of the 12-hour filter sync cycle — they never change in structure, just grow.
@@ -243,6 +245,110 @@ async function computeStaticRuleCount() {
     logEvent('system', 'warn', `computeStaticRuleCount failed: ${e.message}`);
   }
 }
+let _staticRuleIds = new Set();
+
+async function loadStaticRuleIds() {
+  try {
+    const manifest = chrome.runtime.getManifest();
+    const rulesets = manifest.declarative_net_request?.rule_resources ?? [];
+    const ids = new Set();
+    for (const rs of rulesets) {
+      try {
+        const res   = await fetch(chrome.runtime.getURL(rs.path));
+        const rules = await res.json();
+        if (Array.isArray(rules)) for (const r of rules) if (r.id) ids.add(r.id);
+      } catch (_) {}
+    }
+    _staticRuleIds = ids;
+    for (const list of FILTER_LISTS) {
+      const end = list.start + list.max - 1;
+      for (const id of ids) {
+        if (id >= list.start && id <= end) {
+          logEvent('system', 'error',
+            `Static rule ID ${id} collides with ${list.name} dynamic range [${list.start},${end}]`);
+        }
+      }
+    }
+  } catch (e) {
+    logEvent('system', 'warn', `loadStaticRuleIds failed: ${e.message}`);
+  }
+}
+
+function isFilterListRuleId(id) {
+  return FILTER_LISTS.some(l => id >= l.start && id < l.start + l.max);
+}
+
+function filterStaticConflicts(rules) {
+  if (!_staticRuleIds.size) return rules;
+  return rules.filter(r => !_staticRuleIds.has(r.id));
+}
+
+async function restoreGlobalPauseIfActive() {
+  const { globalPause = false } = await chrome.storage.local.get('globalPause');
+  if (!globalPause || globalPause.until <= Date.now()) return;
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [PAUSE_ALL_RULE_ID],
+      addRules: [{
+        id: PAUSE_ALL_RULE_ID,
+        priority: 10000,
+        action: { type: 'allow' },
+        condition: {
+          urlFilter: '*',
+          resourceTypes: [
+            'main_frame','sub_frame','script','image','stylesheet',
+            'object','xmlhttprequest','ping','media','websocket','other',
+          ],
+        },
+      }],
+    });
+  } catch (e) {
+    logEvent('pause', 'warn', `Restore pause rule after sync failed: ${e.message}`);
+  }
+}
+
+async function applyUserFilterRules() {
+  try {
+    const { userDnrRules = [] } = await chrome.storage.local.get('userDnrRules');
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const removeIds = existing
+      .filter(r => r.id >= USER_DNR_BASE && r.id <= USER_DNR_END)
+      .map(r => r.id);
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: removeIds,
+      addRules: userDnrRules.slice(0, USER_DNR_END - USER_DNR_BASE + 1),
+    });
+  } catch (e) {
+    logEvent('user-filters', 'warn', `applyUserFilterRules failed: ${e.message}`);
+  }
+}
+
+async function purgeFilterListDynamicRules() {
+  try {
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const removeIds = existing.filter(r => isFilterListRuleId(r.id)).map(r => r.id);
+    if (removeIds.length) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: removeIds, addRules: [] });
+      logEvent('settings', 'info', `Purged ${removeIds.length} filter-list dynamic rules`);
+    }
+  } catch (e) {
+    logEvent('settings', 'warn', `purgeFilterListDynamicRules failed: ${e.message}`);
+  }
+}
+
+async function reapplyFeatureRules() {
+  const s = await getSettings();
+  await Promise.all([
+    applyRemoveParamRules(),
+    applyMatrixRules(),
+    applyReferrerRule(s.referrerStrip !== false),
+    applyHttpsUpgradeRule(s.httpsUpgrade !== false),
+    applyPrivacyHeadersRule(s.privacyHeaders !== false),
+    applyUserFilterRules(),
+  ]);
+  await restoreGlobalPauseIfActive();
+}
+
 
 // Rule IDs for privacy/security DNR rules (outside filter ranges)
 const REFERRER_RULE_ID   = 47000;
@@ -536,10 +642,12 @@ async function _retryFailedLists() {
   if (newRules.length > 0) {
     try {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
+      const existingIds = new Set(existing.map(r => r.id));
+      const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
       const budget = 5000 - existing.length;
-      if (budget > 0) {
-        await chrome.declarativeNetRequest.updateDynamicRules({ addRules: newRules.slice(0, budget) });
-        logEvent('filter-sync', 'info', `Retry: added ${Math.min(newRules.length, budget)} rules`);
+      if (budget > 0 && uniqueNew.length > 0) {
+        await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
+        logEvent('filter-sync', 'info', `Retry: added ${Math.min(uniqueNew.length, budget)} rules`);
       }
     } catch (e) { logEvent('filter-sync', 'warn', `Retry DNR apply failed: ${e.message}`); }
   }
@@ -794,15 +902,30 @@ function _stopKeepAlive() {
 
 async function applyRemoveParamRules() {
   try {
-    const { removeParamData = null } = await chrome.storage.local.get('removeParamData');
+    const settings = await getSettings();
+    const existingRpRules = await chrome.declarativeNetRequest.getDynamicRules();
+    const rpRemoveIds = existingRpRules
+      .filter(r => r.id >= REMOVEPARAM_BASE && r.id < MATRIX_BASE)
+      .map(r => r.id);
 
-    // Merge filter-list params with static hardcoded set
+    if (!settings.tracking) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: rpRemoveIds, addRules: [] });
+      return;
+    }
+
+    const { removeParamData = null, userRemoveParams = null } =
+      await chrome.storage.local.get(['removeParamData', 'userRemoveParams']);
+
     const globalParams = new Set(STATIC_REMOVE_PARAMS);
     const domainGroups = [];
 
     if (removeParamData) {
       for (const p of removeParamData.global ?? []) globalParams.add(p);
       for (const g of removeParamData.domain ?? []) domainGroups.push(g);
+    }
+    if (userRemoveParams) {
+      for (const p of userRemoveParams.global ?? []) globalParams.add(p);
+      for (const g of userRemoveParams.domain ?? []) domainGroups.push(g);
     }
 
     const newRules = [];
@@ -848,13 +971,6 @@ async function applyRemoveParamRules() {
       });
       if (idCursor > REMOVEPARAM_BASE + 999) break; // safety cap
     }
-
-    // Swap: only remove rule IDs that are actually present — avoids sending
-    // a 1000-element removeRuleIds array on every sync when most slots are empty
-    const existingRpRules = await chrome.declarativeNetRequest.getDynamicRules();
-    const rpRemoveIds = existingRpRules
-      .filter(r => r.id >= REMOVEPARAM_BASE && r.id < MATRIX_BASE)
-      .map(r => r.id);
 
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: rpRemoveIds,
@@ -1334,26 +1450,39 @@ async function syncFilterLists(force = false) {
     // Hard-cap at MAX_DYNAMIC_RULES — the DNR API rejects any batch that would push
     // the total over 5000, so excess rules must be dropped before we start adding.
     if (deduped.length > MAX_DYNAMIC_RULES) deduped = deduped.slice(0, MAX_DYNAMIC_RULES);
+    deduped = filterStaticConflicts(deduped);
 
-    // Atomic swap: remove old rules and add new ones in one call per batch.
-    // This eliminates the window where no rules are active.
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
     const removeIds = existing.map(r => r.id);
+    const existingSnapshot = existing.map(r => ({ ...r }));
 
     if (deduped.length > 0 || removeIds.length > 0) {
-      // First batch removes old + adds first 500 new rules atomically
       const firstBatch = deduped.slice(0, 500);
+      let swapOk = false;
       try {
         await chrome.declarativeNetRequest.updateDynamicRules({
           removeRuleIds: removeIds,
           addRules: firstBatch,
         });
+        swapOk = true;
       } catch (e) { logEvent('filter-sync', 'error', `DNR rule swap failed: ${e.message}`); }
-      // Remaining batches are add-only (old rules already removed)
-      for (let i = 500; i < deduped.length; i += 500) {
+      if (swapOk) {
+        for (let i = 500; i < deduped.length; i += 500) {
+          try {
+            await chrome.declarativeNetRequest.updateDynamicRules({ addRules: deduped.slice(i, i + 500) });
+          } catch (e) { logEvent('filter-sync', 'error', `DNR batch failed at offset ${i}: ${e.message}`); }
+        }
+      } else if (existingSnapshot.length > 0) {
         try {
-          await chrome.declarativeNetRequest.updateDynamicRules({ addRules: deduped.slice(i, i + 500) });
-        } catch (e) { logEvent('filter-sync', 'error', `DNR batch failed at offset ${i}: ${e.message}`); }
+          const currentIds = (await chrome.declarativeNetRequest.getDynamicRules()).map(r => r.id);
+          for (let i = 0; i < existingSnapshot.length; i += 500) {
+            await chrome.declarativeNetRequest.updateDynamicRules({
+              removeRuleIds: i === 0 ? currentIds : [],
+              addRules: existingSnapshot.slice(i, i + 500),
+            });
+          }
+          logEvent('filter-sync', 'warn', 'Restored prior dynamic rules after failed swap');
+        } catch (e) { logEvent('filter-sync', 'error', `DNR rule restore failed: ${e.message}`); }
       }
     }
 
@@ -1499,14 +1628,7 @@ async function syncFilterLists(force = false) {
     // Re-apply all feature DNR rules — the atomic rule swap above removes ALL
     // dynamic rules (including privacy/referrer/https/matrix IDs) so they must
     // be restored after every sync, not just on install.
-    const _reapplySettings = await getSettings();
-    await Promise.all([
-      applyRemoveParamRules(),
-      applyMatrixRules(),
-      applyReferrerRule(_reapplySettings.referrerStrip !== false),
-      applyHttpsUpgradeRule(_reapplySettings.httpsUpgrade !== false),
-      applyPrivacyHeadersRule(_reapplySettings.privacyHeaders !== false),
-    ]);
+    await reapplyFeatureRules();
 
     // Schedule a retry in 5 minutes for any lists that failed
     if (_retryQueue.length > 0) {
@@ -1600,6 +1722,10 @@ async function injectCosmetics(tabId, tabUrl) {
     if (SKIP_DOMAINS.some(d => domain === d || domain.endsWith('.' + d))) return;
   } catch (_) { return; }
 
+  try {
+    await chrome.scripting.insertCSS({ target: { tabId }, files: ['src/cosmetic.css'] });
+  } catch (_) {}
+
   // ── Inject scriptlets for this domain ──────────────────────────────────────
   // scriptlets.js is already injected at document_start via manifest content_scripts.
   // It defines globalThis.__sbRunScriptlets. We just need to call it with the applicable
@@ -1632,7 +1758,7 @@ async function injectCosmetics(tabId, tabUrl) {
         },
         args: [applicable],
       });
-    } catch (e) { logEvent('filter-sync', 'warn', `User filter parse failed: ${e.message}`); }
+    } catch (e) { logEvent('filter-sync', 'warn', `Scriptlet injection failed: ${e.message}`); }
   }
 
   // userCosmetics / userDomainCosmetics already loaded above
@@ -1714,18 +1840,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'PARSE_USER_FILTERS': {
-        // Parse user-typed filter rules and store as cosmetics/scriptlets.
-        // Always REPLACE (not merge) — accumulating means deleted rules silently persist.
         const { text } = msg;
         if (text && typeof text === 'string') {
-          const { cosmetics, domainCosmetics, scriptletRules } =
-            parseFilterList(text, 90000, 500);
+          const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } =
+            parseFilterList(text, USER_DNR_BASE, USER_DNR_END - USER_DNR_BASE + 1);
           await chrome.storage.local.set({
-            userCosmetics:        cosmetics,
-            userDomainCosmetics:  domainCosmetics,
-            userScriptletRules:   scriptletRules,
+            userCosmetics: cosmetics,
+            userDomainCosmetics: domainCosmetics,
+            userScriptletRules: scriptletRules,
+            userDnrRules: rules,
+            userRemoveParams: removeParams,
             userFilterText: text,
           });
+          await applyUserFilterRules();
+          await applyRemoveParamRules();
         }
         sendResponse({ ok: true });
         break;
@@ -1737,8 +1865,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'CLEAR_USER_FILTERS': {
         await chrome.storage.local.remove(
-          ['userCosmetics','userDomainCosmetics','userScriptletRules','userFilterText']
+          ['userCosmetics','userDomainCosmetics','userScriptletRules','userFilterText',
+           'userDnrRules','userRemoveParams']
         );
+        await applyUserFilterRules();
+        await applyRemoveParamRules();
         sendResponse({ ok: true });
         break;
       }
@@ -1863,12 +1994,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
         try {
           const en = [], dis = [];
-          if (merged.general) en.push('base_rules','extended_rules'); else dis.push('base_rules','extended_rules');
+          if (merged.general) {
+            en.push('base_rules', 'extended_rules', 'hosts_rules');
+          } else {
+            dis.push('base_rules', 'extended_rules', 'hosts_rules');
+            await purgeFilterListDynamicRules();
+          }
           if (merged.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
           if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
           if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
         } catch (e) { logEvent('settings', 'warn', `Settings apply failed: ${e.message}`); }
         if (msg.settings?.general === true) syncFilterLists(false);
+        if ('tracking' in msg.settings) await applyRemoveParamRules();
         // Apply rule-backed settings whenever they change
         if ('referrerStrip'   in msg.settings) applyReferrerRule(merged.referrerStrip !== false);
         if ('httpsUpgrade'    in msg.settings) applyHttpsUpgradeRule(merged.httpsUpgrade !== false);
@@ -1933,7 +2070,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const dyn = await chrome.declarativeNetRequest.getDynamicRules();
           if (dyn.length > 1000) pass('Filter rules', `${dyn.length} dynamic rules active`);
           else if (dyn.length > 0) warn('Filter rules', `Only ${dyn.length} dynamic rules — sync may be needed`);
-          else fail('Filter rules', 'No dynamic rules loaded — run Force Sync');
+          else fail('Filter rules', 'No dynamic rules loaded — click ↺ sync in Stats');
         } catch (e) { fail('Filter rules', e.message); }
 
         // 2. Static rulesets enabled
@@ -2594,18 +2731,21 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   await chrome.storage.local.set({ licenseValid: true });
 
   chrome.alarms.create('filterSync', { periodInMinutes: 720 });
-  setupContextMenus();
+  chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
+  await setupContextMenus();
 
-  // Init all feature engines on install/update
   const _s = await getSettings();
   await Promise.all([
+    loadStaticRuleIds(),
     applyRemoveParamRules(), applyMatrixRules(),
     applyReferrerRule(_s.referrerStrip !== false),
     applyHttpsUpgradeRule(_s.httpsUpgrade !== false),
     applyPrivacyHeadersRule(_s.privacyHeaders !== false),
+    applyUserFilterRules(),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
   ]);
+  await restoreGlobalPauseIfActive();
 
   // Show welcome page on fresh install
   if (reason === 'install') {
@@ -2705,16 +2845,21 @@ chrome.runtime.onStartup.addListener(async () => {
     if (staticRuleCount) _staticRuleCount = staticRuleCount;
   } catch (_) {}
   await Promise.all([
+    loadStaticRuleIds(),
     applyRemoveParamRules(), applyMatrixRules(),
     applyReferrerRule(_ss.referrerStrip !== false),
     applyHttpsUpgradeRule(_ss.httpsUpgrade !== false),
     applyPrivacyHeadersRule(_ss.privacyHeaders !== false),
+    applyUserFilterRules(),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
   ]);
+  await restoreGlobalPauseIfActive();
 
   const existing = await chrome.alarms.get('filterSync');
   if (!existing) chrome.alarms.create('filterSync', { periodInMinutes: 720 });
+  const sbAlarm = await chrome.alarms.get('safeBrowsingRefresh');
+  if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
     if (sbRulesVersion !== '2.10.1') {
@@ -2731,7 +2876,7 @@ chrome.runtime.onStartup.addListener(async () => {
       logEvent('filter-sync', 'error', `Startup sync failed: ${e.message}`);
     });
   }, 500);
-  setupContextMenus();
+  await setupContextMenus();
   try {
     const { stats } = await chrome.storage.local.get('stats');
     const total = stats?.total ?? 0;

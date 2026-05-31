@@ -24,4 +24,13 @@
       globalThis.chrome = globalThis.browser;
     }
   }
+
+  // Mid-session global pause flag — content scripts check this in observer ticks.
+  globalThis.__sbGlobalPause = false;
+  if (typeof globalThis.chrome?.runtime?.onMessage !== 'undefined') {
+    globalThis.chrome.runtime.onMessage.addListener((msg) => {
+      if (msg?.type === 'GLOBAL_PAUSE') globalThis.__sbGlobalPause = true;
+      if (msg?.type === 'GLOBAL_RESUME') globalThis.__sbGlobalPause = false;
+    });
+  }
 })();

@@ -163,6 +163,7 @@
 
   // ── Main tick ─────────────────────────────────────────────────────────────────
   function domTick() {
+    if (globalThis.__sbGlobalPause) return;
     const hasAd = detectAdByDOM();
     removeAdUI();
 

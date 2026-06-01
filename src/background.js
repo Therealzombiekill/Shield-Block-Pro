@@ -2058,7 +2058,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'RESET_STATS':
-        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
+        await chrome.storage.local.set({
+          stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 },
+          dailyStats: {},   // clear Today / This week / 7-day chart too, so reset is consistent
+        });
         try {
           chrome.action.setBadgeText({ text: '' });
           const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });

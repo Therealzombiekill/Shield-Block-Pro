@@ -32,6 +32,7 @@
   // Never run on YouTube — our selectors can match player elements and cause black screens
   if (_host.includes('youtube.com') || _host.includes('youtu.be')) return;
   if (_genWl.some(d => _host === d || _host.endsWith('.' + d))) return;
+  const _isAternos = _host === 'aternos.org' || _host.endsWith('.aternos.org');
 
   // ── Ad selectors ────────────────────────────────────────────────────────────
   // Combined into a single string for one querySelectorAll call per tick.
@@ -241,7 +242,7 @@
   const SCROLL_LOCK_CLASSES = [
     'noscroll', 'no-scroll', 'no_scroll', 'scroll-lock', 'scroll-locked',
     'scrolllock', 'disable-scroll', 'disable-scrolling', 'stop-scrolling',
-    'prevent-scroll', 'overflow-hidden', 'body-no-scroll',
+    'prevent-scroll', 'body-no-scroll',
   ];
 
   function unlockScroll() {
@@ -259,6 +260,56 @@
     }
   }
 
+  // ── Aternos.org ───────────────────────────────────────────────────────────────
+  // First-party exaroton promos and "Advertisement" slots that network rules can't
+  // catch (same-origin). Scoped to aternos.org; server controls have no promo links
+  // or "Advertisement" labels, so they're left untouched. Climbing is guarded so it
+  // never removes a layout region.
+  function cleanAternos() {
+    let removed = 0;
+    const REGIONS = ['BODY', 'MAIN', 'NAV', 'HEADER', 'SECTION'];
+
+    // exaroton promo banners (top bar + center/side ad blocks)
+    for (const a of document.querySelectorAll('a[href*="exaroton"]')) {
+      const txt = a.textContent || '';
+      const promo = a.querySelector('img') ||
+        /server power|high.?end|per.?second|only pay to play|start your/i.test(txt);
+      if (!promo) continue;
+      let box = a;
+      for (let i = 0; i < 4 && box.parentElement; i++) {
+        const p = box.parentElement;
+        if (REGIONS.includes(p.tagName) || p.children.length > 4) break;
+        box = p;
+      }
+      if (box && box.isConnected && !REGIONS.includes(box.tagName)) { box.remove(); removed++; }
+    }
+
+    // "Advertisement" slot labels → remove the slot wrapper they head
+    for (const el of document.querySelectorAll('div, span, p, h3, h4')) {
+      if (el.children.length !== 0) continue;
+      if (!/^advertisement$/i.test((el.textContent || '').trim())) continue;
+      let slot = el.parentElement;
+      for (let i = 0; i < 2 && slot && slot.parentElement; i++) {
+        const p = slot.parentElement;
+        if (REGIONS.includes(p.tagName) || p.children.length > 4) break;
+        slot = p;
+      }
+      if (slot && slot.isConnected && !REGIONS.includes(slot.tagName)) { slot.remove(); removed++; }
+    }
+
+    // Anti-adblock nag text
+    for (const el of document.querySelectorAll('p, div, span')) {
+      if (el.children.length > 2) continue;
+      if (/pay for your servers using advertis|turn off your ad.?block/i.test(el.textContent || '')) {
+        if (el.isConnected && !REGIONS.includes(el.tagName)) { el.remove(); removed++; }
+      }
+    }
+
+    if (removed > 0) {
+      chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'general' }).catch(() => {});
+    }
+  }
+
   // ── Main tick ─────────────────────────────────────────────────────────────────
   // NOTE: Soft paywall bypass is handled by content-paywall.js (separate content
   // script with its own MutationObserver). Do not duplicate it here.
@@ -268,6 +319,7 @@
     cleanAntiAdblock();
     cleanInterstitials();
     unlockScroll();
+    if (_isAternos) cleanAternos();
   }
 
   // ── Observer ──────────────────────────────────────────────────────────────────

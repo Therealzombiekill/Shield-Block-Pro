@@ -418,6 +418,7 @@ function setTabBadge(tabId) {
 async function refreshTabBadge(tabId, url) {
   if (!tabId || tabId < 0) return;
   try {
+    if (!_badgeEnabled) { chrome.action.setBadgeText({ text: '', tabId }); return; }
     if (!url) { try { url = (await chrome.tabs.get(tabId))?.url; } catch (_) {} }
     if (url) {
       try {
@@ -443,18 +444,24 @@ let _pendingStats     = {};  // { statType: count }
 let _pendingTimeSaved = 0;   // seconds accumulated since last flush
 let _pendingFlush     = null;
 
-// Track daily stats for 7-day chart
-async function recordDailyStats(count) {
-  try {
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const { dailyStats = {} } = await chrome.storage.local.get('dailyStats');
-    dailyStats[today] = (dailyStats[today] || 0) + count;
-    // Keep only last 30 days
-    const keys = Object.keys(dailyStats).sort().slice(-30);
-    const pruned = {};
-    keys.forEach(k => { pruned[k] = dailyStats[k]; });
-    await chrome.storage.local.set({ dailyStats: pruned });
-  } catch (e) { logEvent('storage', 'warn', `dailyStats write failed: ${e.message}`); }
+// Track daily stats for 7-day chart. Serialised through _dailyQueue so concurrent
+// callers (_flushStats and countNetworkBlocks) can't lose each other's increments
+// in the read-modify-write against chrome.storage.local.
+let _dailyQueue = Promise.resolve();
+function recordDailyStats(count) {
+  _dailyQueue = _dailyQueue.then(async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const { dailyStats = {} } = await chrome.storage.local.get('dailyStats');
+      dailyStats[today] = (dailyStats[today] || 0) + count;
+      // Keep only last 30 days
+      const keys = Object.keys(dailyStats).sort().slice(-30);
+      const pruned = {};
+      keys.forEach(k => { pruned[k] = dailyStats[k]; });
+      await chrome.storage.local.set({ dailyStats: pruned });
+    } catch (e) { logEvent('storage', 'warn', `dailyStats write failed: ${e.message}`); }
+  });
+  return _dailyQueue;
 }
 
 // Queue that serialises all stat writes — prevents concurrent _flushStats calls
@@ -2064,8 +2071,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
         try {
           chrome.action.setBadgeText({ text: '' });
-          const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-          if (t?.id) { _pageStats.delete(t.id); chrome.action.setBadgeText({ text: '', tabId: t.id }); }
+          _pageStats.clear(); // clear per-page counts for ALL tabs, not just the active one
+          for (const t of await chrome.tabs.query({})) {
+            if (t?.id) chrome.action.setBadgeText({ text: '', tabId: t.id });
+          }
         } catch (_) {}
         sendResponse({ ok: true });
         break;

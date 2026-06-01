@@ -18,9 +18,17 @@
 #
 set -euo pipefail
 
-cd "$(dirname "$0")"
+# Resolve the output path against the invocation directory *before* we cd into
+# the project root, so a relative path argument lands where the caller expects.
+# The default is anchored to the repo root regardless of where the script runs.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OUT="${1:-$SCRIPT_DIR/ShieldBlock-Pro-complete-stable.zip}"
+case "$OUT" in
+  /*) ;;                  # absolute path: use as-is
+  *)  OUT="$PWD/$OUT" ;;  # relative path: anchor to caller's working directory
+esac
 
-OUT="${1:-ShieldBlock-Pro-complete-stable.zip}"
+cd "$SCRIPT_DIR"
 
 # --- Sanity checks ----------------------------------------------------------
 if [ ! -f manifest.json ]; then
@@ -38,10 +46,13 @@ fi
 echo "Packaging ShieldBlock Pro v$VERSION -> $OUT"
 
 # --- Build ------------------------------------------------------------------
-# Zip into a temp file first so the previous artifact is never packed into the
-# new one. Include everything the extension loads at runtime; exclude dev docs,
-# the build script, the artifact itself, VCS metadata, and OS junk.
-TMP="$(mktemp -u -t sbpro-XXXXXX).zip"
+# Zip into a secure temp dir (outside the project tree) so the previous
+# artifact is never packed into the new one, and clean it up on exit. Include
+# everything the extension loads at runtime; exclude dev docs, the build script,
+# the artifact itself, VCS metadata, and OS junk.
+TMP_DIR="$(mktemp -d -t sbpro-XXXXXX)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+TMP="$TMP_DIR/ShieldBlock-Pro.zip"
 
 zip -r -X "$TMP" . \
   -x '.git/*' \

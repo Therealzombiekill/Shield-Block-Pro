@@ -864,6 +864,7 @@ async function countNetworkBlocks(tabId, url) {
 chrome.webNavigation.onBeforeNavigate.addListener(async ({ tabId, frameId, url }) => {
   if (frameId !== 0) return;
   _pageStats.delete(tabId);
+  try { chrome.action.setBadgeText({ text: '', tabId }); } catch (_) {} // reset page count on navigation
   _navStart.set(tabId, Date.now());
   _navCounted.delete(tabId);
   _navCounting.delete(tabId);

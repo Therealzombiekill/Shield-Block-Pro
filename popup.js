@@ -139,6 +139,27 @@ async function refreshStats() {
 
     $('stat-page').textContent = fmt(page.total ?? 0);
 
+    // Per-page "what got blocked" breakdown chips
+    const catRow = $('page-cat-row');
+    if (catRow) {
+      const cats = [
+        ['ads / trackers', page.network],
+        ['page ads',       page.general],
+        ['sponsored',      page.social],
+        ['cookie popups',  page.cookies],
+        ['Amazon ads',     page.amazon],
+      ].filter(([, v]) => (v || 0) > 0);
+      catRow.textContent = '';
+      for (const [label, v] of cats) {
+        const chip = document.createElement('span');
+        chip.className = 'pchip';
+        const b = document.createElement('b');
+        b.textContent = fmt(v);
+        chip.append(b, ' ' + label);
+        catRow.appendChild(chip);
+      }
+    }
+
     // Also draw the sparkline when stats refresh
     drawSparkline();
   } catch (_) {

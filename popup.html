@@ -107,6 +107,12 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 .pagepill-ico{font-size:15px;flex-shrink:0}
 .pagepill-n{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--green);line-height:1}
 .pagepill-l{font-size:11px;color:var(--muted);margin-left:auto}
+/* Per-page "what got blocked" category chips */
+.page-cats{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.page-cats:empty{display:none}
+.pchip{display:inline-flex;align-items:center;gap:4px;background:var(--s2);
+  border:1px solid var(--border);border-radius:20px;padding:3px 9px;font-size:10px;color:var(--muted)}
+.pchip b{font-family:var(--mono);color:var(--accent2);font-weight:700}
 
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
 .sc{
@@ -555,6 +561,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <!-- ── Per-page blocked requests ──────────────────────────────── -->
     <div class="ss">
       <div class="ss-hd">Blocked on this page</div>
+      <div class="page-cats" id="page-cat-row"></div>
       <div id="page-log-list">—</div>
     </div>
 

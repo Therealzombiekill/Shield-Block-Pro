@@ -18,6 +18,12 @@ There are no automated tests. Manual testing workflow:
 
 To verify filter parsing changes, open the popup → **Support** tab → "Run check" health check, or check the Log tab for sync errors.
 
+## Packaging for store upload
+
+There is no code build step, but the Chrome Web Store and Firefox AMO require `manifest.json` to be at the **root** of the uploaded ZIP. Run `./build.sh` to produce a correctly-structured `ShieldBlock-Pro-complete-stable.zip` (manifest and assets at the root; dev-only files like `CLAUDE.md`, `AGENTS.md`, `README.md`, and `build.sh` excluded). The script aborts if the manifest lacks a version or doesn't land at the archive root.
+
+**Do not** upload GitHub's "Download ZIP" output (or a ZIP of the checkout folder) — those nest everything under a `<repo>-<branch>/` folder, so the store can't find the manifest and reports *"There was a problem uploading your file… The manifest must define a version."*
+
 ## Architecture
 
 ### Execution worlds and the communication model

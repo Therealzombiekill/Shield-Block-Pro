@@ -370,11 +370,13 @@ const DNT_GPC_RULE_ID    = 47002; // set DNT: 1 and Sec-GPC: 1 on all outbound r
 // every navigation adds latency and I/O pressure. Cache in memory; invalidate
 // whenever SET_SETTINGS writes new values (which is the only mutation path).
 let _settingsCache = null;
+let _badgeEnabled  = true;  // hot-path mirror of settings.badgeEnabled (see setTabBadge)
 
 async function getSettings() {
   if (_settingsCache) return _settingsCache;
   const { settings } = await chrome.storage.local.get('settings');
   _settingsCache = { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
+  _badgeEnabled  = _settingsCache.badgeEnabled !== false;
   return _settingsCache;
 }
 
@@ -388,6 +390,51 @@ function formatBadge(n) {
   return n >= 1e6 ? (n/1e6).toFixed(1)+'M'
        : n >= 1000 ? (n/1000).toFixed(1)+'k'
        : String(n);
+}
+
+// ── Per-page badge ──────────────────────────────────────────────────────────
+// The toolbar badge shows how many items were blocked on the CURRENT page (like
+// uBlock Origin), reset on each navigation and following the active tab. Running
+// lifetime/session totals live in the popup, not the badge.
+
+// Hot-path update from a block event: bumps the badge to the page's running
+// count. Only sets when there is something to show, so it never clobbers a
+// paused '⏸' badge or the clean empty state on a fresh page.
+function setTabBadge(tabId) {
+  if (!tabId || tabId < 0 || !_badgeEnabled) return;
+  const ps = _pageStats.get(tabId);
+  const n  = ps ? (ps.total | 0) : 0;
+  if (n <= 0) return;
+  try {
+    chrome.action.setBadgeText({ text: formatBadge(n), tabId });
+    chrome.action.setBadgeBackgroundColor({ color: '#7c6aff', tabId });
+    chrome.action.setBadgeTextColor?.({ color: '#ffffff', tabId });
+  } catch (_) {}
+}
+
+// Full refresh for a tab: resolves whitelist/pause state and shows the page
+// count, '⏸' when the site is paused, or nothing when disabled/zero. Use on
+// navigation-complete and tab-activation.
+async function refreshTabBadge(tabId, url) {
+  if (!tabId || tabId < 0) return;
+  try {
+    if (!url) { try { url = (await chrome.tabs.get(tabId))?.url; } catch (_) {} }
+    if (url) {
+      try {
+        const domain = new URL(url).hostname.replace(/^www\./, '');
+        if (domainMatchesWhitelist(domain, await getWhitelist())) {
+          chrome.action.setBadgeText({ text: '⏸', tabId });
+          chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId });
+          return;
+        }
+      } catch (_) {}
+    }
+    const ps = _pageStats.get(tabId);
+    const n  = ps ? (ps.total | 0) : 0;
+    chrome.action.setBadgeText({ text: (_badgeEnabled && n > 0) ? formatBadge(n) : '', tabId });
+    chrome.action.setBadgeBackgroundColor({ color: '#7c6aff', tabId });
+    chrome.action.setBadgeTextColor?.({ color: '#ffffff', tabId });
+  } catch (_) {}
 }
 
 // Batched stat writer — accumulates increments and flushes in one storage write
@@ -442,13 +489,7 @@ function _flushStats() {
         stats: s, lifetime: lt,
         timeSaved: (prevSaved ?? 0) + savedThisFlush,
       });
-      try {
-        chrome.action.setBadgeText({ text: formatBadge(s.total) });
-        chrome.action.setBadgeBackgroundColor({ color: '#7c6aff' });
-        // Apply badge visibility from settings
-        const { settings: badgeSettings } = await chrome.storage.local.get('settings');
-        if (badgeSettings?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
-      } catch (e) { logEvent('badge', 'warn', `Badge update failed: ${e.message}`); }
+      // Badge is updated per-tab from the block event (see setTabBadge), not here.
     } catch (_) {}
   });
 }
@@ -738,6 +779,7 @@ function incrementStat(type, tabId) {
       ps[type] = (ps[type] | 0) + 1;
     }
     _pageStats.set(tabId, ps);
+    setTabBadge(tabId);
   }
   // Accumulate — flush to storage in a single write after 500ms idle
   _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
@@ -800,6 +842,7 @@ async function countNetworkBlocks(tabId, url) {
               : 'general';
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
+    setTabBadge(tabId);
 
     _statQueue = _statQueue.then(async () => {
       try {
@@ -810,12 +853,6 @@ async function countNetworkBlocks(tabId, url) {
         s[cat]   = (s[cat]   | 0) + count;
         lt.total = (lt.total | 0) + count;
         await chrome.storage.local.set({ stats: s, lifetime: lt });
-        try {
-          chrome.action.setBadgeText({ text: formatBadge(s.total) });
-          // Honour badgeEnabled — don't re-show the badge if the user turned it off
-          const { settings: _bs } = await chrome.storage.local.get('settings');
-          if (_bs?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
-        } catch (_) {}
       } catch (_) {}
     });
   } catch (_) {}
@@ -2020,7 +2057,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'RESET_STATS':
         await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
-        try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
+        try {
+          chrome.action.setBadgeText({ text: '' });
+          const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+          if (t?.id) { _pageStats.delete(t.id); chrome.action.setBadgeText({ text: '', tabId: t.id }); }
+        } catch (_) {}
         sendResponse({ ok: true });
         break;
 
@@ -2059,6 +2100,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if ('referrerStrip'   in msg.settings) applyReferrerRule(merged.referrerStrip !== false);
         if ('httpsUpgrade'    in msg.settings) applyHttpsUpgradeRule(merged.httpsUpgrade !== false);
         if ('privacyHeaders'  in msg.settings) applyPrivacyHeadersRule(merged.privacyHeaders !== false);
+        // Reflect the badge on/off toggle immediately
+        if ('badgeEnabled' in msg.settings) {
+          _badgeEnabled = merged.badgeEnabled !== false;
+          try {
+            if (!_badgeEnabled) {
+              for (const t of await chrome.tabs.query({})) {
+                try { chrome.action.setBadgeText({ text: '', tabId: t.id }); } catch (_) {}
+              }
+            } else {
+              const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+              if (t?.id) refreshTabBadge(t.id, t.url);
+            }
+          } catch (_) {}
+        }
         // Auto-push updated settings to chrome.storage.sync (fire-and-forget)
         pushToCloud().catch(() => {});
         sendResponse({ ok: true });
@@ -2784,13 +2839,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== 'complete' || !tab?.url) return;
   try {
-    const domain = new URL(tab.url).hostname.replace(/^www\./, '');
-    const wl = await getWhitelist();
-    const whitelisted = domainMatchesWhitelist(domain, wl);
-    chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId });
-    if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId });
+    await refreshTabBadge(tabId, tab.url);
   } catch (e) { logEvent('system', 'warn', `Badge restore failed: ${e.message}`); }
 });
+
+// Follow tab switches so the badge always reflects the focused tab's page count.
+chrome.tabs.onActivated.addListener(({ tabId }) => { refreshTabBadge(tabId); });
 
 
 // ── Install / Startup ──────────────────────────────────────────────────────

@@ -43,10 +43,11 @@
       '[data-testid="advertisement"]',
       '[data-testid="ad-slot"]',
       '[data-testid="ad-view"]',
+      '[data-testid="ad-slot-container"]',
       '[data-testid="sponsored-playlist"]',
       '[data-testid="ad-break"]',
-      '[aria-label*="Advertisement"]',
-      '[aria-label*="Sponsored"]',
+      '[aria-label*="Advertisement" i]',
+      '[aria-label*="Sponsored" i]',
     ];
     for (const sel of AD_SELECTORS) {
       if (document.querySelector(sel)) return true;
@@ -68,6 +69,12 @@
     // Method 4: Spotify wraps progress bar in an ad-specific container
     // Use data-testid which is more stable than class names
     if (document.querySelector('[data-testid="ad-slot"], [data-testid="ad-view"]')) return true;
+
+    // Method 5: the now-playing widget announces the current entity in its
+    // aria-label; during an ad Spotify labels it "Advertisement". This is the
+    // most reliable signal since it survives most DOM/testid renames.
+    const npw = document.querySelector('[data-testid="now-playing-widget"]');
+    if (npw && /advertisement/i.test(npw.getAttribute('aria-label') || '')) return true;
 
     return false;
   }
@@ -99,9 +106,13 @@
   }
 
   function removeSpotifyAdUI() {
+    // Scoped to ad/upsell elements only — never touches playback controls.
     const REMOVE_SELECTORS = [
       '[data-testid="browse-ad-slot"]',
-      '[class*="upgrade-button"]:not([style*="display:none"])',
+      '[data-testid="ad-slot-container"]',
+      '[data-testid="hpto-container"]',          // home-page takeover ad
+      '[data-testid="upgrade-button"]',          // "Upgrade" nag in the top bar
+      'button[aria-label="Upgrade to Premium" i]',
     ];
     for (const sel of REMOVE_SELECTORS) {
       try { document.querySelectorAll(sel).forEach(el => el.remove()); } catch (_) {}

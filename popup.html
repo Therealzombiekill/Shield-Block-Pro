@@ -89,6 +89,25 @@ body{width:360px;min-height:480px;background:var(--bg);color:var(--text);
 .hero-label strong{display:block;font-family:var(--mono);font-size:9px;
   text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:2px;font-weight:500}
 
+/* Big counters: this week / lifetime / time saved */
+.bigstats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.bcard{background:var(--s2);border:1px solid var(--border);border-radius:10px;
+  padding:11px 6px 9px;text-align:center;transition:border-color .15s}
+.bcard:hover{border-color:var(--border2)}
+.bcard-n{display:block;font-family:var(--mono);font-size:21px;font-weight:700;
+  color:#fff;line-height:1;letter-spacing:-.03em}
+.bcard-l{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.06em;margin-top:6px}
+.bcard.saved .bcard-n{color:var(--green)}
+
+/* This-page highlight strip (mirrors the toolbar badge) */
+.pagepill{display:flex;align-items:center;gap:9px;background:var(--s2);
+  border:1px solid var(--border);border-left:3px solid var(--accent2);
+  border-radius:10px;padding:9px 12px;margin-bottom:12px}
+.pagepill-ico{font-size:15px;flex-shrink:0}
+.pagepill-n{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--green);line-height:1}
+.pagepill-l{font-size:11px;color:var(--muted);margin-left:auto}
+
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
 .sc{
   background:var(--s2);border:1px solid var(--border);border-radius:8px;
@@ -461,8 +480,32 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <div class="hero">
       <div class="hero-count-row">
         <span class="hero-num" id="stat-total">0</span>
-        <span class="hero-label"><strong>Session</strong>ads blocked</span>
+        <span class="hero-label"><strong>Today</strong>blocked &amp; counting</span>
       </div>
+
+      <!-- Big counters: this week / lifetime / time saved -->
+      <div class="bigstats">
+        <div class="bcard">
+          <span class="bcard-n" id="stat-week">0</span>
+          <span class="bcard-l">This week</span>
+        </div>
+        <div class="bcard">
+          <span class="bcard-n" id="stat-lifetime">0</span>
+          <span class="bcard-l">Lifetime</span>
+        </div>
+        <div class="bcard saved">
+          <span class="bcard-n" id="stat-time-saved">—</span>
+          <span class="bcard-l">Time saved</span>
+        </div>
+      </div>
+
+      <!-- This page (mirrors the toolbar badge) -->
+      <div class="pagepill">
+        <span class="pagepill-ico">📄</span>
+        <span class="pagepill-n" id="stat-page">—</span>
+        <span class="pagepill-l">blocked on this page</span>
+      </div>
+
       <div class="stat-grid">
         <div class="sc yt">
           <span class="sc-n" id="s-yt">0</span>
@@ -504,18 +547,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     </div>
 
     <div class="info-rows">
-      <div class="info-row">
-        <span class="info-label">This page</span>
-        <span class="info-val green" id="stat-page">—</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Lifetime total</span>
-        <span class="info-val" id="stat-lifetime">0</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Time saved</span>
-        <span class="info-val green" id="stat-time-saved">—</span>
-      </div>
       <div class="info-row">
         <span class="info-label">Filters synced</span>
         <span class="info-val" id="stat-last-sync">—</span>

@@ -86,24 +86,27 @@ let _lastTotal = 0;
 
 async function refreshStats() {
   try {
-    const [s, lt, ps, stored] = await Promise.all([
+    const [s, lt, ps, daily, stored] = await Promise.all([
       msg('GET_STATS'), msg('GET_LIFETIME'), msg('GET_PAGE_STATS'),
+      msg('GET_DAILY_STATS'),
       chrome.storage.local.get(['timeSaved','filterSyncedAt']),
     ]);
     const stats = s  ?? { total:0, amazon:0, general:0, social:0, cookies:0 };
     const life  = lt ?? { total:0 };
     const page  = ps ?? { total:0 };
+    const days  = Array.isArray(daily) ? daily : [];
+    const today = days.length ? (days[days.length - 1].count || 0) : 0;
+    const week  = days.reduce((a, d) => a + (d.count || 0), 0);
 
-    const total = stats.total || 0;
     const el = $('stat-total');
-    el.textContent = fmt(total);
+    el.textContent = fmt(today);
 
-    // Flash accent color when count increases
-    if (total > _lastTotal && _lastTotal > 0) {
+    // Flash accent color when today's count increases
+    if (today > _lastTotal && _lastTotal > 0) {
       el.classList.add('flash');
       setTimeout(() => el.classList.remove('flash'), 600);
     }
-    _lastTotal = total;
+    _lastTotal = today;
 
     $('s-yt').textContent = fmt(stats.youtube  || 0);
     $('s-tw').textContent = fmt(stats.twitch   || 0);
@@ -114,7 +117,8 @@ async function refreshStats() {
     $('s-sc').textContent = fmt(stats.social   || 0);
     $('s-ck').textContent = fmt(stats.cookies  || 0);
     $('s-wb').textContent = fmt(stats.general  || 0);
-    $('stat-lifetime').textContent = fmt(life.total) + ' total';
+    $('stat-week').textContent = fmt(week);
+    $('stat-lifetime').textContent = fmt(life.total);
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 
     const syncedAt = stored?.filterSyncedAt;
@@ -133,19 +137,7 @@ async function refreshStats() {
       }
     }
 
-    const n = page.total ?? 0;
-    if (n > 0) {
-      const parts = [];
-      if (page.amazon  > 0) parts.push(`${fmt(page.amazon)} amz`);
-      if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
-      if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);
-      if (page.general > 0) parts.push(`${fmt(page.general)} web`);
-      $('stat-page').textContent = parts.length
-        ? fmt(n) + ' · ' + parts.join(' · ')
-        : fmt(n) + ' blocked';
-    } else {
-      $('stat-page').textContent = '—';
-    }
+    $('stat-page').textContent = fmt(page.total ?? 0);
 
     // Also draw the sparkline when stats refresh
     drawSparkline();

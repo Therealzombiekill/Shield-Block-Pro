@@ -843,6 +843,7 @@ async function countNetworkBlocks(tabId, url) {
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
     setTabBadge(tabId);
+    recordDailyStats(count); // include network blocks in daily / 7-day totals
 
     _statQueue = _statQueue.then(async () => {
       try {

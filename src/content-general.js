@@ -82,6 +82,12 @@
     '[id*="adagio-slot"]', '[class*="adagio"]',
     '[class*="outstream-ad"]', '[class*="interstitial-ad"]',
     '.onetrust-pc-dark-filter',
+    // High-confidence network / slot markers
+    '[id*="google_ads_iframe"]', '[id^="aswift_"]', '[id*="gpt-ad"]', '.gpt-ad',
+    '[aria-label="Advertisement"]', '[aria-label="advertisement"]',
+    '[data-ad]', '[data-adunit]', '[data-ad-unit]', '[data-ad-region]',
+    '.ad-placeholder', '.ads-container', '[class*="trc_related_container"]',
+    '.ob-widget', '[class*="pubexchange"]',
   ];
 
   // Pre-join for single querySelectorAll — falls back to individual queries on error
@@ -144,6 +150,8 @@
     '[class*="email-popup"]', '[class*="subscribe-popup"]',
     '[class*="exit-intent"]', '[class*="exit-popup"]',
     '[class*="mailchimp-popup"]', '[id*="mc-embed-popup"]',
+    '[class*="signup-modal"]', '[class*="subscribe-modal"]', '[class*="popup-newsletter"]',
+    '[class*="popup-subscribe"]', '.modal-newsletter', '[class*="om-popup"]',
   ].join(',');
 
   function cleanNewsletters() {
@@ -161,6 +169,9 @@
     '[class*="adblocker-wall"]', '[class*="whitelist-modal"]',
     '#adblock-message', '.adblock-message',
     '.ablock-notification', '#ablock-notification',
+    '[class*="adblock-detected"]', '[id*="adblock-detected"]',
+    '[class*="adblocker-detected"]', '[class*="adBlockDetected"]',
+    '.adblock-popup', '#adblock-popup', '[class*="abp-detected"]',
   ].join(',');
 
   const ANTIBLOCK_TEXT = [
@@ -224,6 +235,15 @@
 
   // ── Scroll unlock ─────────────────────────────────────────────────────────────
   // Some ad scripts lock body scroll. Periodically restore it when no modal is open.
+  // Narrowly-scoped class names that are unambiguously about scrolling — removing
+  // them can't accidentally hide a legitimate dialog (unlike generic modal-state
+  // classes such as "modal-open", which we deliberately leave alone).
+  const SCROLL_LOCK_CLASSES = [
+    'noscroll', 'no-scroll', 'no_scroll', 'scroll-lock', 'scroll-locked',
+    'scrolllock', 'disable-scroll', 'disable-scrolling', 'stop-scrolling',
+    'prevent-scroll', 'overflow-hidden', 'body-no-scroll',
+  ];
+
   function unlockScroll() {
     if (document.fullscreenElement) return;
     if (document.querySelector('[role="dialog"]:not([aria-hidden="true"])')) return;
@@ -232,6 +252,9 @@
       if (el.style.overflow === 'hidden' || el.style.overflowY === 'hidden') {
         el.style.overflow = '';
         el.style.overflowY = '';
+      }
+      for (const c of SCROLL_LOCK_CLASSES) {
+        if (el.classList.contains(c)) el.classList.remove(c);
       }
     }
   }

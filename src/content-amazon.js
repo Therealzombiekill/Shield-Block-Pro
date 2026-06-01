@@ -20,7 +20,6 @@ const _AMAZON_CSS = `
   .AdHolder, .AdComponent, .amAdDiv,
   [data-csa-c-type="ad"],
   [data-csa-c-rtype="sponsored"],
-  [data-csa-c-slot-id],
   [data-ad-details],
   #ape_Detail_dp-ads-center-promo_Desktop_placement,
   #dp-ads-center-promo_Desktop_placement,
@@ -34,10 +33,10 @@ const _AMAZON_CSS = `
   [id*="sponsored-products-shelf"],
   [id*="sponsored_products"],
   [id*="sp_detail"], [id*="sp_dp"],
-  [id*="ad_feature_div"], [id*="ad-feedback-form"],
+  [id*="ad-feedback-form"],
   .s-sponsored-header-text,
   [class*="s-sponsored-header"],
-  [data-csa-c-content-id*="sp-"],
+  [data-csa-c-content-id^="sp-"],
   #videoAds, #videoAd, [id*="video-ads"],
   #amasBottom, #amsDetailRight_feature_div,
   #amsDetailRight, #rhf, .sopp_theme,
@@ -99,16 +98,18 @@ function _removeAmazonCss() {
     '[cel_widget_id*="MAIN-SPONSORED_PRODUCTS"]',
     '[cel_widget_id*="MAIN-SP_DETAIL"]',
     '#rhf', '#amsDetailRight',
-    '.sopp_theme', '[id*="ad_feature_div"]',
-    // 2025 Amazon ad slots
-    '[data-csa-c-slot-id]',
+    '.sopp_theme',
+    // NOTE: [data-csa-c-slot-id] and [id*="ad_feature_div"] removed — the first
+    // is a generic telemetry attribute on most page modules (not just ads) and
+    // the second's substring also matches legit ids like "head_feature_div",
+    // so together they hid entire Amazon browse/search pages.
     '#centerBanner-sp-ads_feature_div',
     '[class*="s-sponsored-header"]',
     '#sp-cc', '#sp-cc-aboveTheFold',
     // 2025 Amazon ad formats
     '[data-csa-c-rtype="sponsored"]',
     '[cel_widget_id*="BOTTOM_APEX-SPONSORED"]',
-    '[data-csa-c-content-id*="sp-"]',
+    '[data-csa-c-content-id^="sp-"]',
     '#dp-ads-bottom-mobile-shoveler_feature_div',
   ];
 

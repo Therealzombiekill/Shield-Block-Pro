@@ -36,6 +36,7 @@
     '[class*="preroll"]',
     '[class*="pre-roll"]',
     '[id*="ad-container"]',
+    '[aria-label*="Advertisement" i]',
   ];
 
   function isAdPlaying() {

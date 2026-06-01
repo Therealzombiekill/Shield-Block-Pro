@@ -45,6 +45,8 @@
     // Hulu's ad "badge"
     '[data-automationid="ad-badge"]',
     '[data-automationid="ad-info"]',
+    '[data-automationid="ad-countdown"]',
+    '[aria-label*="Advertisement" i]',
   ];
 
   function isAdPlaying() {
@@ -96,6 +98,7 @@
       '[class*="ad-countdown"]',
       '[data-automationid="ad-badge"]',
       '[data-automationid="ad-info"]',
+      '[data-automationid="ad-countdown"]',
       '[class*="SponsoredContent"]',
       '[class*="AdBanner"]',
       '[data-automationid="hitch-unit"]',

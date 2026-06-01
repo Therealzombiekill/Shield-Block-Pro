@@ -132,6 +132,7 @@
     'div[class*="ad-choice"]',
     '[data-test-selector="ChannelRecommendationCard"]',
     'article[data-a-target*="promoted"]',
+    '[data-a-target="player-ad-notice"]',
   ];
 
   function removeAdUI() {

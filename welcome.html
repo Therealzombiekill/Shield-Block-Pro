@@ -13,55 +13,55 @@
   --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
 body{background:var(--bg);color:var(--text);font-family:var(--sans);
-  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}
-.wrap{max-width:600px;width:100%}
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:48px 20px}
+.wrap{max-width:680px;width:100%}
 .logo{display:flex;align-items:center;gap:14px;margin-bottom:40px}
-.icon{width:52px;height:52px;border-radius:14px;
+.icon{width:56px;height:56px;border-radius:14px;
   background:linear-gradient(135deg,var(--accent),var(--accent2));
   display:flex;align-items:center;justify-content:center;
   box-shadow:0 0 32px var(--glow)}
-.logo-name{font-family:var(--mono);font-size:22px;font-weight:700;color:#fff}
+.logo-name{font-family:var(--mono);font-size:25px;font-weight:700;color:#fff}
 .logo-name em{color:var(--accent2);font-style:normal}
-.logo-tag{font-size:13px;color:var(--muted);margin-top:2px}
-h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px;line-height:1.2}
+.logo-tag{font-size:15px;color:var(--muted);margin-top:3px}
+h1{font-size:34px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px;line-height:1.2}
 h1 span{color:var(--accent2)}
-.sub{font-size:15px;color:var(--sub);line-height:1.6;margin-bottom:36px}
-.section-label{font-family:var(--mono);font-size:10px;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px}
-.features{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
-.features.two{grid-template-columns:1fr 1fr;margin-bottom:28px}
-.feat{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px}
-.feat-icon{font-size:18px;margin-bottom:8px}
-.feat-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
-.feat-desc{font-size:11px;color:var(--muted);line-height:1.5}
-.platforms{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
-.plat{display:flex;align-items:center;gap:6px;background:var(--s1);
-  border:1px solid var(--border);border-radius:8px;padding:7px 12px}
-.plat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.plat-name{font-size:12px;font-weight:600;color:var(--text)}
-.plat-note{font-size:10px;color:var(--muted);margin-left:2px}
-.shortcuts{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:28px}
-.shortcuts h3{font-family:var(--mono);font-size:10px;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px}
-.sc-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sub{font-size:18px;color:var(--sub);line-height:1.6;margin-bottom:40px}
+.section-label{font-family:var(--mono);font-size:13px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+.features{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px}
+.features.two{grid-template-columns:1fr 1fr;margin-bottom:32px}
+.feat{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:16px}
+.feat-icon{font-size:22px;margin-bottom:9px}
+.feat-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:5px}
+.feat-desc{font-size:13px;color:var(--sub);line-height:1.55}
+.platforms{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:32px}
+.plat{display:flex;align-items:center;gap:7px;background:var(--s1);
+  border:1px solid var(--border);border-radius:8px;padding:9px 14px}
+.plat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.plat-name{font-size:14px;font-weight:600;color:var(--text)}
+.plat-note{font-size:12px;color:var(--muted);margin-left:3px}
+.shortcuts{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:32px}
+.shortcuts h3{font-family:var(--mono);font-size:13px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+.sc-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .sc-row:last-child{margin-bottom:0}
-.sc-label{font-size:12px;color:var(--sub)}
-.sc-key{font-family:var(--mono);font-size:10px;background:var(--s2);
-  border:1px solid var(--border);border-radius:5px;padding:3px 8px;color:var(--accent2)}
-.cta{display:flex;gap:10px}
-.btn-primary{flex:1;padding:13px;background:var(--accent);border:none;border-radius:9px;
-  color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);
+.sc-label{font-size:14px;color:var(--sub)}
+.sc-key{font-family:var(--mono);font-size:12px;background:var(--s2);
+  border:1px solid var(--border);border-radius:5px;padding:4px 9px;color:var(--accent2)}
+.cta{display:flex;gap:12px}
+.btn-primary{flex:1;padding:15px;background:var(--accent);border:none;border-radius:9px;
+  color:#fff;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--sans);
   transition:opacity .15s}
 .btn-primary:hover{opacity:.9}
-.btn-secondary{padding:13px 20px;background:var(--s1);border:1px solid var(--border);
-  border-radius:9px;color:var(--muted);font-size:14px;cursor:pointer;font-family:var(--sans);
+.btn-secondary{padding:15px 24px;background:var(--s1);border:1px solid var(--border);
+  border-radius:9px;color:var(--sub);font-size:16px;cursor:pointer;font-family:var(--sans);
   transition:border-color .15s}
 .btn-secondary:hover{border-color:var(--accent);color:var(--text)}
-.tip{font-size:11px;color:var(--muted);text-align:center;margin-top:16px}
+.tip{font-size:13px;color:var(--muted);text-align:center;margin-top:18px;line-height:1.7}
 .tip a{color:var(--accent2);text-decoration:none}
-.badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,217,126,.08);
-  border:1px solid rgba(0,217,126,.2);border-radius:20px;padding:3px 10px;
-  font-family:var(--mono);font-size:10px;color:var(--green);margin-bottom:20px}
+.badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,217,126,.08);
+  border:1px solid rgba(0,217,126,.2);border-radius:20px;padding:5px 13px;
+  font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:22px}
 </style>
 </head>
 <body>
@@ -76,7 +76,7 @@ h1 span{color:var(--accent2)}
       </svg>
     </div>
     <div>
-      <div class="logo-name">SHIELD<em>BLOCK</em> <em style="font-size:14px;color:var(--muted)">PRO</em></div>
+      <div class="logo-name">SHIELD<em>BLOCK</em> <em style="font-size:16px;color:var(--muted)">PRO</em></div>
       <div class="logo-tag">v2.10.1 · Free forever</div>
     </div>
   </div>

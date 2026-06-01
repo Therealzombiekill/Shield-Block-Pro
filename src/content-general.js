@@ -1,7 +1,7 @@
 /**
  * ShieldBlock Pro — General Ad Removal v3.0
- * Runs at document_idle — handles dynamic ads injected after page load.
- * Static ads are already hidden by cosmetic.css at document_start.
+ * DOM-level ad removal runs at document_idle. Base cosmetics are injected by the
+ * background on navigation when the cosmetic toggle is enabled.
  */
 
 (async () => {
@@ -19,10 +19,6 @@
   }
   const _genWl = settings?.whitelist ?? [];
   if (settings?.globalPause) return; // global pause active — skip all processing
-
-  if (settings?.privacy !== false) {
-    window.postMessage({ type: 'SB_PRIVACY_ENABLE' }, '*');
-  }
 
   // Signal inject-privacy.js (MAIN world) to activate timezone spoofing if enabled.
   // Can't read storage in MAIN world, so isolated world posts the signal.
@@ -244,7 +240,6 @@
   // NOTE: Soft paywall bypass is handled by content-paywall.js (separate content
   // script with its own MutationObserver). Do not duplicate it here.
   function tick() {
-    if (globalThis.__sbGlobalPause) return;
     cleanAds();
     cleanNewsletters();
     cleanAntiAdblock();

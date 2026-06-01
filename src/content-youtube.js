@@ -35,7 +35,10 @@
   window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
 
   const _host = location.hostname.replace(/^www\./, '');
-  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
+  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) {
+    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    return;
+  }
 
   _sbLog('info', `Init — ${_host}`, { ytMusic: _host.includes('music.') });
 
@@ -174,8 +177,7 @@
   }
 
   // ── Main loop ─────────────────────────────────────────────────────────────────
-  function tick() {
-    if (globalThis.__sbGlobalPause) return; handleAd(); removeOverlays(); handleYTMusicAd(); }
+  function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); }
 
   const _tickInterval = setInterval(tick, 750);
   tick();

@@ -9,27 +9,19 @@
  *   could remove legitimate product content. Replaced with safer selectors.
  */
 
-// Instant CSS — injected at document_start before content loads
-if (!document.getElementById('_sb_amazon_css')) {
-const _qs = document.createElement('style');
-_qs.id = '_sb_amazon_css';
-_qs.textContent = `
-  /* Sponsored products everywhere */
+const _AMAZON_CSS = `
   [data-component-type="sp-sponsored-result"],
   [data-cel-widget*="sp-sponsored"],
   [cel_widget_id*="SPONSORED"],
   [cel_widget_id*="SP_DETAIL"],
   [cel_widget_id*="APEX-SPONSORED"],
-  /* Sponsored labels */
   .puis-sponsored-label-text, .a-sponsored-label,
   [aria-label*="Sponsored"] > span,
-  /* Ad containers */
   .AdHolder, .AdComponent, .amAdDiv,
   [data-csa-c-type="ad"],
   [data-csa-c-rtype="sponsored"],
   [data-csa-c-slot-id],
   [data-ad-details],
-  /* Known placement IDs */
   #ape_Detail_dp-ads-center-promo_Desktop_placement,
   #dp-ads-center-promo_Desktop_placement,
   #dp-ads-middle-promo_Desktop_placement,
@@ -39,24 +31,30 @@ _qs.textContent = `
   #ad_plus_anchor_desktop, #banner-ads-slot,
   #desktop_qualifiedBuyers_Desktop_placement,
   #desktop_buybox_desktop_sideSheet,
-  /* Shelf/shelf placement */
   [id*="sponsored-products-shelf"],
   [id*="sponsored_products"],
   [id*="sp_detail"], [id*="sp_dp"],
   [id*="ad_feature_div"], [id*="ad-feedback-form"],
-  /* Sponsored brand banner at top of search */
   .s-sponsored-header-text,
   [class*="s-sponsored-header"],
   [data-csa-c-content-id*="sp-"],
-  /* Video ads */
   #videoAds, #videoAd, [id*="video-ads"],
-  /* Legacy */
   #amasBottom, #amsDetailRight_feature_div,
   #amsDetailRight, #rhf, .sopp_theme,
   .a-sponsored-label, [data-ad-details]
   { display:none!important; }
 `;
-(document.head || document.documentElement).appendChild(_qs);
+
+function _injectAmazonCss() {
+  if (document.getElementById('_sb_amazon_css')) return;
+  const _qs = document.createElement('style');
+  _qs.id = '_sb_amazon_css';
+  _qs.textContent = _AMAZON_CSS;
+  (document.head || document.documentElement).appendChild(_qs);
+}
+
+function _removeAmazonCss() {
+  document.getElementById('_sb_amazon_css')?.remove();
 }
 
 (async () => {
@@ -79,6 +77,7 @@ _qs.textContent = `
   if (!settings?.amazon) return;
   if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
 
+  _injectAmazonCss();
 
   const AD_SELECTORS = [
     '[data-component-type="sp-sponsored-result"]',
@@ -183,7 +182,7 @@ _qs.textContent = `
     if (changes.settings?.newValue?.amazon === false) {
       observer.disconnect();
       clearTimeout(debounce);
-      document.getElementById('_sb_amazon_css')?.remove(); // also remove injected CSS
+      _removeAmazonCss();
     }
   });
 

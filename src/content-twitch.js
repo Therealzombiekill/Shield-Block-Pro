@@ -37,7 +37,10 @@
   window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
 
   const _hostname = location.hostname.replace(/^www\./, '');
-  if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+  if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) {
+    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
+    return;
+  }
 
   _sbLog('info', `Init — ${_hostname}`);
 
@@ -163,7 +166,6 @@
 
   // ── Main tick ─────────────────────────────────────────────────────────────────
   function domTick() {
-    if (globalThis.__sbGlobalPause) return;
     const hasAd = detectAdByDOM();
     removeAdUI();
 

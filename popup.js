@@ -694,7 +694,10 @@ async function refreshMatrix() {
          'border:1px solid var(--border2)');
       btn.innerHTML = `<span>${current === 'block' ? '🔴' : current === 'allow' ? '🟢' : '⚪'}</span><span>${def.label}</span>`;
       btn.addEventListener('click', async () => {
-        const next = current === 'default' ? 'block' : current === 'block' ? 'allow' : 'default';
+        const fresh = await msg('GET_MATRIX') ?? {};
+        const site = fresh[_currentHost] ?? {};
+        const cur = site[key] ?? 'default';
+        const next = cur === 'default' ? 'block' : cur === 'block' ? 'allow' : 'default';
         await msg('SET_MATRIX_RULE', { hostname: _currentHost, ruleKey: key, action: next });
         if (status) { status.textContent = `${def.label} → ${next}`; setTimeout(() => { if (status) status.textContent = ''; }, 2000); }
         refreshMatrix();

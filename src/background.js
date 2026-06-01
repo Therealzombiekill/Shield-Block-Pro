@@ -283,6 +283,15 @@ function filterStaticConflicts(rules) {
   return rules.filter(r => !_staticRuleIds.has(r.id));
 }
 
+async function broadcastGlobalResume() {
+  try {
+    const tabs = await chrome.tabs.query({ status: 'complete' });
+    for (const tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, { type: 'GLOBAL_RESUME' }).catch(() => {});
+    }
+  } catch (_) {}
+}
+
 async function restoreGlobalPauseIfActive() {
   const { globalPause = false } = await chrome.storage.local.get('globalPause');
   if (!globalPause || globalPause.until <= Date.now()) return;
@@ -445,6 +454,8 @@ function _flushStats() {
 }
 
 let _statQueue = Promise.resolve();
+
+const _tabCosmeticState = new Map(); // tabId -> { baseCss, css }
 
 const _pageStats  = new Map();
 const _requestLog = [];       // network blocks (last 150) — in-memory only
@@ -1242,6 +1253,29 @@ async function applyPrivacyHeadersRule(enabled) {
   }
 }
 
+function _appendCachedListData(stored, list, limit, buckets) {
+  const cached = stored[`fr_${list.key}`] ?? [];
+  buckets.allRules.push(...cached.slice(0, limit));
+  buckets.allCosmetics.push(...(stored[`fc_${list.key}`] ?? []));
+  const cachedDomCos = stored[`fd_${list.key}`] ?? {};
+  for (const [dom, sels] of Object.entries(cachedDomCos)) {
+    if (!buckets.allDomainCosmetics[dom]) buckets.allDomainCosmetics[dom] = [];
+    buckets.allDomainCosmetics[dom].push(...sels);
+  }
+  const cachedScriptlets = stored[`fs_${list.key}`] ?? {};
+  for (const [dom, rules] of Object.entries(cachedScriptlets)) {
+    if (!buckets.allScriptletRules[dom]) buckets.allScriptletRules[dom] = [];
+    buckets.allScriptletRules[dom].push(...rules);
+  }
+  const cachedRp = stored[`frp_${list.key}`];
+  if (cachedRp) {
+    for (const p of cachedRp.global ?? []) buckets.allRemoveParams.global.add(p);
+    buckets.allRemoveParams.domain.push(...(cachedRp.domain ?? []));
+  }
+  _syncListStatus[list.key] = { status: 'cached', ruleCount: cached.length };
+  logEvent('filter-sync', 'warn', `${list.name}: fetch failed — ${cached.length} cached rules reused`);
+}
+
 async function syncFilterLists(force = false) {
   if (_syncLock) return;
   _syncLock = true;
@@ -1350,7 +1384,12 @@ async function syncFilterLists(force = false) {
           const failKey = failedEntry?.list?.key ?? 'unknown';
           _syncListStatus[failKey] = { status: 'error', error: failMsg };
           // Queue for a single retry in 5 minutes — recovers from transient network blips
-          if (failedEntry) _retryQueue.push({ list: failedEntry.list, limit: failedEntry.limit });
+          if (failedEntry) {
+            _retryQueue.push({ list: failedEntry.list, limit: failedEntry.limit });
+            _appendCachedListData(stored, failedEntry.list, failedEntry.limit, {
+              allRules, allCosmetics, allDomainCosmetics, allScriptletRules, allRemoveParams,
+            });
+          }
           continue;
         }
         const val = result.value;
@@ -1453,8 +1492,8 @@ async function syncFilterLists(force = false) {
     deduped = filterStaticConflicts(deduped);
 
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
-    const removeIds = existing.map(r => r.id);
-    const existingSnapshot = existing.map(r => ({ ...r }));
+    const removeIds = existing.filter(r => isFilterListRuleId(r.id)).map(r => r.id);
+    const existingSnapshot = existing.filter(r => isFilterListRuleId(r.id)).map(r => ({ ...r }));
 
     if (deduped.length > 0 || removeIds.length > 0) {
       const firstBatch = deduped.slice(0, 500);
@@ -1704,13 +1743,14 @@ async function injectCosmetics(tabId, tabUrl) {
   if (!tabUrl || !/^https?:\/\//.test(tabUrl)) return;
   // Merge both storage reads into one so all variables are available before use
   const { cosmeticSelectors, domainCosmetics = {}, scriptletRules = {},
-          settings: s, whitelist: wl = [],
+          settings: s, whitelist: wl = [], globalPause = false,
           userCosmetics = [], userDomainCosmetics = {}, userScriptletRules = {} } =
     await chrome.storage.local.get([
       'cosmeticSelectors','domainCosmetics','scriptletRules','settings','whitelist',
-      'userCosmetics','userDomainCosmetics','userScriptletRules',
+      'userCosmetics','userDomainCosmetics','userScriptletRules','globalPause',
     ]);
   if (!s?.cosmetic) return;
+  if (globalPause && globalPause.until > Date.now()) return;
 
   let domain;
   try {
@@ -1722,9 +1762,13 @@ async function injectCosmetics(tabId, tabUrl) {
     if (SKIP_DOMAINS.some(d => domain === d || domain.endsWith('.' + d))) return;
   } catch (_) { return; }
 
-  try {
-    await chrome.scripting.insertCSS({ target: { tabId }, files: ['src/cosmetic.css'] });
-  } catch (_) {}
+  const tabState = _tabCosmeticState.get(tabId) ?? { baseCss: false, css: '' };
+  if (!tabState.baseCss) {
+    try {
+      await chrome.scripting.insertCSS({ target: { tabId }, files: ['src/cosmetic.css'] });
+      tabState.baseCss = true;
+    } catch (_) {}
+  }
 
   // ── Inject scriptlets for this domain ──────────────────────────────────────
   // scriptlets.js is already injected at document_start via manifest content_scripts.
@@ -1783,18 +1827,23 @@ async function injectCosmetics(tabId, tabUrl) {
                    !sel.includes('{') && !sel.includes('}') &&
                    !sel.includes('<') && !sel.includes('>'));
 
-  for (let i = 0; i < safe.length; i += 200) {
-    const chunk = safe.slice(i, i + 200);
-    const css = chunk.join(',\n') + ' { display:none!important; }';
+  const css = safe.slice(0, 5000).join(',\n') + ' { display:none!important; }';
+  if (tabState.css && tabState.css !== css) {
+    try { await chrome.scripting.removeCSS({ target: { tabId }, css: tabState.css }); } catch (_) {}
+  }
+  if (css.length > 30 && tabState.css !== css) {
     try {
       await chrome.scripting.insertCSS({ target: { tabId }, css });
+      tabState.css = css;
     } catch (_) {
-      for (const sel of chunk) {
-        try { await chrome.scripting.insertCSS({ target: { tabId }, css: `${sel}{display:none!important}` }); }
-        catch (_) {}
+      for (let i = 0; i < safe.length; i += 200) {
+        const chunk = safe.slice(i, i + 200);
+        const chunkCss = chunk.join(',\n') + ' { display:none!important; }';
+        try { await chrome.scripting.insertCSS({ target: { tabId }, css: chunkCss }); } catch (_) {}
       }
     }
   }
+  _tabCosmeticState.set(tabId, tabState);
 }
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -2429,12 +2478,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       // ── Safe browsing ──────────────────────────────────────────────────────
-      case 'GET_SAFE_BROWSING_STATUS':
+      case 'GET_SAFE_BROWSING_STATUS': {
+        const _sbSettings = await getSettings();
         sendResponse({
-          active: true,
+          active: _sbSettings.safeBrowsing !== false && _safeBrowsingDomains.size > 0,
           domainCount: _safeBrowsingDomains.size,
         });
         break;
+      }
       case 'REFRESH_SAFE_BROWSING':
         fetchSafeBrowsingLists().catch(() => {});
         sendResponse({ ok: true });
@@ -2497,13 +2548,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         try { await chrome.alarms.clear('pauseAll'); } catch (_) {}
 
-        // Notify content scripts to resume
-        try {
-          const tabs = await chrome.tabs.query({ status: 'complete' });
-          for (const tab of tabs) {
-            chrome.tabs.sendMessage(tab.id, { type: 'GLOBAL_RESUME' }).catch(() => {});
-          }
-        } catch (_) {}
+        await broadcastGlobalResume();
 
         logEvent('pause', 'info', 'Global pause manually resumed');
         sendResponse({ ok: true });
@@ -2585,7 +2630,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
           }
           await chrome.storage.local.set(safe);
-          invalidateSettingsCache(); // settings may have changed
+          invalidateSettingsCache();
+          const _imp = await getSettings();
+          try {
+            const en = [], dis = [];
+            if (_imp.general) en.push('base_rules', 'extended_rules', 'hosts_rules');
+            else dis.push('base_rules', 'extended_rules', 'hosts_rules');
+            if (_imp.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
+            if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
+            if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
+          } catch (_) {}
+          if (typeof safe.userFilterText === 'string' && safe.userFilterText) {
+            const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } =
+              parseFilterList(safe.userFilterText, USER_DNR_BASE, USER_DNR_END - USER_DNR_BASE + 1);
+            await chrome.storage.local.set({
+              userCosmetics: cosmetics,
+              userDomainCosmetics: domainCosmetics,
+              userScriptletRules: scriptletRules,
+              userDnrRules: rules,
+              userRemoveParams: removeParams,
+            });
+          }
+          await reapplyFeatureRules();
+          if (_imp.general !== false) syncFilterLists(false).catch(() => {});
         }
         sendResponse({ ok: true });
         break;
@@ -2617,6 +2684,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // ── Tab events ─────────────────────────────────────────────────────────────
 
+chrome.tabs.onRemoved.addListener((tabId) => { _tabCosmeticState.delete(tabId); });
+
 chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
   if (frameId === 0) injectCosmetics(tabId, url);
 });
@@ -2634,6 +2703,7 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
         removeRuleIds: [PAUSE_ALL_RULE_ID],
         addRules: [],
       });
+      await broadcastGlobalResume();
       logEvent('pause', 'info', 'Global pause expired — blocking resumed');
     } catch (e) {
       logEvent('pause', 'warn', `pauseAll alarm cleanup failed: ${e.message}`);

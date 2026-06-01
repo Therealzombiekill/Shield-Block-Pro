@@ -38,6 +38,11 @@
       'This site may contain malware or phishing content.\n\n' +
       'Are you absolutely sure you want to continue to:\n' + blocked
     );
-    if (confirmed) location.href = blocked;
+    if (confirmed) {
+      try {
+        const u = new URL(blocked);
+        if (u.protocol === 'http:' || u.protocol === 'https:') location.href = u.href;
+      } catch (_) {}
+    }
   });
 })();

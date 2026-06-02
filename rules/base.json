@@ -4487,7 +4487,8 @@
       "urlFilter": "||pagead2.googlesyndication.com^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4513,7 +4514,8 @@
       "urlFilter": "||tpc.googlesyndication.com^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4539,7 +4541,8 @@
       "urlFilter": "||googlesyndication.com^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4565,7 +4568,8 @@
       "urlFilter": "||pagead2.googleadservices.com^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4591,7 +4595,8 @@
       "urlFilter": "||googleadservices.com^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4617,7 +4622,8 @@
       "urlFilter": "||ad.doubleclick.net^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4643,7 +4649,8 @@
       "urlFilter": "||static.doubleclick.net^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4669,7 +4676,8 @@
       "urlFilter": "||pubads.g.doubleclick.net^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4695,7 +4703,8 @@
       "urlFilter": "||securepubads.g.doubleclick.net^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",
@@ -4721,7 +4730,8 @@
       "urlFilter": "||googleads.g.doubleclick.net^",
       "initiatorDomains": [
         "youtube.com",
-        "www.youtube.com"
+        "www.youtube.com",
+        "music.youtube.com"
       ],
       "resourceTypes": [
         "image",

@@ -2873,11 +2873,31 @@
         "ping"
       ],
       "excludedInitiatorDomains": [
-        "youtube.com",
+        "accounts.google.com",
+        "api.github.com",
+        "calendar.google.com",
+        "chat.google.com",
+        "classroom.google.com",
+        "docs.google.com",
+        "drive.google.com",
+        "gist.github.com",
+        "github.com",
+        "githubassets.com",
+        "githubusercontent.com",
+        "google.com",
+        "keep.google.com",
+        "mail.google.com",
+        "meet.google.com",
+        "music.youtube.com",
+        "photos.google.com",
+        "sheets.google.com",
+        "slides.google.com",
+        "tv.youtube.com",
+        "www.github.com",
+        "www.google.com",
         "youtu.be",
         "youtube-nocookie.com",
-        "music.youtube.com",
-        "tv.youtube.com"
+        "youtube.com"
       ]
     }
   },
@@ -13286,11 +13306,31 @@
         "ping"
       ],
       "excludedInitiatorDomains": [
-        "youtube.com",
+        "accounts.google.com",
+        "api.github.com",
+        "calendar.google.com",
+        "chat.google.com",
+        "classroom.google.com",
+        "docs.google.com",
+        "drive.google.com",
+        "gist.github.com",
+        "github.com",
+        "githubassets.com",
+        "githubusercontent.com",
+        "google.com",
+        "keep.google.com",
+        "mail.google.com",
+        "meet.google.com",
+        "music.youtube.com",
+        "photos.google.com",
+        "sheets.google.com",
+        "slides.google.com",
+        "tv.youtube.com",
+        "www.github.com",
+        "www.google.com",
         "youtu.be",
         "youtube-nocookie.com",
-        "music.youtube.com",
-        "tv.youtube.com"
+        "youtube.com"
       ]
     }
   },

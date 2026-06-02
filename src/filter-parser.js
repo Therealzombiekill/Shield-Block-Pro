@@ -42,6 +42,13 @@ const PROTECTED_DOMAINS = new Set([
   'ajax.googleapis.com', 'fonts.googleapis.com', 'fonts.gstatic.com',
   // Common broken if blocked
   'jquery.com', 'bootstrapcdn.com', 'jsdelivr.net', 'unpkg.com',
+  // GitHub — site and assets
+  'github.com', 'githubassets.com', 'githubusercontent.com', 'ghcr.io',
+  // Google Workspace / sign-in (apis.google.com, boq.google.com)
+  'google.com', 'drive.google.com', 'docs.google.com', 'sheets.google.com',
+  'slides.google.com', 'mail.google.com', 'accounts.google.com',
+  'calendar.google.com', 'meet.google.com', 'classroom.google.com',
+  'youtubei.googleapis.com',
 ]);
 
 function isDomainProtected(filter) {

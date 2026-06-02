@@ -182,6 +182,18 @@
         "*://music.youtube.com/*"
       ],
       "js": [
+        "src/browser-compat.js",
+        "src/content-youtube-bootstrap.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*",
+        "*://music.youtube.com/*"
+      ],
+      "js": [
         "src/inject-youtube.js"
       ],
       "run_at": "document_start",

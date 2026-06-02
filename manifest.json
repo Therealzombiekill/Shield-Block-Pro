@@ -232,6 +232,16 @@
         "id": "hosts_rules",
         "enabled": true,
         "path": "rules/hosts.json"
+      },
+      {
+        "id": "easylist",
+        "enabled": true,
+        "path": "rules/static/easylist.json"
+      },
+      {
+        "id": "easyprivacy",
+        "enabled": true,
+        "path": "rules/static/easyprivacy.json"
       }
     ]
   },

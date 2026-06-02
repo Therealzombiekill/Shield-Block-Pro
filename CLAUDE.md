@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, trackers, cookie banners, and streaming platform ads. There is no build step, no bundler, and no package.json — all source files are loaded directly by the browser. To test changes, load the extension as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked → point at this directory) and reload it after every change.
+ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, trackers, cookie banners, and streaming platform ads. The extension itself has no build step or bundler — all source files are loaded directly by the browser. The only tooling is an optional ruleset generator (`npm run build:rulesets` → `tools/build-static-rulesets.mjs`) that regenerates the large bundled static filter rulesets; the `package.json` exists solely so Node can run it and is irrelevant to the loaded extension. To test changes, load the extension as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked → point at this directory) and reload it after every change.
 
 ## How to test
 
@@ -42,16 +42,20 @@ The MAIN world script receives enable/disable signals from the ISOLATED script v
 
 All Declarative Net Request rules share a single integer ID namespace. Collisions cause silent rule drops. The layout is documented in `background.js` lines 13–17 and the filter list table at lines 108–176:
 
+MV3 keeps static and dynamic rules in separate ID namespaces, but `loadStaticRuleIds()` / `filterStaticConflicts()` conflate them by number as a safety net — so static IDs must stay clear of every dynamic range.
+
 | Range | Owner |
 |---|---|
-| 1–9999 | Static bundled rules (`rules/*.json`) |
+| 1–9999 | Small bundled static rules (`rules/base.json`, `extended.json`, `tracking.json`, `hosts.json`) |
 | 10000–29999 | Dynamic filter list rules (per-list sub-ranges, see table) |
 | 30000–30999 | `$removeparam` tracking param rules |
 | 31000–31999 | Per-domain filtering matrix rules |
 | 47000–47002 | Privacy/security rules (referrer, HTTPS upgrade, DNT/GPC) |
 | 49999 | Global pause-all allow rule |
+| 1000001–1016000 | Static ruleset `rules/static/easylist.json` (EasyList) |
+| 2000001–2011000 | Static ruleset `rules/static/easyprivacy.json` (EasyPrivacy) |
 
-Chrome hard-caps `updateDynamicRules` at 5,000 rules total. Each filter list in `FILTER_LISTS` has a `start` and `max` that must not overlap with any other list. When adding a new list entry, verify no overlap using the startup `_checkRanges()` self-check (logged at info level).
+Chrome hard-caps `updateDynamicRules` at 5,000 rules total — this is why the large stable lists (EasyList, EasyPrivacy) ship as **bundled static rulesets** instead, which don't count against the dynamic cap (see "Static bundled rules" below). Each *dynamic* filter list in `FILTER_LISTS` has a `start` and `max` that must not overlap with any other list. When adding a new list entry, verify no overlap using the startup `_checkRanges()` self-check (logged at info level).
 
 ### Filter pipeline
 
@@ -125,7 +129,9 @@ CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom p
 
 ### Static bundled rules
 
-`rules/base.json` (369 rules), `rules/extended.json` (394 rules), `rules/hosts.json` (1278 rules), `rules/tracking.json` (2 rules) — these ship with the extension and are always active regardless of filter sync status. IDs 1–9999 are reserved for these files. When editing them, keep IDs sequential and within their file's assigned range.
+`rules/base.json`, `rules/extended.json`, `rules/hosts.json`, `rules/tracking.json` — small hand-maintained lists that ship with the extension and are always active regardless of filter sync status. IDs 1–9999 are reserved for these files. When editing them, keep IDs sequential and within their file's assigned range.
+
+**Large bundled static rulesets** (`rules/static/easylist.json`, `rules/static/easyprivacy.json`) are machine-generated, not hand-edited. They exist because the 5,000-rule `updateDynamicRules` cap throttles the runtime filter sync to a tiny fraction of EasyList/EasyPrivacy; static rulesets don't count against that cap, so the bulk of those two lists ships here instead (≈16k + 11k rules, kept under Chrome's 30k enabled-static guarantee). Regenerate with `npm run build:rulesets`, which fetches the upstream lists and converts them through the **same** `parseFilterList()` the runtime path uses. They are gated by the `general` setting (the "Network Block" toggle) via `updateEnabledRulesets`, alongside the small bundled rulesets. Because MV3 resets ruleset enabled-state to manifest defaults on every extension update, `onInstalled` reconciles all gated rulesets back to the user's saved preference.
 
 ### Alarms
 
@@ -138,6 +144,7 @@ CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom p
 ## Key constraints
 
 - **No eval()**: Scriptlets are implemented as named functions in `IMPL` map in `scriptlets.js`, called by name — never `eval`'d from filter list strings.
-- **5,000 dynamic rule cap**: Chrome enforces this hard. The sum of all `max` values in `FILTER_LISTS` must stay ≤ 5,000. The startup `_checkRanges()` check verifies this.
+- **5,000 dynamic rule cap**: Chrome enforces this hard. The sum of all `max` values in `FILTER_LISTS` must stay ≤ 5,000. The startup `_checkRanges()` check verifies this. The bulk of EasyList/EasyPrivacy is offloaded to static rulesets to avoid this cap (see "Static bundled rules").
+- **30,000 enabled static rule guarantee**: Chrome guarantees only ~30,000 rules across *enabled* static rulesets. The bundled rulesets (small lists + `rules/static/*`) must sum to under this; `tools/build-static-rulesets.mjs` caps the generated lists accordingly. Firefox's static-rule limit is lower and unverified for these large lists — validate before relying on the Firefox build.
 - **No content scripts on YouTube cosmetics**: `content-general.js` and `content-procedural.js` explicitly skip `youtube.com` — cosmetic selectors can match player elements and cause black screens.
 - **CSP**: `"extension_pages": "script-src 'self'; object-src 'self'"` — no inline scripts, no remote scripts. The popup cannot fetch cross-origin URLs directly; it sends `FETCH_FILTER_URL` to the background which does the fetch and enforces a 512KB size limit.

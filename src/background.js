@@ -7,7 +7,10 @@ import { parseFilterList } from './filter-parser.js';
 
 const MAX_DYNAMIC_RULES = 5000;
 // ID reserved for the global pause-all DNR allow rule. Must be outside all filter
-// ID ranges: static rules 1–9999, dynamic filter rules 10000–20250.
+// ID ranges. Layout: bundled static rules 1–9999 (rules/*.json); dynamic filter
+// rules 10000–20250; feature rules 30000–48499; pause-all 49999. The large
+// bundled static rulesets (rules/static/easylist.json, easyprivacy.json) use
+// disjoint 1M/2M ID bands — see tools/build-static-rulesets.mjs.
 const PAUSE_ALL_RULE_ID = 49999;
 
 // ── Feature rule ID ranges ─────────────────────────────────────────────────
@@ -2048,9 +2051,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           const en = [], dis = [];
           if (merged.general) {
-            en.push('base_rules', 'extended_rules', 'hosts_rules');
+            en.push('base_rules', 'extended_rules', 'hosts_rules', 'easylist', 'easyprivacy');
           } else {
-            dis.push('base_rules', 'extended_rules', 'hosts_rules');
+            dis.push('base_rules', 'extended_rules', 'hosts_rules', 'easylist', 'easyprivacy');
             await purgeFilterListDynamicRules();
           }
           if (merged.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
@@ -2639,9 +2642,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           try {
             const en = [], dis = [];
             if (_imp.general) {
-              en.push('base_rules', 'extended_rules', 'hosts_rules');
+              en.push('base_rules', 'extended_rules', 'hosts_rules', 'easylist', 'easyprivacy');
             } else {
-              dis.push('base_rules', 'extended_rules', 'hosts_rules');
+              dis.push('base_rules', 'extended_rules', 'hosts_rules', 'easylist', 'easyprivacy');
               // Mirror SET_SETTINGS: disabling general must also drop the synced
               // dynamic filter-list rules, not just the static rulesets.
               await purgeFilterListDynamicRules();
@@ -2884,6 +2887,19 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   // Fetch filter lists immediately — without this, a fresh install or update
   // has NO dynamic rules until the next browser restart triggers onStartup.
   setTimeout(() => syncFilterLists(true).catch(() => {}), 1000);
+
+  // Chrome resets enabled-ruleset state to the manifest defaults on every
+  // extension update. Reconcile the settings-gated static rulesets (including
+  // the bundled EasyList/EasyPrivacy bulk lists) with the user's saved
+  // preferences so an update never silently re-enables blocking they turned off.
+  try {
+    const _s = await getSettings();
+    const _en = [], _dis = [];
+    (_s.general === false ? _dis : _en).push('base_rules', 'extended_rules', 'hosts_rules', 'easylist', 'easyprivacy');
+    (_s.tracking === false ? _dis : _en).push('tracking_rules');
+    if (_en.length)  await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: _en });
+    if (_dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: _dis });
+  } catch (e) { logEvent('system', 'warn', `Ruleset reconcile failed: ${e.message}`); }
 });
 
 // ── Keyboard shortcut handlers ────────────────────────────────────────────────

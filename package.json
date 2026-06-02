@@ -1,0 +1,10 @@
+{
+  "name": "shieldblock-pro",
+  "version": "2.10.1",
+  "private": true,
+  "type": "module",
+  "description": "Build tooling for ShieldBlock Pro. The extension itself has no build step and loads unbundled; this package.json exists only so Node can run the optional ruleset generator.",
+  "scripts": {
+    "build:rulesets": "node tools/build-static-rulesets.mjs"
+  }
+}

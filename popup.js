@@ -200,7 +200,7 @@ async function refreshTopDomains() {
       sbBadge.title = `Safe browsing active — ${sbStatus.domainCount.toLocaleString()} threat domains`;
     }
 
-    if (!domains.length) { list.textContent = 'No blocks recorded yet'; return; }
+    if (!domains.length) { list.textContent = 'No blocks yet this session — keep browsing.'; return; }
     const max = domains[0]?.count || 1;
     list.textContent = '';
     const frag = document.createDocumentFragment();
@@ -339,7 +339,8 @@ function renderWhitelistItems(whitelist, currentDomain) {
   list.textContent = '';
   if (!whitelist.length) {
     const empty = document.createElement('div'); empty.className = 'wl-empty';
-    empty.textContent = 'No sites whitelisted'; list.appendChild(empty); return;
+    empty.innerHTML = '<strong>Blocking is on everywhere</strong>Turn off the switch above to allow ads on a site you want to support.';
+    list.appendChild(empty); return;
   }
   whitelist.forEach(d => {
     const item = document.createElement('div'); item.className = 'wl-item';
@@ -729,7 +730,7 @@ async function refreshCustomRules() {
   const list = $('custom-rules-list');
   if (!list) return;
   if (!rules.length) {
-    list.innerHTML = '<div class="wl-empty">None — use ⊕ pick to hide elements</div>';
+    list.innerHTML = '<div class="wl-empty"><strong>No hidden elements yet</strong>Right-click anything on a page → "Hide element", or use ⊕ pick above.</div>';
     return;
   }
   list.textContent = '';

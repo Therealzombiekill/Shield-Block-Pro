@@ -11,7 +11,7 @@
   --accent:#7c6aff;--accent2:#a78bfa;--glow:rgba(124,106,255,.15);
   --green:#00d97e;--red:#ff4d6d;--yellow:#f5c542;
   --amzn:#f0a500;--social:#ec4899;--cookie:#34d399;
-  --text:#e2e2f0;--sub:#9090b0;--muted:#5a5a78;--faint:#30304a;
+  --text:#e2e2f0;--sub:#9aa0c0;--muted:#7e7ea0;--faint:#30304a;
   --mono:'JetBrains Mono','Fira Code','Consolas',monospace;
   --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
@@ -87,14 +87,17 @@ body{width:384px;min-height:480px;background:var(--bg);color:var(--text);
 .hero-num.flash{color:var(--accent2)}
 .hero-label{font-size:12px;color:var(--muted);line-height:1.5}
 .hero-label strong{display:block;font-family:var(--mono);font-size:10px;
-  text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:2px;font-weight:500}
+  text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:2px;font-weight:500}
 
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
 .sc{
-  background:var(--s2);border:1px solid var(--border);border-radius:8px;
-  padding:8px 6px 7px;text-align:center;transition:border-color .15s;
+  background:linear-gradient(180deg,#181826,#101019);
+  border:1px solid var(--border);border-radius:10px;
+  padding:10px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.35);
+  transition:border-color .15s,transform .12s,box-shadow .15s;
 }
-.sc:hover{border-color:var(--border2)}
+.sc:hover{border-color:var(--border2);transform:translateY(-1px);
+  box-shadow:0 4px 12px rgba(0,0,0,.32)}
 .sc-n{display:block;font-family:var(--mono);font-size:15px;font-weight:700;line-height:1;transition:color .3s}
 .sc-l{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;
   letter-spacing:.05em;margin-top:3px}
@@ -155,17 +158,17 @@ body{width:384px;min-height:480px;background:var(--bg);color:var(--text);
 .blockers{padding:10px 14px 14px}
 .sec-hd{
   font-family:var(--mono);font-size:10px;font-weight:700;
-  color:var(--faint);text-transform:uppercase;letter-spacing:.12em;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.12em;
   margin:10px 0 6px;
 }
 .sec-hd:first-child{margin-top:12px}
 .tr{
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px 12px;background:var(--s1);border:1px solid var(--border);
-  border-radius:8px;margin-bottom:5px;cursor:pointer;
+  padding:11px 12px;background:linear-gradient(180deg,#121220,#0e0e18);
+  border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer;
   transition:border-color .12s,background .12s;
 }
-.tr:hover{background:var(--s2);border-color:var(--border2)}
+.tr:hover{background:linear-gradient(180deg,#18182a,#121220);border-color:var(--border2)}
 .tr-info{display:flex;align-items:center;gap:10px}
 .ti{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;
   justify-content:center;flex-shrink:0}
@@ -182,8 +185,9 @@ body{width:384px;min-height:480px;background:var(--bg);color:var(--text);
 /* ── Whitelist panel ─────────────────────────────────────────────────── */
 .wl-wrap{padding:12px 14px}
 .site-card{
-  background:var(--s1);border:1px solid var(--border);border-radius:9px;
-  padding:11px 13px;margin-bottom:10px;
+  background:linear-gradient(180deg,#16161f,#0f0f18);
+  border:1px solid var(--border2);border-radius:12px;
+  padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.3);
 }
 .site-url{
   font-family:var(--mono);font-size:12px;color:var(--text);
@@ -193,13 +197,15 @@ body{width:384px;min-height:480px;background:var(--bg);color:var(--text);
 .site-lbl{font-size:13px;color:var(--muted)}
 .sw.lg{transform:scale(1.2);transform-origin:right center}
 .wl-hd{
-  font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);
+  font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);
   text-transform:uppercase;letter-spacing:.1em;margin:0 0 6px;
 }
 .wl-empty{
-  text-align:center;color:var(--muted);font-size:12px;padding:14px;
-  border:1px dashed var(--border);border-radius:7px;
+  text-align:center;color:var(--muted);font-size:12px;padding:16px;
+  border:1px dashed var(--border2);border-radius:8px;line-height:1.5;
 }
+.wl-empty strong{display:block;color:var(--sub);font-size:13px;
+  margin-bottom:4px;font-weight:600}
 .wl-item{
   display:flex;align-items:center;justify-content:space-between;
   padding:7px 10px;background:var(--s1);border:1px solid var(--border);
@@ -213,11 +219,19 @@ body{width:384px;min-height:480px;background:var(--bg);color:var(--text);
 .wl-rm:hover{color:var(--red)}
 
 /* ── Support panel ───────────────────────────────────────────────────── */
-.sup{padding:14px;display:flex;flex-direction:column;gap:10px}
+.sup{padding:16px;display:flex;flex-direction:column;gap:12px}
 .sup-card{
-  background:var(--s2);border:1px solid var(--border2);border-radius:10px;
-  padding:14px;
+  background:linear-gradient(180deg,#181826,#121019);
+  border:1px solid var(--border2);border-radius:12px;
+  padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.3);
 }
+.sup-trust{border-color:rgba(0,217,126,.28);
+  background:linear-gradient(180deg,rgba(0,217,126,.06),#121019)}
+.sup-trust .sup-label{color:var(--green)}
+.sup-trust strong{color:var(--text)}
+.sup-trust-link{display:inline-block;margin-top:8px;font-size:12px;
+  color:var(--accent2);text-decoration:none}
+.sup-trust-link:hover{text-decoration:underline}
 .sup-label{
   font-family:var(--mono);font-size:10px;color:var(--accent2);
   letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;
@@ -245,7 +259,7 @@ body{width:384px;min-height:480px;background:var(--bg);color:var(--text);
   background:var(--s1);flex-shrink:0;
 }
 .ftr-l{display:flex;align-items:center;gap:6px}
-.ver{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.ver{font-family:var(--mono);font-size:10px;color:var(--muted)}
 .ftr-badge{
   padding:2px 6px;border-radius:4px;
   background:rgba(124,106,255,.1);border:1px solid rgba(124,106,255,.18);
@@ -254,7 +268,7 @@ body{width:384px;min-height:480px;background:var(--bg);color:var(--text);
 .log-row{padding:6px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
 .log-row:hover{background:var(--s1)}
 .log-dom{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
-.log-ts{color:var(--faint);font-size:10px;flex-shrink:0}
+.log-ts{color:var(--muted);font-size:10px;flex-shrink:0}
 .log-ftag{background:var(--s2);border:1px solid var(--border);border-radius:4px;
 color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;padding:2px 6px;
 transition:all .12s}
@@ -533,7 +547,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <span class="ss-hd">Top blocked this session</span>
         <span id="sb-indicator" title="Safe browsing status" style="display:none">🛡 Safe Browsing</span>
       </div>
-      <div id="top-domains-list">No blocks recorded yet</div>
+      <div id="top-domains-list">No blocks yet this session — keep browsing.</div>
     </div>
 
     <!-- ── 7-day chart ─────────────────────────────────────────────── -->
@@ -772,7 +786,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         </div>
       </div>
       <div class="wl-hd">Whitelisted sites</div>
-      <div id="wl-list"><div class="wl-empty">No sites whitelisted</div></div>
+      <div id="wl-list"><div class="wl-empty"><strong>Blocking is on everywhere</strong>Turn off the switch above to allow ads on a site you want to support.</div></div>
     </div>
   </div>
 
@@ -788,6 +802,13 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         </div>
         <div id="health-summary">Click 'Run check' to test all subsystems</div>
         <div id="health-checks"></div>
+      </div>
+
+      <!-- ── Privacy trust signal ──────────────────────────────────────── -->
+      <div class="sup-card sup-trust">
+        <div class="sup-label">Privacy by design</div>
+        <p><strong>100% local.</strong> ShieldBlock blocks ads and trackers entirely on your device — no accounts, no telemetry, no analytics. Your browsing history never leaves your browser.</p>
+        <a href="privacy.html" target="_blank" rel="noopener" class="sup-trust-link">Read the privacy policy ↗</a>
       </div>
 
       <div class="sup-card">
@@ -866,7 +887,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
 
       <div class="wl-hd wl-hd-mt">Custom hidden elements</div>
-      <div id="custom-rules-list"><div class="wl-empty">None — use ⊕ pick to hide elements</div></div>
+      <div id="custom-rules-list"><div class="wl-empty"><strong>No hidden elements yet</strong>Right-click anything on a page → "Hide element", or use ⊕ pick above.</div></div>
     </div>
   </div>
 

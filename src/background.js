@@ -347,14 +347,15 @@ async function purgeFilterListDynamicRules() {
 
 async function reapplyFeatureRules() {
   const s = await getSettings();
-  await Promise.all([
-    applyRemoveParamRules(),
-    applyMatrixRules(),
-    applyReferrerRule(s.referrerStrip !== false),
-    applyHttpsUpgradeRule(s.httpsUpgrade !== false),
-    applyPrivacyHeadersRule(s.privacyHeaders !== false),
-    applyUserFilterRules(),
-  ]);
+  // These all read-modify-write the shared dynamic rule store. Running them
+  // concurrently races chrome.declarativeNetRequest.updateDynamicRules, which
+  // can drop rules or throw "Internal error" — so apply them sequentially.
+  await applyRemoveParamRules();
+  await applyMatrixRules();
+  await applyReferrerRule(s.referrerStrip !== false);
+  await applyHttpsUpgradeRule(s.httpsUpgrade !== false);
+  await applyPrivacyHeadersRule(s.privacyHeaders !== false);
+  await applyUserFilterRules();
   await restoreGlobalPauseIfActive();
 }
 
@@ -1767,6 +1768,9 @@ async function injectCosmetics(tabId, tabUrl) {
     try {
       await chrome.scripting.insertCSS({ target: { tabId }, files: ['src/cosmetic.css'] });
       tabState.baseCss = true;
+      // Persist immediately — a later early return (no selectors) would otherwise
+      // lose this and re-inject cosmetic.css on every navigation for this tab.
+      _tabCosmeticState.set(tabId, tabState);
     } catch (_) {}
   }
 
@@ -2634,13 +2638,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const _imp = await getSettings();
           try {
             const en = [], dis = [];
-            if (_imp.general) en.push('base_rules', 'extended_rules', 'hosts_rules');
-            else dis.push('base_rules', 'extended_rules', 'hosts_rules');
+            if (_imp.general) {
+              en.push('base_rules', 'extended_rules', 'hosts_rules');
+            } else {
+              dis.push('base_rules', 'extended_rules', 'hosts_rules');
+              // Mirror SET_SETTINGS: disabling general must also drop the synced
+              // dynamic filter-list rules, not just the static rulesets.
+              await purgeFilterListDynamicRules();
+            }
             if (_imp.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
             if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
             if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
           } catch (_) {}
-          if (typeof safe.userFilterText === 'string' && safe.userFilterText) {
+          // Parse even when the imported text is empty so previously-stored user
+          // rules are cleared; only skip when the field is absent entirely.
+          if (typeof safe.userFilterText === 'string') {
             const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } =
               parseFilterList(safe.userFilterText, USER_DNR_BASE, USER_DNR_END - USER_DNR_BASE + 1);
             await chrome.storage.local.set({
@@ -2804,18 +2816,15 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   await setupContextMenus();
 
-  const _s = await getSettings();
+  // Static rule IDs first, then the DNR feature rules sequentially (they share
+  // the dynamic rule store — see reapplyFeatureRules), then the independent
+  // non-DNR loaders in parallel.
+  await loadStaticRuleIds();
+  await reapplyFeatureRules();
   await Promise.all([
-    loadStaticRuleIds(),
-    applyRemoveParamRules(), applyMatrixRules(),
-    applyReferrerRule(_s.referrerStrip !== false),
-    applyHttpsUpgradeRule(_s.httpsUpgrade !== false),
-    applyPrivacyHeadersRule(_s.privacyHeaders !== false),
-    applyUserFilterRules(),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
   ]);
-  await restoreGlobalPauseIfActive();
 
   // Show welcome page on fresh install
   if (reason === 'install') {
@@ -2908,23 +2917,19 @@ chrome.runtime.onStartup.addListener(async () => {
   logEvent('system', 'info', 'Service worker started (onStartup)');
 
   // Init feature engines on every browser start
-  const _ss = await getSettings();
   // Restore cached static rule count before computing fresh (avoids showing 0 briefly)
   try {
     const { staticRuleCount } = await chrome.storage.local.get('staticRuleCount');
     if (staticRuleCount) _staticRuleCount = staticRuleCount;
   } catch (_) {}
+  // Sequentialize DNR feature rules (shared dynamic rule store — see
+  // reapplyFeatureRules), then run the independent non-DNR loaders in parallel.
+  await loadStaticRuleIds();
+  await reapplyFeatureRules();
   await Promise.all([
-    loadStaticRuleIds(),
-    applyRemoveParamRules(), applyMatrixRules(),
-    applyReferrerRule(_ss.referrerStrip !== false),
-    applyHttpsUpgradeRule(_ss.httpsUpgrade !== false),
-    applyPrivacyHeadersRule(_ss.privacyHeaders !== false),
-    applyUserFilterRules(),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
   ]);
-  await restoreGlobalPauseIfActive();
 
   const existing = await chrome.alarms.get('filterSync');
   if (!existing) chrome.alarms.create('filterSync', { periodInMinutes: 720 });

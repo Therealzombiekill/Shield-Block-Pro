@@ -26,11 +26,10 @@
 
 (function () {
   'use strict';
-
-  let _privacyInstalled = false;
-  function installPrivacyPatches() {
-    if (_privacyInstalled) return;
-    _privacyInstalled = true;
+  // Anti-fingerprinting patches MUST run immediately and synchronously here at
+  // document_start (world: MAIN), before any page script can read the native
+  // APIs. An async enable-message roundtrip would let fingerprinting scripts
+  // cache the un-spoofed values first, so the patches run inline at load.
 
   // ── Shared session seed — consistent within a tab, unique across tabs ────────
   const SESSION_SEED = (() => {
@@ -781,10 +780,4 @@
   // itself before each request and cannot be spoofed. No action needed here.
   // (Documented so future maintainers don't spend time attempting to override them.)
 
-  } // installPrivacyPatches
-
-  window.addEventListener('message', function (e) {
-    if (e.source !== window) return;
-    if (e.data?.type === 'SB_PRIVACY_ENABLE') installPrivacyPatches();
-  });
 })();

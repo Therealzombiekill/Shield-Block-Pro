@@ -209,7 +209,7 @@ async function refreshTopDomains() {
       const row = document.createElement('div');
       row.style.cssText = 'margin-bottom:3px';
       row.innerHTML = `
-        <div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:1px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:1px">
           <span style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escapeHtml(domain)}</span>
           <span style="color:var(--muted);margin-left:6px;flex-shrink:0">${count}</span>
         </div>
@@ -688,7 +688,7 @@ async function refreshMatrix() {
       btn.className = 'ghost matrix-btn';
       btn.dataset.key = key;
       btn.title = def.title;
-      btn.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:9px;padding:3px 5px;border-radius:4px;width:100%;' +
+      btn.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:10px;padding:3px 5px;border-radius:4px;width:100%;' +
         (current === 'block' ? 'color:#f87171;border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.08)' :
          current === 'allow' ? 'color:var(--green);border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08)' :
          'border:1px solid var(--border2)');
@@ -736,7 +736,7 @@ async function refreshCustomRules() {
   rules.forEach(r => {
     const item = document.createElement('div'); item.className = 'wl-item';
     const span = document.createElement('span'); span.className = 'wl-dom';
-    span.style.cssText = 'max-width:220px;font-size:10px'; span.textContent = r.slice(0,60); item.appendChild(span);
+    span.style.cssText = 'max-width:220px;font-size:11px'; span.textContent = r.slice(0,60); item.appendChild(span);
     const btn = document.createElement('button'); btn.className = 'wl-rm';
     btn.dataset.rule = r; btn.title = 'Remove'; btn.textContent = '×'; item.appendChild(btn);
     list.appendChild(item);
@@ -869,16 +869,16 @@ async function loadCustomLists() {
   const container = $('custom-lists-container');
   if (!container) return;
   if (!lists.length) {
-    container.innerHTML = '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">No subscriptions yet.</div>';
+    container.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">No subscriptions yet.</div>';
     return;
   }
   container.innerHTML = lists.map(l => `
     <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;background:var(--s2);border-radius:6px;padding:5px 8px">
       <div style="flex:1;min-width:0">
-        <div style="font-size:10px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtmlCL(l.name)}</div>
-        <div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)">${escapeHtmlCL(l.url)}</div>
+        <div style="font-size:11px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtmlCL(l.name)}</div>
+        <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)">${escapeHtmlCL(l.url)}</div>
       </div>
-      <button class="ghost cl-remove" data-key="${escapeHtmlCL(l.key)}" style="font-size:10px;padding:2px 7px;flex-shrink:0">✕</button>
+      <button class="ghost cl-remove" data-key="${escapeHtmlCL(l.key)}" style="font-size:11px;padding:2px 7px;flex-shrink:0">✕</button>
     </div>
   `).join('');
   container.querySelectorAll('.cl-remove').forEach(btn => {
@@ -933,7 +933,7 @@ async function renderCatalog() {
   for (const cat of catalog.categories) {
     const btn = document.createElement('button');
     btn.className = 'ghost log-ftag' + (cat.id === _catalogCat ? ' active' : '');
-    btn.style.cssText = `font-size:9px;padding:2px 7px;border-color:${cat.color}30;color:${cat.id === _catalogCat ? cat.color : 'var(--muted)'}`;
+    btn.style.cssText = `font-size:10px;padding:2px 7px;border-color:${cat.color}30;color:${cat.id === _catalogCat ? cat.color : 'var(--muted)'}`;
     btn.textContent = cat.label;
     btn.addEventListener('click', () => { _catalogCat = cat.id; renderCatalog(); });
     catRow.appendChild(btn);
@@ -951,10 +951,10 @@ async function renderCatalog() {
     row.innerHTML =
       `<div style="flex:1;min-width:0">` +
         `<div style="color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(list.name)}</div>` +
-        `<div style="color:var(--muted);font-size:8px;margin-top:1px">${escapeHtml(list.desc)}</div>` +
+        `<div style="color:var(--muted);font-size:9px;margin-top:1px">${escapeHtml(list.desc)}</div>` +
       `</div>` +
       `<button data-url="${escapeHtml(list.url)}" data-name="${escapeHtml(list.name)}" ` +
-        `class="ghost catalog-sub-btn" style="font-size:9px;padding:2px 7px;white-space:nowrap;` +
+        `class="ghost catalog-sub-btn" style="font-size:10px;padding:2px 7px;white-space:nowrap;` +
         `${isSubbed ? 'color:var(--green);border-color:rgba(74,222,128,.4)' : 'border:1px solid var(--border2)'}">` +
         `${isSubbed ? '✓ Added' : '+ Add'}` +
       `</button>`;

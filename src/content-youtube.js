@@ -24,7 +24,11 @@
     catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   const _wl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return; // global pause active — skip all processing
+  if (settings?.globalPause) {
+    // global pause active — tell MAIN world to stop intercepting too, then skip
+    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    return;
+  }
 
   if (!settings?.youtube) {
     // Signal MAIN world to stop intercepting

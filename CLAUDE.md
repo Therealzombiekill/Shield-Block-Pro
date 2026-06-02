@@ -137,6 +137,16 @@ Firefox-specific callouts in the codebase:
 
 CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom properties defined in `:root`. No inline styles except for `display:none` on dynamically-shown elements.
 
+### Internationalization (i18n)
+
+UI strings go through `chrome.i18n`. `src/i18n.js` (loaded first in `popup.html`, `welcome.html`, `blocked.html`) walks the DOM on load and:
+- replaces the text of `[data-i18n="key"]` elements with `chrome.i18n.getMessage(key)`, and
+- sets attributes for `[data-i18n-attr="attr:key;attr2:key2"]` (used for `title`/`placeholder`).
+
+It **falls back to the baked-in English** in the markup if a key is missing or `chrome.i18n` is unavailable, so a missing translation degrades to English — never a blank UI. It also exposes a global `t(key, fallback, subs)` for strings built in `popup.js` (e.g. `t('running', 'Running…')`, or with placeholders `t('n_rules_active', \`${n} rules active\`, [n])`).
+
+The English catalog is `_locales/en/messages.json` (`default_locale` is `en`; the manifest's name/description use `__MSG_appName__`/`__MSG_appDesc__`). For the `en` locale the catalog mirrors the on-page text, so the rendered UI is identical to a pre-i18n build. **To add a language**, drop in `_locales/<lang>/messages.json` with the same keys — no code changes. To localize a new string: add `data-i18n="key"` (or `t('key','English')`) and a catalog entry. `tools/i18n-tag.mjs` re-tags HTML idempotently and is provably non-destructive (it only inserts `data-i18n` attributes). `test/i18n.test.js` fails the build if any referenced key is missing from the catalog (a missing manifest `__MSG__` would otherwise break extension load).
+
 ### Static bundled rules
 
 `rules/base.json` (369 rules), `rules/extended.json` (394 rules), `rules/hosts.json` (1278 rules), `rules/tracking.json` (2 rules) — these ship with the extension and are always active regardless of filter sync status. IDs 1–9999 are reserved for these files. When editing them, keep IDs sequential and within their file's assigned range.

@@ -11,6 +11,9 @@
   "add": {
     "message": "Add"
   },
+  "adding": {
+    "message": "Adding…"
+  },
   "ads_blocked_privacy_secured": {
     "message": "Ads blocked. Privacy secured."
   },
@@ -19,6 +22,9 @@
   },
   "all_2": {
     "message": "all"
+  },
+  "all_systems_healthy": {
+    "message": "✓ All systems healthy"
   },
   "alt_shift_b": {
     "message": "Alt + Shift + B"
@@ -49,6 +55,9 @@
   },
   "apply_rules": {
     "message": "Apply rules"
+  },
+  "applying": {
+    "message": "Applying…"
   },
   "auto_reject_gdpr_60_cmps": {
     "message": "Auto-reject GDPR · 60+ CMPs"
@@ -92,6 +101,9 @@
   "click_run_check_to_test_all_subsystems": {
     "message": "Click 'Run check' to test all subsystems"
   },
+  "clipboard_is_empty": {
+    "message": "Clipboard is empty"
+  },
   "cloud_sync": {
     "message": "Cloud Sync"
   },
@@ -109,6 +121,12 @@
   },
   "copy": {
     "message": "⬇ Copy"
+  },
+  "copy_all_rules_to_clipboard": {
+    "message": "Copy all rules to clipboard"
+  },
+  "copy_failed": {
+    "message": "Copy failed"
   },
   "cosmetic_hiding": {
     "message": "Cosmetic Hiding"
@@ -134,14 +152,29 @@
   "domain_com": {
     "message": "domain.com"
   },
+  "download_full_log_as_txt": {
+    "message": "Download full log as .txt file"
+  },
   "easylist_22_filter_lists": {
     "message": "EasyList + 22 filter lists"
+  },
+  "enter_a_url_first": {
+    "message": "Enter a URL first"
+  },
+  "enter_a_valid_https_url": {
+    "message": "Enter a valid https:// URL"
   },
   "everywhere_else": {
     "message": "Everywhere else"
   },
+  "export_30_day_blocking_stats_as_csv": {
+    "message": "Export 30-day blocking stats as CSV"
+  },
   "export_diagnostic_report": {
     "message": "🔍 Export diagnostic report"
+  },
+  "export_full_diagnostic_snapshot": {
+    "message": "Export full diagnostic snapshot (settings + stats + filter status + recent log) for debugging"
   },
   "export_settings": {
     "message": "⬇ Export settings"
@@ -158,6 +191,9 @@
   "fetch": {
     "message": "Fetch"
   },
+  "fetching": {
+    "message": "Fetching…"
+  },
   "filters": {
     "message": "Filters"
   },
@@ -172,6 +208,15 @@
   },
   "go_back_to_safety": {
     "message": "← Go Back to Safety"
+  },
+  "health_check_failed": {
+    "message": "Health check failed: "
+  },
+  "health_check_unavailable": {
+    "message": "Health check unavailable"
+  },
+  "hide_an_element_by_clicking_it": {
+    "message": "Hide an element by clicking it"
   },
   "hls_worker": {
     "message": "HLS worker"
@@ -191,8 +236,25 @@
   "import_from_url": {
     "message": "Import from URL"
   },
+  "import_rules_from_clipboard": {
+    "message": "Import rules from clipboard (uBlock Origin / ABP format)"
+  },
   "import_ublock_origin": {
     "message": "Import uBlock Origin"
+  },
+  "imported_list": {
+    "message": "✓ Imported: $list$",
+    "placeholders": {
+      "list": {
+        "content": "$1"
+      }
+    }
+  },
+  "importing": {
+    "message": "Importing…"
+  },
+  "issues_detected_check_items_below": {
+    "message": "✗ Issues detected — check items below"
   },
   "keyboard_shortcuts": {
     "message": "Keyboard shortcuts"
@@ -212,6 +274,9 @@
   "malware": {
     "message": "⚠ Malware"
   },
+  "matrix_unavailable": {
+    "message": "Matrix unavailable"
+  },
   "migrate_your_rules_whitelist_from_a_ubo_": {
     "message": "Migrate your rules & whitelist from a uBO backup file"
   },
@@ -220,6 +285,17 @@
   },
   "my_filter_rules": {
     "message": "My Filter Rules"
+  },
+  "n_rules_active": {
+    "message": "$count$ rules active",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "na_non_web_page": {
+    "message": "N/A (non-web page)"
   },
   "net": {
     "message": "net"
@@ -233,11 +309,20 @@
   "no_blocks_recorded_yet": {
     "message": "No blocks recorded yet"
   },
+  "no_rules_to_copy": {
+    "message": "No rules to copy"
+  },
   "no_sites_whitelisted": {
     "message": "No sites whitelisted"
   },
   "none_use_pick_to_hide_elements": {
     "message": "None — use ⊕ pick to hide elements"
+  },
+  "not_available_on_this_page": {
+    "message": "Not available on this page"
+  },
+  "nothing_blocked_on_this_page_yet": {
+    "message": "Nothing blocked on this page yet"
   },
   "open_shieldblock": {
     "message": "Open ShieldBlock"
@@ -248,6 +333,15 @@
   "pause": {
     "message": "⏸ pause"
   },
+  "pause_all_blocking_for_30_minutes": {
+    "message": "Pause ALL blocking for 30 minutes"
+  },
+  "pause_blocking_on_this_site": {
+    "message": "Pause blocking on this site"
+  },
+  "pause_duration": {
+    "message": "Pause duration"
+  },
   "paypal_me_bronsonbissell": {
     "message": "paypal.me/BronsonBissell"
   },
@@ -256,6 +350,12 @@
   },
   "per_platform_ad_counts_time_saved_and_a_": {
     "message": "Per-platform ad counts, time saved, and a full debug log — all in the popup"
+  },
+  "ph_filter_list_url": {
+    "message": "https://… (any .txt filter list)"
+  },
+  "ph_list_name_optional": {
+    "message": "List name (optional)"
   },
   "phishing": {
     "message": "🎣 Phishing"
@@ -290,6 +390,12 @@
   "push": {
     "message": "↑ Push"
   },
+  "pushing": {
+    "message": "Pushing…"
+  },
+  "remove": {
+    "message": "Remove"
+  },
   "remove_blur_overlays_opt_in": {
     "message": "Remove blur overlays (opt-in)"
   },
@@ -299,14 +405,42 @@
   "reset": {
     "message": "↺ reset"
   },
+  "reset_all_matrix_rules_for_this_site": {
+    "message": "Reset all matrix rules for this site"
+  },
+  "restoring": {
+    "message": "Restoring…"
+  },
+  "resume_all_mins_left": {
+    "message": "▶ Resume All ($mins$m left)",
+    "placeholders": {
+      "mins": {
+        "content": "$1"
+      }
+    }
+  },
   "run_check": {
     "message": "Run check"
+  },
+  "running": {
+    "message": "Running…"
   },
   "safe_browsing": {
     "message": "🛡 Safe Browsing"
   },
   "safe_browsing_2": {
     "message": "Safe Browsing"
+  },
+  "safe_browsing_active_threats": {
+    "message": "Safe browsing active — $count$ threat domains",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "safe_browsing_status": {
+    "message": "Safe browsing status"
   },
   "scriptlet_args": {
     "message": "scriptlet, args"
@@ -422,8 +556,19 @@
   "t_8h": {
     "message": "8h"
   },
+  "testing": {
+    "message": "Testing…"
+  },
   "this_page": {
     "message": "This page"
+  },
+  "time_left": {
+    "message": "▶ $time$ left",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
   },
   "time_saved": {
     "message": "Time saved"
@@ -463,6 +608,17 @@
   },
   "v2_10_1_free_forever": {
     "message": "v2.10.1 · Free forever"
+  },
+  "version_available": {
+    "message": "v$version$ available",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnings_extension_working_but_not_optimal": {
+    "message": "⚠ Warnings — extension working but not optimal"
   },
   "web": {
     "message": "Web"

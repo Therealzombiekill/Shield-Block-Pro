@@ -531,7 +531,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <div class="ss">
       <div class="ss-hd-row">
         <span data-i18n="top_blocked_this_session" class="ss-hd">Top blocked this session</span>
-        <span data-i18n="safe_browsing" id="sb-indicator" title="Safe browsing status" style="display:none">🛡 Safe Browsing</span>
+        <span data-i18n="safe_browsing" id="sb-indicator" title="Safe browsing status" data-i18n-attr="title:safe_browsing_status" style="display:none">🛡 Safe Browsing</span>
       </div>
       <div data-i18n="no_blocks_recorded_yet" id="top-domains-list">No blocks recorded yet</div>
     </div>
@@ -549,15 +549,15 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <span class="ftext" id="ftext"><strong>—</strong> rules active</span>
         </div>
         <div class="fbar-btns">
-          <button data-i18n="pause" class="ghost" id="pause-btn" title="Pause blocking on this site">⏸ pause</button>
-          <select id="pause-dur" title="Pause duration">
+          <button data-i18n="pause" class="ghost" id="pause-btn" title="Pause blocking on this site" data-i18n-attr="title:pause_blocking_on_this_site">⏸ pause</button>
+          <select id="pause-dur" title="Pause duration" data-i18n-attr="title:pause_duration">
             <option data-i18n="t_30m" value="30">30m</option>
             <option data-i18n="t_1h" value="60">1h</option>
             <option data-i18n="t_3h" value="180">3h</option>
             <option data-i18n="t_8h" value="480">8h</option>
           </select>
-          <button data-i18n="all" class="ghost" id="pause-all-btn" title="Pause ALL blocking for 30 minutes">⏸ all</button>
-          <button data-i18n="pick" class="ghost" id="pick-btn" title="Hide an element by clicking it">⊕ pick</button>
+          <button data-i18n="all" class="ghost" id="pause-all-btn" title="Pause ALL blocking for 30 minutes" data-i18n-attr="title:pause_all_blocking_for_30_minutes">⏸ all</button>
+          <button data-i18n="pick" class="ghost" id="pick-btn" title="Hide an element by clicking it" data-i18n-attr="title:hide_an_element_by_clicking_it">⊕ pick</button>
           <button data-i18n="sync" class="ghost" id="sync-btn">↺ sync</button>
           <button data-i18n="reset" class="ghost" id="reset-btn">↺ reset</button>
         </div>
@@ -568,7 +568,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <div class="matrix-sec">
       <div class="matrix-sec-hd">
         <span data-i18n="t_3rd_party_blocking" class="matrix-sec-label">3rd-party blocking</span>
-        <button data-i18n="reset" class="ghost" id="matrix-clear" title="Reset all matrix rules for this site">↺ reset</button>
+        <button data-i18n="reset" class="ghost" id="matrix-clear" title="Reset all matrix rules for this site" data-i18n-attr="title:reset_all_matrix_rules_for_this_site">↺ reset</button>
       </div>
       <div id="matrix-grid"></div>
       <div id="matrix-status"></div>
@@ -860,10 +860,10 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           </label>
         </div>
         <div class="mb6">
-          <button data-i18n="export_diagnostic_report" class="ghost ghost-bd" id="export-diagnostic" style="width:100%;text-align:center;color:var(--muted);font-size:10px" title="Export full diagnostic snapshot (settings + stats + filter status + recent log) for debugging">🔍 Export diagnostic report</button>
+          <button data-i18n="export_diagnostic_report" class="ghost ghost-bd" id="export-diagnostic" style="width:100%;text-align:center;color:var(--muted);font-size:10px" title="Export full diagnostic snapshot (settings + stats + filter status + recent log) for debugging" data-i18n-attr="title:export_full_diagnostic_snapshot">🔍 Export diagnostic report</button>
         </div>
         <div class="mb6">
-          <button data-i18n="export_stats_csv" class="ghost ghost-bd" id="export-stats-csv" style="width:100%;text-align:center;color:var(--muted);font-size:10px" title="Export 30-day blocking stats as CSV">📊 Export stats CSV</button>
+          <button data-i18n="export_stats_csv" class="ghost ghost-bd" id="export-stats-csv" style="width:100%;text-align:center;color:var(--muted);font-size:10px" title="Export 30-day blocking stats as CSV" data-i18n-attr="title:export_30_day_blocking_stats_as_csv">📊 Export stats CSV</button>
         </div>
         <div id="import-status"></div>
       </div>
@@ -886,8 +886,8 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
        <div class="fil-sec-hd">
          <span data-i18n="my_filter_rules" class="fil-label">My Filter Rules</span>
          <div class="fil-btns">
-           <button data-i18n="import" class="ghost fil-ghost-sm" id="import-ub-btn" title="Import rules from clipboard (uBlock Origin / ABP format)">⬆ Import</button>
-           <button data-i18n="copy" class="ghost fil-ghost-sm" id="export-ub-btn" title="Copy all rules to clipboard">⬇ Copy</button>
+           <button data-i18n="import" class="ghost fil-ghost-sm" id="import-ub-btn" title="Import rules from clipboard (uBlock Origin / ABP format)" data-i18n-attr="title:import_rules_from_clipboard">⬆ Import</button>
+           <button data-i18n="copy" class="ghost fil-ghost-sm" id="export-ub-btn" title="Copy all rules to clipboard" data-i18n-attr="title:copy_all_rules_to_clipboard">⬇ Copy</button>
          </div>
        </div>
        <textarea id="filters-text" spellcheck="false" placeholder="# One rule per line. Supports uBlock / ABP / ABP+ format:
@@ -907,7 +907,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
      <div class="fil-divider">
        <div data-i18n="import_from_url" class="fil-label fil-label-top">Import from URL</div>
        <div class="fil-input-row">
-         <input type="text" id="import-url-input" placeholder="https://… (any .txt filter list)">
+         <input type="text" id="import-url-input" placeholder="https://… (any .txt filter list)" data-i18n-attr="placeholder:ph_filter_list_url">
          <button data-i18n="fetch" class="ghost ghost-accent" id="import-url-btn" style="white-space:nowrap">Fetch</button>
        </div>
        <div id="import-url-status"></div>
@@ -936,7 +936,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       <div id="custom-lists-container"></div>
       <input type="text" id="cl-url" placeholder="https://example.com/filters.txt">
       <div class="fil-input-row">
-        <input type="text" id="cl-name" placeholder="List name (optional)">
+        <input type="text" id="cl-name" placeholder="List name (optional)" data-i18n-attr="placeholder:ph_list_name_optional">
         <button data-i18n="add" class="ghost ghost-accent" id="cl-add-btn">Add</button>
       </div>
       <div id="cl-status"></div>
@@ -965,7 +965,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <button class="log-ftag" data-src="picker">🎯</button>
       </div>
       <div class="log-hdr-btns">
-        <button data-i18n="txt" class="ghost ghost-bd" id="download-log-txt" title="Download full log as .txt file">⬇ txt</button>
+        <button data-i18n="txt" class="ghost ghost-bd" id="download-log-txt" title="Download full log as .txt file" data-i18n-attr="title:download_full_log_as_txt">⬇ txt</button>
         <button data-i18n="clear" class="ghost" id="clear-log">clear</button>
       </div>
     </div>

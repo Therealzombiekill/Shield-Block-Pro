@@ -166,7 +166,7 @@ async function refreshPageLog() {
   if (!list) return;
   try {
     const entries = await msg('GET_PAGE_LOG') ?? [];
-    if (!entries.length) { list.textContent = 'Nothing blocked on this page yet'; return; }
+    if (!entries.length) { list.textContent = t('nothing_blocked_on_this_page_yet', 'Nothing blocked on this page yet'); return; }
     // Count by domain
     const counts = new Map();
     for (const e of entries) counts.set(e.url, (counts.get(e.url) || 0) + 1);
@@ -197,10 +197,10 @@ async function refreshTopDomains() {
     // Safe browsing indicator
     if (sbBadge && sbStatus.domainCount > 0) {
       sbBadge.style.display = '';
-      sbBadge.title = `Safe browsing active — ${sbStatus.domainCount.toLocaleString()} threat domains`;
+      sbBadge.title = t('safe_browsing_active_threats', `Safe browsing active — ${sbStatus.domainCount.toLocaleString()} threat domains`, [sbStatus.domainCount.toLocaleString()]);
     }
 
-    if (!domains.length) { list.textContent = 'No blocks recorded yet'; return; }
+    if (!domains.length) { list.textContent = t('no_blocks_recorded_yet', 'No blocks recorded yet'); return; }
     const max = domains[0]?.count || 1;
     list.textContent = '';
     const frag = document.createDocumentFragment();
@@ -267,7 +267,7 @@ async function refreshFilterStatus() {
     }
     // Update the rules count description in blockers panel
     const desc = $('rules-desc');
-    if (desc && active > 0) desc.textContent = `${active.toLocaleString()} rules active`;
+    if (desc && active > 0) desc.textContent = t('n_rules_active', `${active.toLocaleString()} rules active`, [active.toLocaleString()]);
   } catch (_) {}
 }
 
@@ -372,14 +372,14 @@ function renderWhitelistItems(whitelist, currentDomain) {
   list.textContent = '';
   if (!whitelist.length) {
     const empty = document.createElement('div'); empty.className = 'wl-empty';
-    empty.textContent = 'No sites whitelisted'; list.appendChild(empty); return;
+    empty.textContent = t('no_sites_whitelisted', 'No sites whitelisted'); list.appendChild(empty); return;
   }
   whitelist.forEach(d => {
     const item = document.createElement('div'); item.className = 'wl-item';
     const span = document.createElement('span'); span.className = 'wl-dom';
     span.textContent = d; item.appendChild(span);
     const btn = document.createElement('button'); btn.className = 'wl-rm';
-    btn.dataset.domain = d; btn.title = 'Remove'; btn.textContent = '×'; item.appendChild(btn);
+    btn.dataset.domain = d; btn.title = t('remove', 'Remove'); btn.textContent = '×'; item.appendChild(btn);
     list.appendChild(item);
   });
   list.querySelectorAll('.wl-rm').forEach(btn => {
@@ -431,7 +431,7 @@ async function refreshWhitelist() {
       await refreshWhitelist();
     };
   } else {
-    $('site-url').textContent = 'N/A (non-web page)';
+    $('site-url').textContent = t('na_non_web_page', 'N/A (non-web page)');
     $('site-toggle').disabled = true;
   }
   renderWhitelistItems(permanentList, domain);
@@ -460,7 +460,7 @@ async function boot() {
           badge.style.background = 'rgba(0,217,126,.15)';
           badge.style.borderColor = 'rgba(0,217,126,.3)';
           badge.style.color = 'var(--green)';
-          badge.title = `v${latest} available`;
+          badge.title = t('version_available', `v${latest} available`, [latest]);
         }
       }
     } catch(_) {}
@@ -563,23 +563,23 @@ $('run-health-check')?.addEventListener('click', async () => {
   const checks  = $('health-checks');
   if (!summary || !checks) return;
 
-  btn.textContent = 'Running…';
+  btn.textContent = t('running', 'Running…');
   btn.disabled    = true;
   summary.style.color = 'var(--muted)';
-  summary.textContent = 'Testing…';
+  summary.textContent = t('testing', 'Testing…');
   checks.textContent  = '';
 
   try {
     const result = await msg('GET_HEALTH_STATUS');
-    if (!result) { summary.textContent = 'Health check unavailable'; return; }
+    if (!result) { summary.textContent = t('health_check_unavailable', 'Health check unavailable'); return; }
 
     const colors = { pass: 'var(--green)', warn: '#f59e0b', fail: 'var(--red,#f87171)' };
     const icons  = { pass: '✓', warn: '⚠', fail: '✗' };
 
     summary.style.color = colors[result.summary === 'healthy' ? 'pass' : result.summary === 'degraded' ? 'fail' : 'warn'];
-    summary.textContent = result.summary === 'healthy' ? '✓ All systems healthy'
-                        : result.summary === 'degraded' ? '✗ Issues detected — check items below'
-                        : '⚠ Warnings — extension working but not optimal';
+    summary.textContent = result.summary === 'healthy' ? t('all_systems_healthy', '✓ All systems healthy')
+                        : result.summary === 'degraded' ? t('issues_detected_check_items_below', '✗ Issues detected — check items below')
+                        : t('warnings_extension_working_but_not_optimal', '⚠ Warnings — extension working but not optimal');
 
     checks.textContent = '';
     const frag = document.createDocumentFragment();
@@ -606,9 +606,9 @@ $('run-health-check')?.addEventListener('click', async () => {
     checks.appendChild(frag);
   } catch (e) {
     summary.style.color = 'var(--red,#f87171)';
-    summary.textContent = 'Health check failed: ' + e.message;
+    summary.textContent = t('health_check_failed', 'Health check failed: ') + e.message;
   } finally {
-    btn.textContent = 'Run check';
+    btn.textContent = t('run_check', 'Run check');
     btn.disabled    = false;
   }
 });
@@ -673,7 +673,7 @@ async function checkGlobalPause() {
   if (!btn) return;
   if (status?.active) {
     const mins = Math.ceil((status.until - Date.now()) / 60000);
-    btn.textContent = `▶ Resume All (${mins}m left)`;
+    btn.textContent = t('resume_all_mins_left', `▶ Resume All (${mins}m left)`, [String(mins)]);
     btn.classList.add('paused');
   } else {
     btn.textContent = '⏸ Pause All (30m)';
@@ -708,7 +708,7 @@ async function refreshMatrix() {
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (!tab?.url?.startsWith('http')) { grid.innerHTML = ''; if (status) status.textContent = 'Not available on this page'; return; }
+    if (!tab?.url?.startsWith('http')) { grid.innerHTML = ''; if (status) status.textContent = t('not_available_on_this_page', 'Not available on this page'); return; }
     _currentHost = new URL(tab.url).hostname.replace(/^www\./, '');
 
     const matrix = await msg('GET_MATRIX') ?? {};
@@ -741,7 +741,7 @@ async function refreshMatrix() {
     const activeCount = Object.values(siteRules).filter(v => v !== 'default').length;
     if (status) status.textContent = activeCount ? `${activeCount} rule${activeCount > 1 ? 's' : ''} active on ${_currentHost}` : '';
   } catch (e) {
-    if (status) status.textContent = 'Matrix unavailable';
+    if (status) status.textContent = t('matrix_unavailable', 'Matrix unavailable');
   }
 }
 
@@ -771,7 +771,7 @@ async function refreshCustomRules() {
     const span = document.createElement('span'); span.className = 'wl-dom';
     span.style.cssText = 'max-width:220px;font-size:10px'; span.textContent = r.slice(0,60); item.appendChild(span);
     const btn = document.createElement('button'); btn.className = 'wl-rm';
-    btn.dataset.rule = r; btn.title = 'Remove'; btn.textContent = '×'; item.appendChild(btn);
+    btn.dataset.rule = r; btn.title = t('remove', 'Remove'); btn.textContent = '×'; item.appendChild(btn);
     list.appendChild(item);
   });
   list.querySelectorAll('.wl-rm').forEach(btn => {
@@ -792,7 +792,7 @@ async function loadUserFilters() {
 $('filters-save')?.addEventListener('click', async () => {
   const text = $('filters-text')?.value ?? '';
   const status = $('filters-status');
-  if (status) status.textContent = 'Applying…';
+  if (status) status.textContent = t('applying', 'Applying…');
   await msg('PARSE_USER_FILTERS', { text });
   if (status) {
     status.textContent = '✓ Rules applied — reload the page to see changes';
@@ -815,7 +815,7 @@ $('import-ub-btn')?.addEventListener('click', async () => {
   const status = $('filters-status');
   try {
     const text = await navigator.clipboard.readText();
-    if (!text.trim()) { if (status) { status.style.color = 'var(--red,#f87171)'; status.textContent = 'Clipboard is empty'; setTimeout(() => { status.textContent = ''; }, 2500); } return; }
+    if (!text.trim()) { if (status) { status.style.color = 'var(--red,#f87171)'; status.textContent = t('clipboard_is_empty', 'Clipboard is empty'); setTimeout(() => { status.textContent = ''; }, 2500); } return; }
 
     // Strip uBlock/ABP metadata header lines but keep filter rules
     const imported = text.split('\n')
@@ -847,11 +847,11 @@ $('export-ub-btn')?.addEventListener('click', async () => {
   const status = $('filters-status');
   try {
     const text = $('filters-text')?.value ?? '';
-    if (!text.trim()) { if (status) { status.style.color = 'var(--muted)'; status.textContent = 'No rules to copy'; setTimeout(() => { status.textContent = ''; }, 2000); } return; }
+    if (!text.trim()) { if (status) { status.style.color = 'var(--muted)'; status.textContent = t('no_rules_to_copy', 'No rules to copy'); setTimeout(() => { status.textContent = ''; }, 2000); } return; }
     await navigator.clipboard.writeText(text);
     if (status) { status.style.color = 'var(--green)'; status.textContent = '✓ Copied to clipboard'; setTimeout(() => { status.textContent = ''; }, 2000); }
   } catch (e) {
-    if (status) { status.style.color = 'var(--red,#f87171)'; status.textContent = 'Copy failed'; setTimeout(() => { status.textContent = ''; }, 2000); }
+    if (status) { status.style.color = 'var(--red,#f87171)'; status.textContent = t('copy_failed', 'Copy failed'); setTimeout(() => { status.textContent = ''; }, 2000); }
   }
 });
 
@@ -864,9 +864,9 @@ $('import-url-btn')?.addEventListener('click', async () => {
   const url    = input?.value?.trim();
 
   if (!url || !url.startsWith('http')) {
-    if (status) { status.style.color = 'var(--red,#f87171)'; status.textContent = 'Enter a valid https:// URL'; return; }
+    if (status) { status.style.color = 'var(--red,#f87171)'; status.textContent = t('enter_a_valid_https_url', 'Enter a valid https:// URL'); return; }
   }
-  if (status) { status.style.color = 'var(--muted)'; status.textContent = 'Fetching…'; }
+  if (status) { status.style.color = 'var(--muted)'; status.textContent = t('fetching', 'Fetching…'); }
 
   try {
     const result = await msg('FETCH_FILTER_URL', { url });
@@ -926,8 +926,8 @@ $('cl-add-btn')?.addEventListener('click', async () => {
   const url    = $('cl-url')?.value?.trim();
   const name   = $('cl-name')?.value?.trim();
   const status = $('cl-status');
-  if (!url) { if (status) { status.style.color = 'var(--red, #f87171)'; status.textContent = 'Enter a URL first'; setTimeout(()=>{status.textContent='';},2500); } return; }
-  if (status) status.textContent = 'Adding…';
+  if (!url) { if (status) { status.style.color = 'var(--red, #f87171)'; status.textContent = t('enter_a_url_first', 'Enter a URL first'); setTimeout(()=>{status.textContent='';},2500); } return; }
+  if (status) status.textContent = t('adding', 'Adding…');
   const r = await msg('ADD_CUSTOM_LIST', { url, name });
   if (r?.ok) {
     if ($('cl-url')) $('cl-url').value = '';
@@ -1097,7 +1097,7 @@ $('export-btn')?.addEventListener('click', async () => {
 $('import-btn')?.addEventListener('change', async (e) => {
   const file = e.target.files?.[0]; if (!file) return;
   const status = $('import-status');
-  if (status) status.textContent = 'Importing…';
+  if (status) status.textContent = t('importing', 'Importing…');
   try {
     const text = await file.text();
     let data;
@@ -1205,7 +1205,7 @@ async function checkPauseStatus() {
       const timeLeft = mins >= 60
         ? `${Math.floor(mins / 60)}h${mins % 60 ? ' ' + (mins % 60) + 'm' : ''}`
         : `${mins}m`;
-      btn.textContent = `▶ ${timeLeft} left`;
+      btn.textContent = t('time_left', `▶ ${timeLeft} left`, [String(timeLeft)]);
       btn.classList.add('pause-active');
     } else {
       btn.textContent = '⏸ pause';
@@ -1229,7 +1229,7 @@ $('pause-btn')?.addEventListener('click', async () => {
     const minutes = parseInt($('pause-dur')?.value) || 30;
     await msg('PAUSE_SITE', { domain, minutes });
     const h = Math.floor(minutes / 60), m = minutes % 60;
-    $('pause-btn').textContent = `▶ ${minutes >= 60 ? h + 'h' + (m ? ' ' + m + 'm' : '') : minutes + 'm'} left`;
+    $('pause-btn').textContent = t('time_left', `▶ ${minutes >= 60 ? h + 'h' + (m ? ' ' + m + 'm' : '') : minutes + 'm'} left`, [minutes >= 60 ? h + 'h' + (m ? ' ' + m + 'm' : '') : minutes + 'm']);
     $('pause-btn').classList.add('pause-active');
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
   }
@@ -1247,7 +1247,7 @@ function _cloudStatus(text, isError = false) {
 
 $('cloud-push-btn')?.addEventListener('click', async () => {
   const s = $('cloud-status');
-  if (s) { s.style.color = 'var(--muted)'; s.textContent = 'Pushing…'; }
+  if (s) { s.style.color = 'var(--muted)'; s.textContent = t('pushing', 'Pushing…'); }
   const r = await msg('PUSH_TO_CLOUD');
   if (r?.ok) {
     _cloudStatus(`✓ Pushed: ${r.keys?.join(', ')}`);
@@ -1258,7 +1258,7 @@ $('cloud-push-btn')?.addEventListener('click', async () => {
 
 $('cloud-restore-btn')?.addEventListener('click', async () => {
   const s = $('cloud-status');
-  if (s) { s.style.color = 'var(--muted)'; s.textContent = 'Restoring…'; }
+  if (s) { s.style.color = 'var(--muted)'; s.textContent = t('restoring', 'Restoring…'); }
   const r = await msg('RESTORE_FROM_CLOUD');
   if (r?.ok) {
     _cloudStatus(`✓ Restored: ${r.keys?.join(', ')}`);
@@ -1272,13 +1272,13 @@ $('cloud-restore-btn')?.addEventListener('click', async () => {
 $('ubo-import-btn')?.addEventListener('change', async (e) => {
   const file = e.target.files?.[0]; if (!file) return;
   const s = $('ubo-status');
-  if (s) s.textContent = 'Importing…';
+  if (s) s.textContent = t('importing', 'Importing…');
   try {
     const text = await file.text();
     const uboData = JSON.parse(text);
     const r = await msg('IMPORT_UBO', { uboData });
     if (r?.ok) {
-      if (s) s.textContent = `✓ Imported: ${r.imported?.join(', ')}`;
+      if (s) s.textContent = t('imported_list', `✓ Imported: ${r.imported?.join(', ')}`, [r.imported?.join(', ') ?? '']);
       await loadSettings();
     } else {
       if (s) s.textContent = '✗ ' + (r?.error || 'Import failed');

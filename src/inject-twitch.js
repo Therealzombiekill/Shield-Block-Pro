@@ -19,7 +19,13 @@
   'use strict';
 
   // ── Disable flag ──────────────────────────────────────────────────────────────
+  // Default ENABLED so the early PlaybackAccessToken request — which fires before
+  // content-twitch.js can read settings at document_idle — gets the playerType
+  // patch. content-twitch.js caches the effective off/whitelisted/paused state in
+  // a synchronous localStorage hint we read here so those states are honored from
+  // the first byte; postMessage covers same-session toggles.
   let _disabled = false;
+  try { if (localStorage.getItem('__sbTwBlock') === '0') _disabled = true; } catch (_) {}
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     if (e.data?.type === 'SB_TWITCH_DISABLE') _disabled = true;

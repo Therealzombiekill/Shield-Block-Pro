@@ -28,19 +28,20 @@
   }
 
   const _wl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return;
-
-  if (!settings?.twitch) {
-    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
-    return;
-  }
-  window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
-
   const _hostname = location.hostname.replace(/^www\./, '');
-  if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) {
-    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
-    return;
-  }
+  const _whitelisted = _wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+
+  // Effective Twitch ad-blocking state. inject-twitch.js (MAIN world) defaults
+  // ENABLED to catch the early PlaybackAccessToken request, so we must EXPLICITLY
+  // disable it whenever blocking shouldn't run (toggle off, global pause, or this
+  // host whitelisted) — otherwise the GQL patch and ad-endpoint blocking leak
+  // during a global pause. Mirror the state into a synchronous localStorage hint
+  // the injector reads at document_start next load; postMessage covers the
+  // current load and same-session toggles.
+  const _twEnabled = !!settings?.twitch && !settings?.globalPause && !_whitelisted;
+  try { localStorage.setItem('__sbTwBlock', _twEnabled ? '1' : '0'); } catch (_) {}
+  window.postMessage({ type: _twEnabled ? 'SB_TWITCH_ENABLE' : 'SB_TWITCH_DISABLE' }, '*');
+  if (!_twEnabled) return;
 
   _sbLog('info', `Init — ${_hostname}`);
 
@@ -248,6 +249,10 @@
       clearTimeout(toastTimeout);
       hideToast();
       unmuteVideo();
+      // Stop the MAIN-world injector too — without this the GQL patch and
+      // ad-endpoint blocking keep running until the next reload.
+      try { localStorage.setItem('__sbTwBlock', '0'); } catch (_) {}
+      window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
     }
   });
 

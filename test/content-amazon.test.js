@@ -37,3 +37,13 @@ test('a high-priority allowAllRequests rule disables network blocking on Amazon'
   assert.ok(r.priority >= 100, 'the allow rule must outrank block rules');
   assert.deepEqual(r.condition.resourceTypes, ['main_frame', 'sub_frame']);
 });
+
+test('background cosmetic/scriptlet injection (injectCosmetics) skips Amazon', () => {
+  // The manifest excludes content scripts from Amazon, but background.js also
+  // injects cosmetics + scriptlets via chrome.scripting on navigation — that path
+  // must skip Amazon too, or the page is still touched.
+  const bg = readFileSync(`${ROOT}src/background.js`, 'utf8');
+  const m = bg.match(/SKIP_DOMAINS\s*=\s*\[([\s\S]*?)\]/);
+  assert.ok(m, 'SKIP_DOMAINS not found in background.js');
+  assert.ok(/'amazon\.com'/.test(m[1]), 'injectCosmetics SKIP_DOMAINS must include amazon.com');
+});

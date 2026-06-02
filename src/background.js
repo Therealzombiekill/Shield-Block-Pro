@@ -1808,9 +1808,15 @@ async function injectCosmetics(tabId, tabUrl) {
   try {
     domain = new URL(tabUrl).hostname.replace(/^www\./, '');
     if (domainMatchesWhitelist(domain, wl)) return;
-    // Skip YouTube entirely — no ad blocking there, cosmetics only break the player
+    // Skip YouTube (cosmetics break the player) and Amazon (fully excluded — the
+    // extension does nothing on Amazon; content scripts are excluded in the
+    // manifest and this background cosmetic/scriptlet injection must skip it too).
     const SKIP_DOMAINS = ['youtube.com','youtu.be','youtube-nocookie.com',
-                          'music.youtube.com','tv.youtube.com'];
+                          'music.youtube.com','tv.youtube.com',
+                          'amazon.com','amazon.co.uk','amazon.de','amazon.ca',
+                          'amazon.com.au','amazon.co.jp','amazon.in','amazon.fr',
+                          'amazon.es','amazon.it','amazon.com.mx','amazon.com.br',
+                          'amazon.nl','amazon.pl','amazon.se','amazon.sg'];
     if (SKIP_DOMAINS.some(d => domain === d || domain.endsWith('.' + d))) return;
   } catch (_) { return; }
 

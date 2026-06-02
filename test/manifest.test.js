@@ -40,15 +40,14 @@ test('every content-script file referenced by the manifest exists', () => {
   }
 });
 
-test('CNAME uncloaking permissions are opt-in (declared as optional, not required)', () => {
-  // These must NOT be in required permissions — webRequestBlocking/dns would break
-  // or warn on Chrome at load. They live in optional_permissions, requested at
-  // runtime on Firefox only.
-  const required = new Set(manifest.permissions ?? []);
-  const optional = new Set(manifest.optional_permissions ?? []);
-  for (const p of ['dns', 'webRequest', 'webRequestBlocking']) {
-    assert.ok(optional.has(p), `${p} should be in optional_permissions`);
-    assert.ok(!required.has(p), `${p} must not be a required permission`);
+test('manifest declares no Chrome-incompatible permissions', () => {
+  // Chrome stable rejects 'dns' (dev-channel only) and 'webRequestBlocking' (MV2
+  // only) and shows them as load errors. CNAME uncloaking (Firefox-only) must not
+  // pull them into the shipped manifest; its code is feature-detected and dormant
+  // unless those permissions are present at runtime.
+  const all = new Set([...(manifest.permissions ?? []), ...(manifest.optional_permissions ?? [])]);
+  for (const p of ['dns', 'webRequestBlocking']) {
+    assert.ok(!all.has(p), `${p} must not be in the manifest — Chrome stable rejects it`);
   }
 });
 

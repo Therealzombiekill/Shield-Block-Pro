@@ -1,0 +1,14 @@
+{
+  "name": "shieldblock-pro",
+  "version": "2.10.1",
+  "private": true,
+  "type": "module",
+  "description": "ShieldBlock Pro MV3 extension — dev tooling only. The browser loads the source files directly; there is no build step and no runtime dependencies.",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/filter-parser.js && node --check src/background.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

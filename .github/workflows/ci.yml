@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Tests & syntax check (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # Zero runtime/dev dependencies — nothing to install. The browser loads the
+      # source files directly; package.json only declares ESM + the test runner.
+
+      - name: Syntax check all extension scripts
+        run: |
+          set -e
+          for f in src/*.js popup.js blocked.js welcome.js; do
+            [ -f "$f" ] || continue
+            echo "checking $f"
+            node --check "$f"
+          done
+
+      - name: Run test suite
+        run: node --test

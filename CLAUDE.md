@@ -4,11 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, trackers, cookie banners, and streaming platform ads. There is no build step, no bundler, and no package.json — all source files are loaded directly by the browser. To test changes, load the extension as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked → point at this directory) and reload it after every change.
+ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, trackers, cookie banners, and streaming platform ads. There is no build step and no bundler — all source files are loaded directly by the browser. A `package.json` exists only to declare ES modules and run the Node-based test suite; it has **zero dependencies** and the browser ignores it. To test changes, load the extension as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked → point at this directory) and reload it after every change.
 
 ## How to test
 
-There are no automated tests. Manual testing workflow:
+### Automated tests
+
+A zero-dependency suite in `test/` runs on Node's built-in test runner and is enforced in CI (`.github/workflows/ci.yml`, Node 20 + 22):
+
+```
+npm test        # node --test — parser contract, DNR ID ranges/budgets, static rules, manifest integrity
+npm run check   # node --check on the ESM modules (filter-parser.js, background.js)
+```
+
+These guard the **silent-failure surfaces**: a filter-parser regression, a DNR rule-ID collision, a blown rule budget, or a manifest referencing a missing file all turn the build red here instead of quietly degrading blocking in the browser. They do **not** cover runtime/DOM behavior — that still needs the manual workflow below.
+
+### Manual testing
+
+Manual testing workflow:
 
 1. Load unpacked in Chrome at `chrome://extensions`
 2. After editing any `src/*.js` or `popup.*` file, click "Reload" on the extension card or use the Extensions toolbar menu
@@ -58,7 +71,7 @@ Chrome hard-caps `updateDynamicRules` at 5,000 rules total. Each filter list in 
 Filter list text → `parseFilterList()` in `src/filter-parser.js` → four output types:
 1. **DNR rules** (`type: 'dnr'`): Applied via `chrome.declarativeNetRequest.updateDynamicRules`
 2. **Global cosmetic selectors** (CSS `##.selector`): Stored in `chrome.storage.local` under `cosmeticSelectors`, injected via `chrome.scripting.insertCSS` on navigation
-3. **Domain-scoped cosmetics** (`site.com##.selector`): Stored under `domainCosmetics`, injected per-domain
+3. **Domain-scoped cosmetics** (`site.com##.selector`): Stored under `domainCosmetics`, injected per-domain. This store also carries **procedural** selectors (`:has-text`, `:matches-css`, `:upward`, `:xpath`) — `content-procedural.js` reads `domainCosmetics`, splits procedural from plain, and applies the procedural ones with its JS engine while injecting plain ones as a `<style>` block. The parser keeps these out of global `cosmeticSelectors` and `injectCosmetics()` strips them from any `insertCSS` payload, because a single procedural selector is invalid CSS and would invalidate the whole comma-joined rule. `isProceduralSelector()` in `filter-parser.js` is the shared source of truth for "is this procedural".
 4. **Scriptlet rules** (`##+js(name, args)`): Stored under `scriptletRules`, executed via `chrome.scripting.executeScript` calling `globalThis.__sbRunScriptlets()` defined in `src/scriptlets.js`
 
 `$removeparam` rules are collected into `removeParamData` and applied by `applyRemoveParamRules()` which merges them with the hardcoded `STATIC_REMOVE_PARAMS` set and emits a single global DNR redirect+queryTransform rule where possible.

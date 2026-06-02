@@ -3,7 +3,7 @@
  */
 
 import './browser-compat.js';
-import { parseFilterList } from './filter-parser.js';
+import { parseFilterList, isProceduralSelector } from './filter-parser.js';
 
 const MAX_DYNAMIC_RULES = 5000;
 // ID reserved for the global pause-all DNR allow rule. Must be outside all filter
@@ -1825,7 +1825,11 @@ async function injectCosmetics(tabId, tabUrl) {
     .slice(0, 5000)
     .filter(sel => sel && typeof sel === 'string' && sel.length < 200 &&
                    !sel.includes('{') && !sel.includes('}') &&
-                   !sel.includes('<') && !sel.includes('>'));
+                   !sel.includes('<') && !sel.includes('>') &&
+                   // Procedural selectors (:has-text/:upward/:xpath/:matches-css) are not
+                   // valid CSS — one of them would invalidate this whole comma-joined rule.
+                   // content-procedural.js applies them with its JS engine instead.
+                   !isProceduralSelector(sel));
 
   const css = safe.slice(0, 5000).join(',\n') + ' { display:none!important; }';
   if (tabState.css && tabState.css !== css) {

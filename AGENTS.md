@@ -4,7 +4,9 @@ Guidance for AI agents working in this repository.
 
 ## Project overview
 
-ShieldBlock Pro is a Manifest V3 Chrome/Firefox browser extension. There is **no build step**, **no package manager**, and **no automated test suite**. Source files are loaded directly by the browser as an unpacked extension.
+ShieldBlock Pro is a Manifest V3 Chrome/Firefox browser extension. There is **no build step** and **no runtime or dev dependencies** — source files are loaded directly by the browser as an unpacked extension. A `package.json` exists solely to mark the source as ES modules and to wire Node's built-in test runner; `npm install` pulls nothing.
+
+There **is** an automated test suite (`npm test` → `node --test`, files under `test/`) that guards the silent-failure surfaces: the filter-parser contract, DNR rule-ID range disjointness and budgets, static-ruleset validity, and manifest integrity. It runs in CI (`.github/workflows/ci.yml`) on Node 20 and 22.
 
 See `CLAUDE.md` for architecture, storage layout, DNR rule ID ranges, and manual testing workflow.
 
@@ -37,10 +39,10 @@ Useful DevTools entry points:
 | Task | Command / workflow |
 |------|-------------------|
 | Lint | Not configured (no ESLint/Prettier in repo) |
-| Automated tests | None — manual browser testing only |
+| Automated tests | `npm test` (alias for `node --test`) — zero-dependency suite in `test/`, also enforced in CI |
 | Build | None — edit source and reload the extension |
-| Structure validation | `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` |
-| JS syntax check | `node --check src/background.js` (ES modules; run per file) |
+| Structure / manifest validation | Covered by `test/manifest.test.js` and `test/static-rules.test.js` |
+| JS syntax check | `npm run check` (filter-parser + background); CI `node --check`s every script |
 
 ### Hello-world verification
 

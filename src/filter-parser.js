@@ -54,15 +54,42 @@ function isDomainProtected(filter) {
   return false;
 }
 
-// Cosmetic pseudo-classes that Chrome can't handle — skip these
+// ── Procedural cosmetics ─────────────────────────────────────────────────────
+// Pseudo-classes Chrome's native CSS engine can't evaluate, but which the JS
+// engine in content-procedural.js DOES implement. These are NOT valid CSS, so
+// they must never reach chrome.scripting.insertCSS — a single invalid selector
+// invalidates the entire comma-joined style rule, silently dropping every other
+// cosmetic on the page. They ARE valid procedural cosmetics and get applied
+// per-domain by the procedural engine, which reads them straight out of the
+// `domainCosmetics` store. Keep this list in sync with PROCEDURAL_MARKERS in
+// content-procedural.js.
+export const ENGINE_PROCEDURAL_PSEUDOS = [':has-text(', ':matches-css(', ':upward(', ':xpath('];
+
+export function isProceduralSelector(selector) {
+  return ENGINE_PROCEDURAL_PSEUDOS.some(m => selector.includes(m));
+}
+
+// Cosmetic constructs that NEITHER Chrome's CSS engine NOR our procedural engine
+// can handle — dropped outright (they are not valid CSS, so leaving them in would
+// silently no-op, or invalidate the comma-joined stylesheet rule):
+//   :nth-ancestor() / :watch-attr()               — uBO procedural ops we don't implement
+//   :matches-css-before() / :matches-css-after()   — pseudo-element variants we don't implement
+//   :matches-path()                                — URL-path procedural op
+//   :style() / :remove()                           — action operators (restyle/remove), not selectors
+//   `{ `                                           — legacy inline action syntax
+// NOTE: the four ENGINE_PROCEDURAL_PSEUDOS are deliberately absent here — before
+// this fix they were lumped in with the unsupported set, which silently discarded
+// every :has-text/:upward/:xpath/:matches-css rule and left the procedural engine
+// with no input. See test/parser.test.js ("procedural cosmetics reach the engine").
 function hasUnsupportedPseudo(selector) {
   return (
-    selector.includes(':matches-css') ||
-    selector.includes(':upward(') ||
-    selector.includes(':xpath(') ||
     selector.includes(':nth-ancestor(') ||
     selector.includes(':watch-attr(') ||
-    selector.includes(':has-text(') ||
+    selector.includes(':matches-css-before(') ||
+    selector.includes(':matches-css-after(') ||
+    selector.includes(':matches-path(') ||
+    selector.includes(':style(') ||
+    selector.includes(':remove(') ||
     selector.includes('{ ')
   );
 }
@@ -109,13 +136,20 @@ function parseLine(line, idCounter) {
       // match any real hostname.
       if (prefix.includes(',') || prefix.startsWith('~') || prefix.includes('|')) return null;
       if (rawAfter.length < 2 || rawAfter.length > 512) return null;
+      // Procedural selectors (:has-text/:upward/:xpath/:matches-css) are intentionally
+      // allowed through here — content-procedural.js applies them per-domain. Only the
+      // genuinely unimplemented constructs are dropped.
       if (hasUnsupportedPseudo(rawAfter)) return null;
       return { type: 'domain-cosmetic', domain: prefix.toLowerCase(), selector: rawAfter };
     }
 
     // ── Global cosmetic: ##.selector ──────────────────────────────────────
     if (rawAfter.length < 2 || rawAfter.length > 512) return null;
-    if (hasUnsupportedPseudo(rawAfter)) return null;
+    // Global cosmetics are injected as plain CSS via chrome.scripting.insertCSS and
+    // apply to every site. The procedural engine only runs against domain-scoped
+    // rules, so a global procedural selector has no consumer AND would invalidate
+    // the shared stylesheet — drop it along with the unimplemented constructs.
+    if (hasUnsupportedPseudo(rawAfter) || isProceduralSelector(rawAfter)) return null;
     return { type: 'cosmetic', selector: rawAfter };
   }
 

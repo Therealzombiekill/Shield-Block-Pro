@@ -65,12 +65,13 @@
   // ── Skip / mute ───────────────────────────────────────────────────────────────
   let _muted = false;
   let _origVol = null;
+  let _seekLogThrottle = 0;
 
   function handleAd() {
+    const vid = document.querySelector('video');
     if (!isAdPlaying()) {
       // Restore volume if we muted for an ad
       if (_muted) {
-        const vid = document.querySelector('video');
         if (vid && _origVol !== null) { vid.muted = false; vid.volume = _origVol; }
         _sbLog('info', 'Ad cleared — audio restored');
         _muted = false;
@@ -79,26 +80,36 @@
       return;
     }
 
-    // 1. Click skip button if visible
-    const skip = document.querySelector(
-      '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
-    );
-    if (skip) { skip.click(); _sbLog('info', 'Ad: clicked skip button'); return; }
-
-    // 2. Seek past short ads.
-    // Guard: only seek if .ad-showing is on the player — this class is set
-    // by YouTube itself and is the most reliable ad signal. The duration < 120
-    // guard prevents accidentally seeking a short legitimate video (Shorts, clips).
-    const vid = document.querySelector('video');
     const playerHasAdClass = !!document.querySelector('.ad-showing');
-    if (vid && playerHasAdClass && isFinite(vid.duration) && vid.duration > 0 && vid.duration < 120) {
-      vid.currentTime = vid.duration;
-      _sbLog('info', `Ad: seeked past (${vid.duration.toFixed(1)}s)`);
-      return;
+    const skip = document.querySelector(
+      '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-container button'
+    );
+    // A visible skip button means it's DEFINITELY an ad, even when .ad-showing
+    // isn't set (YouTube Music) — so it's safe to seek in that case too.
+    const adState = playerHasAdClass || !!skip;
+
+    // 1. SEEK past the ad — the reliable skip. The skip BUTTON is frequently
+    //    present but inert (countdown not finished, or YouTube Music ads), and the
+    //    old code clicked it and RETURNED, so it clicked forever and never seeked.
+    //    The duration cap keeps us from seeking a real (short) track.
+    let seeked = false;
+    if (vid && adState && isFinite(vid.duration) && vid.duration > 0 && vid.duration < 185) {
+      if (vid.currentTime < vid.duration - 0.2) {
+        vid.currentTime = vid.duration;
+        if (Date.now() - _seekLogThrottle > 3000) {
+          _seekLogThrottle = Date.now();
+          _sbLog('info', `Ad: seeked past (${vid.duration.toFixed(1)}s)`);
+        }
+      }
+      seeked = true;
     }
 
-    // 3. Mute unskippable long ads as last resort
-    if (vid && !_muted) {
+    // 2. Click the skip button too — helps when seeking is blocked. (No per-click
+    //    logging — it floods the log.)
+    if (skip) { try { skip.click(); } catch (_) {} }
+
+    // 3. Mute as last resort — unskippable AND not seekable.
+    if (vid && !seeked && !skip && !_muted) {
       _origVol = vid.volume;
       vid.muted = true;
       _muted = true;
@@ -196,9 +207,9 @@
   // Fast path: click skip button the moment it appears in the DOM
   const _skipObserver = new MutationObserver(() => {
     const skip = document.querySelector(
-      '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
+      '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-container button'
     );
-    if (skip) { skip.click(); _sbLog('info', 'Ad: MutationObserver skip button clicked'); }
+    if (skip) { try { skip.click(); } catch (_) {} } // no logging — fires too often
   });
   _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
 

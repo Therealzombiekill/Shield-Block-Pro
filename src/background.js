@@ -1150,13 +1150,23 @@ async function fetchSafeBrowsingLists() {
   } finally { _stopKeepAlive(); }
 }
 
+// Never treat major legitimate sites as malware/phishing (list false positives).
+const SAFE_BROWSING_ALLOWLIST = new Set([
+  'github.com', 'gitlab.com', 'bitbucket.org',
+  'google.com', 'drive.google.com', 'docs.google.com', 'sheets.google.com',
+  'slides.google.com', 'mail.google.com', 'accounts.google.com',
+  'youtube.com', 'youtu.be',
+]);
+
 function checkSafeBrowsing(url) {
   if (!_safeBrowsingDomains.size) return false;
   try {
     const hostname = new URL(url).hostname.replace(/^www\./, '');
-    if (_safeBrowsingDomains.has(hostname)) return true;
-    // Check parent domains (e.g. sub.evil.com → evil.com)
+    if (SAFE_BROWSING_ALLOWLIST.has(hostname)) return false;
     const parts = hostname.split('.');
+    for (let i = 1; i < parts.length; i++) {
+      if (SAFE_BROWSING_ALLOWLIST.has(parts.slice(i).join('.'))) return false;
+    }
     for (let i = 1; i < parts.length - 1; i++) {
       if (_safeBrowsingDomains.has(parts.slice(i).join('.'))) return true;
     }

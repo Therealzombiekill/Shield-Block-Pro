@@ -7,35 +7,46 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#09090f;--s1:#0e0e18;--border:#1e1e2e;
+  --bg:#09090f;--s1:#0e0e18;--border:#1e1e2e;--border2:#28283c;
   --accent:#7c6aff;--accent2:#a78bfa;
-  --text:#e2e2f0;--sub:#9090b0;--muted:#5a5a78;
+  --green:#00d97e;
+  --text:#f1f1f8;--sub:#bcbcd4;--muted:#9a9ab8;
   --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code','Consolas',monospace;
 }
 body{background:var(--bg);color:var(--text);font-family:var(--sans);
-  line-height:1.7;padding:60px 20px}
-.wrap{max-width:720px;margin:0 auto}
-header{margin-bottom:48px}
+  line-height:1.7;padding:60px 20px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:740px;margin:0 auto}
+header{margin-bottom:44px}
 .logo-row{display:flex;align-items:center;gap:12px;margin-bottom:28px}
-.icon{width:40px;height:40px;border-radius:10px;
+.icon{width:42px;height:42px;border-radius:11px;
   background:linear-gradient(135deg,var(--accent),var(--accent2));
-  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 0 18px rgba(124,106,255,.25)}
 .logo-name{font-size:18px;font-weight:700;color:#fff;letter-spacing:-.01em}
-h1{font-size:32px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
+h1{font-size:33px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
 h1 span{color:var(--accent2)}
-.meta{font-size:13px;color:var(--muted)}
-h2{font-size:18px;font-weight:600;color:var(--text);margin:36px 0 12px;
+.meta{font-size:13px;color:var(--muted);font-family:var(--mono)}
+h2{font-size:18px;font-weight:600;color:var(--text);margin:38px 0 12px;
   padding-bottom:8px;border-bottom:1px solid var(--border)}
 p{color:var(--sub);margin-bottom:14px;font-size:15px}
-ul{color:var(--sub);margin:0 0 14px 20px;font-size:15px}
-ul li{margin-bottom:6px}
-.highlight{background:var(--s1);border:1px solid var(--border);border-left:3px solid var(--accent2);
-  border-radius:8px;padding:16px 20px;margin-bottom:20px}
-.highlight p{margin:0;color:var(--text);font-size:14px}
+ul{color:var(--sub);margin:0 0 14px 22px;font-size:15px}
+ul li{margin-bottom:7px}
+strong{color:var(--text)}
+code{font-family:var(--mono);font-size:.86em;background:var(--s1);
+  border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:var(--accent2)}
+.highlight{background:var(--s1);border:1px solid var(--border);border-left:3px solid var(--green);
+  border-radius:10px;padding:18px 22px;margin-bottom:22px}
+.highlight p{margin:0;color:var(--text);font-size:14.5px}
+.grid{display:grid;grid-template-columns:1fr;gap:0;border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;margin-bottom:16px}
+.grid div{padding:12px 16px;border-bottom:1px solid var(--border);font-size:14px}
+.grid div:last-child{border-bottom:none}
+.grid b{color:var(--text);font-family:var(--mono);font-size:12.5px}
 a{color:var(--accent2);text-decoration:none}
 a:hover{text-decoration:underline}
 footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border);
-  font-size:12px;color:var(--muted);text-align:center}
+  font-size:12px;color:var(--muted);text-align:center;font-family:var(--mono)}
 </style>
 </head>
 <body>
@@ -43,7 +54,7 @@ footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border);
   <header>
     <div class="logo-row">
       <div class="icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6L12 2z"
                 stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
           <path d="M9 12l2 2 4-4" stroke="white" stroke-width="1.8"
@@ -53,70 +64,81 @@ footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border);
       <div class="logo-name">ShieldBlock Pro</div>
     </div>
     <h1>Privacy <span>Policy</span></h1>
-    <p class="meta">Last updated: May 11, 2026 &nbsp;·&nbsp; Effective immediately</p>
+    <p class="meta">Last updated: June 2, 2026 &nbsp;·&nbsp; Effective immediately</p>
   </header>
 
   <div class="highlight">
-    <p><strong>Short version:</strong> ShieldBlock Pro processes everything locally on your device. We do not collect, transmit, or sell any personal data. No account is required. No analytics. No tracking.</p>
+    <p><strong>The short version:</strong> ShieldBlock Pro does everything on your device. It has no servers, no accounts, no analytics, and no tracking. It does not collect, transmit, or sell any personal data — ever. We never see which sites you visit or what gets blocked.</p>
   </div>
 
   <h2>1. Who we are</h2>
-  <p>ShieldBlock Pro ("the Extension") is a browser extension developed and maintained by Bronson Bissell. Questions can be directed to the support page linked in the Chrome Web Store listing.</p>
+  <p>ShieldBlock Pro ("the Extension", "we") is a free, independent browser extension developed by Bronson Bissell. It blocks ads, trackers, and cookie-consent banners across the web and on streaming platforms (YouTube, Twitch, Spotify, Hulu, Kick, and Amazon). Questions? Contact <a href="mailto:zombiekillacrew@gmail.com">zombiekillacrew@gmail.com</a>.</p>
 
-  <h2>2. What data the Extension handles</h2>
-  <p>The Extension stores the following data <strong>exclusively on your local device</strong> using browser-provided storage APIs (<code>chrome.storage.local</code> and the browser's built-in IndexedDB). None of this data ever leaves your device.</p>
+  <h2>2. The data the Extension stores (all on your device)</h2>
+  <p>The Extension keeps the following <strong>only in your browser's local storage</strong> (<code>chrome.storage.local</code> and the browser's built-in IndexedDB). None of it is ever sent to us or anyone else:</p>
   <ul>
-    <li><strong>Settings &amp; preferences</strong> — which features are enabled, your whitelist of sites, and toggle states. Stored in <code>chrome.storage.local</code>.</li>
-    <li><strong>Ad block statistics</strong> — counts of ads blocked per platform (YouTube, Twitch, Spotify, etc.) and an estimate of time saved. Stored in <code>chrome.storage.local</code>.</li>
-    <li><strong>Event logs</strong> — a rolling debug log (last 7 days) of extension activity used for in-popup diagnostics. Stored in IndexedDB on your device. Logs are never sent anywhere.</li>
-    <li><strong>Filter list cache</strong> — downloaded filter list files (EasyList, uBlock filters, etc.) are cached locally so the extension works without re-downloading on every page. Stored in <code>chrome.storage.local</code>.</li>
+    <li><strong>Settings &amp; whitelist</strong> — which features are on, sites you've paused or allowed, and toggle states.</li>
+    <li><strong>Statistics</strong> — counts of items blocked per platform and an estimate of time saved. These are aggregate numbers, not a record of the pages you visited.</li>
+    <li><strong>Diagnostic log</strong> — a short rolling log of extension activity (kept locally in IndexedDB) that powers the in-popup "health check." It never leaves your device.</li>
+    <li><strong>Filter-list cache</strong> — downloaded ad-filter lists and the blocking rules and cosmetic selectors parsed from them, cached so the Extension works fast and offline.</li>
+    <li><strong>Your custom rules</strong> — any filters you type or elements you hide with the picker.</li>
   </ul>
 
-  <h2>3. Data we do NOT collect</h2>
+  <h2>3. Optional settings sync</h2>
+  <p>If you choose to enable it, the Extension can sync <strong>only your settings and whitelist</strong> across your own browsers using the browser's built-in account sync (<code>chrome.storage.sync</code>). This is handled entirely by your browser vendor (Google or Mozilla) under their privacy policy — it does not pass through any server we operate, and it never includes browsing history, statistics, or logs.</p>
+
+  <h2>4. What we never collect</h2>
   <ul>
-    <li>Browsing history or URLs you visit</li>
-    <li>Page content or form data</li>
-    <li>Personally identifiable information of any kind</li>
-    <li>Crash reports or telemetry</li>
-    <li>Information about which ads were blocked on which sites</li>
+    <li>Your browsing history or the URLs you visit</li>
+    <li>Page content, form data, keystrokes, or credentials</li>
+    <li>Any personally identifiable information</li>
+    <li>A record of which ads were blocked on which sites</li>
+    <li>Crash reports, telemetry, or analytics of any kind</li>
   </ul>
 
-  <h2>4. Network requests made by the Extension</h2>
-  <p>The Extension makes outbound network requests only for the following purposes:</p>
+  <h2>5. Network requests the Extension makes</h2>
+  <p>The Extension connects to the internet only to download public, non-personalized data:</p>
   <ul>
-    <li><strong>Filter list updates</strong> — the Extension periodically downloads ad-blocking filter lists from public CDNs (e.g., EasyList, uBlock Origin filter repositories, AdGuard servers). These requests carry no user identifiers. The downloaded content is cached locally.</li>
+    <li><strong>Filter lists</strong> — it periodically fetches ad-blocking lists from public repositories (EasyList, uBlock Origin, AdGuard, and regional lists). These requests carry no identifiers and the results are cached locally.</li>
+    <li><strong>Safe Browsing lists</strong> — it downloads lists of known malware/phishing domains and checks sites <strong>locally</strong> against that downloaded list. The URLs you visit are <strong>not</strong> sent anywhere for this check.</li>
   </ul>
-  <p>No other network requests are made. The Extension does not connect to any ShieldBlock-owned server, analytics service, or third-party data broker.</p>
+  <p>The Extension does <strong>not</strong> connect to any server operated by us, any analytics service, or any data broker.</p>
 
-  <h2>5. Permissions and why we need them</h2>
+  <h2>6. No remote code</h2>
+  <p>The Extension never downloads or executes remote code. Filter lists are treated strictly as data. Ad-defusing "scriptlets" are a fixed set of named functions shipped inside the Extension and called by name — there is no <code>eval()</code> and no remotely loaded script.</p>
+
+  <h2>7. Permissions, and why each is needed</h2>
+  <div class="grid">
+    <div><b>declarativeNetRequest</b> — block ad/tracker requests and strip tracking URL parameters, without reading page content.</div>
+    <div><b>declarativeNetRequestFeedback</b> — count blocked requests so the popup and badge can show a number. No URLs leave your device.</div>
+    <div><b>scripting</b> — inject cosmetic ad-hiding CSS and platform ad-removal scripts, and run the "hide element" picker you trigger.</div>
+    <div><b>storage / unlimitedStorage</b> — save settings and the large local filter/cosmetic caches (which can exceed the default storage quota) so blocking stays reliable.</div>
+    <div><b>tabs / webNavigation</b> — apply per-site rules at the right time and update the per-tab block badge. Used for tab id/URL only; nothing is logged or sent.</div>
+    <div><b>alarms</b> — schedule periodic filter-list and Safe Browsing refreshes and expire temporary pauses.</div>
+    <div><b>contextMenus</b> — provide the right-click "hide element" and "block on this site" actions.</div>
+    <div><b>host access (&lt;all_urls&gt;)</b> — ads appear on every site, so rules must be able to apply anywhere. The Extension only blocks/hides ad elements; it does not read or transmit page content.</div>
+  </div>
+
+  <h2>8. Third parties</h2>
+  <p>We do not share, sell, rent, or trade any data, because we never collect any. The only external parties involved are the maintainers of the public filter lists the Extension downloads (EasyList, uBlock Origin, AdGuard, and regional list authors); those downloads contain no information that could identify you.</p>
+
+  <h2>9. Children's privacy</h2>
+  <p>The Extension collects no personal data from anyone, including children under 13 (or the applicable age in your jurisdiction).</p>
+
+  <h2>10. Your rights &amp; controls</h2>
+  <p>Because all data lives on your device and we hold nothing, you are always in control:</p>
   <ul>
-    <li><strong>declarativeNetRequest</strong> — to block ads and trackers at the network level without reading page content.</li>
-    <li><strong>storage</strong> — to save your settings and statistics locally.</li>
-    <li><strong>tabs / webNavigation</strong> — to detect navigation events so the extension can apply rules per-page and update the popup badge count.</li>
-    <li><strong>scripting</strong> — to inject ad-removal scripts into YouTube, Twitch, Spotify, Hulu, and Kick pages.</li>
-    <li><strong>alarms</strong> — to schedule periodic filter list refreshes.</li>
-    <li><strong>contextMenus</strong> — to provide the right-click "Hide this element" picker.</li>
-    <li><strong>host_permissions (&lt;all_urls&gt;)</strong> — required so <code>declarativeNetRequest</code> rules can apply to any website and so content scripts can run on streaming platforms.</li>
+    <li>Reset statistics or clear logs anytime from the popup's <strong>Support</strong> tab.</li>
+    <li>Export your settings, stats, or a diagnostic snapshot from the popup whenever you like.</li>
+    <li>Uninstalling the Extension permanently deletes all of its local storage and IndexedDB data.</li>
   </ul>
+  <p>Under the GDPR and CCPA/CPRA, requests for access, deletion, or portability are satisfied entirely by these on-device controls — there is no server-side copy of your data for us to produce or erase.</p>
 
-  <h2>6. Data sharing and third parties</h2>
-  <p>We do not share, sell, rent, or trade any data with any third party. The Extension has no backend server and no telemetry pipeline. The only external parties involved are the operators of the public filter list repositories the Extension downloads from (EasyList, uBlock, AdGuard), and those downloads carry no user-identifying information.</p>
+  <h2>11. Changes to this policy</h2>
+  <p>If we make material changes, we'll update the "Last updated" date above. Because we collect no personal data, changes are expected to be infrequent.</p>
 
-  <h2>7. Children's privacy</h2>
-  <p>The Extension does not knowingly collect any information from children under 13 (or the applicable age in your jurisdiction). No personal data is collected from any user regardless of age.</p>
-
-  <h2>8. Data retention and deletion</h2>
-  <p>All data is stored locally on your device. You can delete it at any time by:</p>
-  <ul>
-    <li>Opening the extension popup → Settings → "Reset Stats" or "Clear Logs"</li>
-    <li>Uninstalling the Extension — this removes all <code>chrome.storage.local</code> and IndexedDB data automatically</li>
-  </ul>
-
-  <h2>9. Changes to this policy</h2>
-  <p>If we make material changes to this policy, we will update the "Last updated" date above. Continued use of the Extension after changes constitutes acceptance of the updated policy. Given that we collect no personal data, changes are expected to be infrequent.</p>
-
-  <h2>10. Contact</h2>
-  <p>If you have questions about this privacy policy, please open an issue on the Chrome Web Store support page or contact the developer via the link in the store listing.</p>
+  <h2>12. Contact</h2>
+  <p>Questions about this policy or the Extension's privacy practices: <a href="mailto:zombiekillacrew@gmail.com">zombiekillacrew@gmail.com</a>.</p>
 
   <footer>
     &copy; 2026 ShieldBlock Pro · Bronson Bissell ·

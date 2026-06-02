@@ -52,6 +52,15 @@ test('CNAME uncloaking permissions are opt-in (declared as optional, not require
   }
 });
 
+test('tiktok-ads.js is loaded before content-social.js (defines __sbTikTok first)', () => {
+  const social = manifest.content_scripts.find(cs => cs.js.includes('src/content-social.js'));
+  assert.ok(social, 'content-social.js entry not found');
+  const ti = social.js.indexOf('src/tiktok-ads.js');
+  const ci = social.js.indexOf('src/content-social.js');
+  assert.ok(ti !== -1, 'tiktok-ads.js must be in the same entry as content-social.js');
+  assert.ok(ti < ci, 'tiktok-ads.js must load before content-social.js');
+});
+
 test('the procedural cosmetic engine is registered as a content script', () => {
   // Gap #1 fix is pointless if content-procedural.js never runs. Pin the wiring.
   const wired = manifest.content_scripts.some(cs => cs.js.includes('src/content-procedural.js'));

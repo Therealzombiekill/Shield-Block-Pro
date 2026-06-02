@@ -381,22 +381,31 @@
   // Only use data-e2e attributes (TikTok's own stable test IDs) + sponsored
   // text label matching. Removed all [class*="..."] selectors — too fragile.
   function cleanTikTok() {
-    // data-e2e is TikTok's stable test attribute — used in their own test suite
-    document.querySelectorAll(
-      '[data-e2e*="ad-"], [data-e2e="for-you-ad"], ' +
-      '[data-e2e="recommend-ad-card"], [data-e2e="search-ad-item"]'
-    ).forEach(el => {
-      removePost(el.closest('article') ?? el.closest('li') ?? el);
+    // Detection logic lives in tiktok-ads.js (loaded first) so it's unit-testable.
+    const TT = globalThis.__sbTikTok;
+    if (!TT) return; // helper not loaded — skip rather than mis-target an element
+
+    const seen = new Set();
+    const removeAdAt = (node) => {
+      // Walk up to the real feed-item container. The previous code removed the
+      // label element itself (closest('article') fell through to `el`), leaving
+      // the ad video playing. Never remove anything if no container is found.
+      const container = TT.findContainer(node) || node.closest('article') || node.closest('li');
+      if (container && container.isConnected && !seen.has(container)) {
+        seen.add(container);
+        removePost(container);
+      }
+    };
+
+    // 1. Elements TikTok itself tags as ads (data-e2e markers).
+    document.querySelectorAll('[data-e2e]').forEach(el => {
+      if (TT.e2eMarksAd(el)) removeAdAt(el);
     });
 
-    // Sponsored text labels via the universal isSponsored() check
-    document.querySelectorAll('[data-e2e]').forEach(el => {
-      for (const span of el.querySelectorAll('span')) {
-        if (span.children.length === 0 && isSponsored(span)) {
-          removePost(el.closest('article') ?? el.closest('li') ?? el);
-          break;
-        }
-      }
+    // 2. "Sponsored" / "Paid partnership" captions — exact match on a leaf node
+    //    only, so organic videos that merely mention sponsorship are left alone.
+    document.querySelectorAll('[data-e2e] span, [data-e2e] div, [data-e2e] p').forEach(el => {
+      if (el.children.length === 0 && TT.isAdLabelText(el.textContent)) removeAdAt(el);
     });
   }
 

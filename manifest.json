@@ -98,6 +98,7 @@
       ],
       "js": [
         "src/browser-compat.js",
+        "src/tiktok-ads.js",
         "src/content-social.js"
       ],
       "run_at": "document_idle"

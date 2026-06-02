@@ -75,6 +75,20 @@ const STATIC_REMOVE_PARAMS = new Set([
   'source_caller', 'mibextid', // Meta Business
   'irclickid', // Impact Radius
   'cvosrc', 'cvo_campaign',
+  // Matomo / Piwik analytics
+  'mtm_campaign', 'mtm_cid', 'mtm_kwd', 'mtm_source', 'mtm_medium', 'mtm_content', 'mtm_group', 'mtm_placement',
+  'pk_campaign', 'pk_cid', 'pk_kwd', 'pk_source', 'pk_medium', 'pk_content',
+  // Google Shopping / Ads
+  'srsltid', 'gad_source',
+  // AT Internet / Piano Analytics
+  'at_medium', 'at_campaign', 'at_custom', 'at_recipient_id', 'at_recipient_list',
+  // Email & marketing platforms
+  '_branch_match_id', '_branch_referrer', // Branch
+  'ml_subscriber', 'ml_subscriber_hash',  // MailerLite
+  'ck_subscriber_id',                     // ConvertKit
+  '_kx',                                  // Klaviyo
+  'vgo_ee',                               // Twilio SendGrid
+  'trk_contact', 'trk_msg', 'trk_module', 'trk_sid', // Listrak
 ]);
 
 // ── Time saved estimates (seconds per blocked item by type) ───────────────────

@@ -10,6 +10,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   parseFilterList, isProceduralSelector, ENGINE_PROCEDURAL_PSEUDOS,
   MAX_COSMETICS, MAX_DOMAIN_COSMETICS, MAX_SCRIPTLETS,
@@ -139,6 +141,17 @@ test('isProceduralSelector matches exactly the four engine pseudo-classes', () =
   assert.equal(isProceduralSelector('.plain-class'), false);
   assert.equal(isProceduralSelector('.x:hover'), false);
   assert.equal(isProceduralSelector('[data-has-text]'), false);
+});
+
+test('parser ENGINE_PROCEDURAL_PSEUDOS stays in sync with the engine PROCEDURAL_MARKERS', () => {
+  // If a pseudo is added to one list but not the other, a procedural selector
+  // routed to domainCosmetics would be treated as plain CSS and injected — and a
+  // single invalid selector invalidates the whole comma-joined rule.
+  const proc = readFileSync(fileURLToPath(new URL('../src/content-procedural.js', import.meta.url)), 'utf8');
+  const m = proc.match(/PROCEDURAL_MARKERS\s*=\s*\[([^\]]*)\]/);
+  assert.ok(m, 'PROCEDURAL_MARKERS not found in content-procedural.js');
+  const engineMarkers = [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
+  assert.deepEqual([...ENGINE_PROCEDURAL_PSEUDOS].sort(), engineMarkers.sort());
 });
 
 // ── Scriptlets ───────────────────────────────────────────────────────────────

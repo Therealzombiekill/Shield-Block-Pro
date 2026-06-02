@@ -1530,7 +1530,7 @@ async function syncFilterLists(force = false) {
     // Deduplicate domain cosmetics selectors per domain
     const domainCosmeticsFinal = {};
     for (const [dom, sels] of Object.entries(allDomainCosmetics)) {
-      domainCosmeticsFinal[dom] = [...new Set(sels)].slice(0, 200); // max 200 per domain
+      domainCosmeticsFinal[dom] = [...new Set(sels)].slice(0, 400); // max 400 per domain
     }
 
     // Deduplicate scriptlet rules per domain
@@ -1818,7 +1818,11 @@ async function injectCosmetics(tabId, tabUrl) {
        .filter(([d]) => domain.endsWith('.' + d))
        .flatMap(([, v]) => v),
   ];
-  const allSelectors = [...(cosmeticSelectors || []), ...userCosmetics, ...domainSpecific];
+  // Domain-specific and user selectors first: they're the targeted ad-container
+  // hides, and the list below is truncated to 5000 before injection. Putting the
+  // large global set last means a heavy site's specific rules always make the cut
+  // (otherwise blank ad-placeholder gaps survive on sites with many global rules).
+  const allSelectors = [...domainSpecific, ...userCosmetics, ...(cosmeticSelectors || [])];
   if (!allSelectors.length) return;
 
   const safe = allSelectors

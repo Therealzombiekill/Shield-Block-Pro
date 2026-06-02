@@ -10,8 +10,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFilterList, isProceduralSelector, ENGINE_PROCEDURAL_PSEUDOS }
-  from '../src/filter-parser.js';
+import {
+  parseFilterList, isProceduralSelector, ENGINE_PROCEDURAL_PSEUDOS,
+  MAX_COSMETICS, MAX_DOMAIN_COSMETICS, MAX_SCRIPTLETS,
+} from '../src/filter-parser.js';
 
 // ── Network (DNR) rules ──────────────────────────────────────────────────────
 
@@ -171,4 +173,28 @@ test('domain-scoped removeparam carries its initiator domains', () => {
   assert.equal(removeParams.domain.length, 1);
   assert.deepEqual(removeParams.domain[0].params, ['fbclid']);
   assert.deepEqual(removeParams.domain[0].initDomains, ['test.com']);
+});
+
+// ── Cosmetic budgets ─────────────────────────────────────────────────────────
+// Bounded to keep storage.local from overflowing. Domain cosmetics are applied
+// uncapped per-page by content-procedural.js, so they carry the larger budget.
+
+test('cosmetic budget constants are sane (domain budget is the largest)', () => {
+  assert.ok(MAX_COSMETICS >= 8000, `global cosmetic budget regressed: ${MAX_COSMETICS}`);
+  assert.ok(MAX_DOMAIN_COSMETICS >= 15000, `domain cosmetic budget regressed: ${MAX_DOMAIN_COSMETICS}`);
+  assert.ok(MAX_DOMAIN_COSMETICS >= MAX_COSMETICS, 'domain budget should be >= global budget');
+  assert.ok(MAX_SCRIPTLETS >= 1000);
+});
+
+test('global cosmetic budget is enforced', () => {
+  const text = Array.from({ length: MAX_COSMETICS + 25 }, (_, i) => `##.ad-${i}`).join('\n');
+  const { cosmetics } = parseFilterList(text, 1000);
+  assert.equal(cosmetics.length, MAX_COSMETICS);
+});
+
+test('domain cosmetic budget is enforced across all domains', () => {
+  const text = Array.from({ length: MAX_DOMAIN_COSMETICS + 25 }, (_, i) => `site${i}.com##.ad`).join('\n');
+  const { domainCosmetics } = parseFilterList(text, 1000);
+  const total = Object.values(domainCosmetics).reduce((s, v) => s + v.length, 0);
+  assert.equal(total, MAX_DOMAIN_COSMETICS);
 });

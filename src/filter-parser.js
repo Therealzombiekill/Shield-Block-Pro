@@ -228,6 +228,17 @@ function parseLine(line, idCounter) {
   } catch (_) { return null; }
 }
 
+// ── Cosmetic budgets ─────────────────────────────────────────────────────────
+// Caps on how many selectors/scriptlets we keep per sync, to bound storage.
+// Domain-scoped cosmetics are the targeted ad-container hides that prevent blank
+// placeholder gaps on heavy sites; content-procedural.js applies them per-page
+// with no cap, so they get the largest budget. Global cosmetics share the single
+// per-page insertCSS rule, so raising their cap past what one page can inject
+// yields diminishing returns.
+export const MAX_COSMETICS        = 10000;
+export const MAX_DOMAIN_COSMETICS = 25000;
+export const MAX_SCRIPTLETS       = 3000;
+
 /**
  * Parse a filter list text.
  * Returns:
@@ -245,9 +256,6 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
   // removeparams: { global: Set<string>, domain: Map<domainKey, Set<string>> }
   const removeParams    = { global: new Set(), domain: new Map() };
 
-  const MAX_COSMETICS        = 8000;
-  const MAX_DOMAIN_COSMETICS = 15000;
-  const MAX_SCRIPTLETS       = 3000;
   let domainCosmeticCount    = 0;
   let scriptletCount         = 0;
   let id = startId;

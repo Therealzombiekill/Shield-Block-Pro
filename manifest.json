@@ -5,6 +5,7 @@
   "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
     "tabs",

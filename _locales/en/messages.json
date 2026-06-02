@@ -17,6 +17,9 @@
   "ads_blocked_privacy_secured": {
     "message": "Ads blocked. Privacy secured."
   },
+  "ads_trackers_blocked": {
+    "message": "ads & trackers blocked"
+  },
   "all": {
     "message": "⏸ all"
   },

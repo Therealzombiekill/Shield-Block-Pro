@@ -54,6 +54,8 @@
     return !!(
       document.querySelector('.ad-showing') ||
       document.querySelector('.ytp-ad-text') ||
+      document.querySelector('.ytp-ad-player-overlay') ||
+      document.querySelector('.ytp-ad-player-overlay-layout') ||
       document.querySelector('.ytp-ad-skip-button') ||
       document.querySelector('.ytp-skip-ad-button') ||
       document.querySelector('.ytp-ad-skip-button-modern')
@@ -115,6 +117,9 @@
     '#masthead-ad',
     '#player-ads',
     'ytd-display-ad-renderer',
+    'ytd-ad-slot-renderer',                 // modern in-feed / search ad slot (2024+)
+    'ytd-in-feed-ad-layout-renderer',       // modern in-feed ad layout
+    'ad-slot-renderer',
     'ytd-banner-promo-renderer',
     'ytd-statement-banner-renderer',
     '.ytd-banner-promo-renderer',

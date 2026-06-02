@@ -48,7 +48,10 @@
     ...customHideRules,
   ].filter(Boolean);
 
-  const PROCEDURAL_MARKERS = [':has-text(', ':matches-css(', ':upward(', ':xpath('];
+  // Markers come from the shared engine (procedural-engine.js) so the parser,
+  // engine, and this splitter stay in lockstep.
+  const PROCEDURAL_MARKERS = (globalThis.__sbProc && globalThis.__sbProc.MARKERS) ||
+    [':has-text(', ':matches-css(', ':upward(', ':xpath(', ':matches-attr(', ':min-text-length('];
   const procedural = applicable.filter(s => PROCEDURAL_MARKERS.some(m => s.includes(m)));
   const plain      = applicable.filter(s => !procedural.includes(s));
 
@@ -66,85 +69,30 @@
   }
 
   // ── Procedural filter engine ──────────────────────────────────────────────
-  function toRe(s) {
-    if (!s) return null;
-    if (s.startsWith('/') && s.lastIndexOf('/') > 0) {
-      const li = s.lastIndexOf('/');
-      try { return new RegExp(s.slice(1, li), s.slice(li + 1)); } catch (_) { return null; }
-    }
-    try { return new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); } catch (_) { return null; }
-  }
-
-  /**
-   * BUG FIX: Extract a procedural pseudo-class argument using balanced-paren matching.
-   * Old code used a regex like /^(.*?):has-text\((.+)\)$/ which breaks on patterns
-   * containing nested parens, e.g. div:has-text(text(node)) → arg was "text(node" not "text(node)".
-   * New parser walks chars and counts depth, so all nesting is handled correctly.
-   */
-  function extractProc(sel, pseudoName) {
-    const marker = ':' + pseudoName + '(';
-    const idx = sel.indexOf(marker);
-    if (idx === -1) return null;
-    let depth = 0, end = -1;
-    for (let i = idx + marker.length - 1; i < sel.length; i++) {
-      if (sel[i] === '(') depth++;
-      else if (sel[i] === ')') { if (--depth === 0) { end = i; break; } }
-    }
-    if (end === -1) return null; // unbalanced parens — skip
-    return { base: sel.slice(0, idx).trim(), arg: sel.slice(idx + marker.length, end), rest: sel.slice(end + 1) };
-  }
+  // Matching logic lives in procedural-engine.js (globalThis.__sbProc) so it is
+  // unit-tested and supports CHAINING (e.g. :has-text(x):upward(2)). Here we just
+  // supply the DOM adapter and remove what it resolves to.
+  const _ctx = {
+    queryAll: (sel) => { try { return Array.from(document.querySelectorAll(sel)); } catch (_) { return []; } },
+    getText:  (el) => el.textContent || '',
+    getStyle: (el, prop) => { try { return window.getComputedStyle(el).getPropertyValue(prop); } catch (_) { return ''; } },
+    attrs:    (el) => el.attributes || [],
+    parent:   (el) => el.parentElement,
+    closest:  (el, sel) => { try { return el.closest(sel); } catch (_) { return null; } },
+    xpath:    (expr, el) => {
+      try {
+        const r = document.evaluate(expr, el || document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        const out = [];
+        for (let i = 0; i < r.snapshotLength; i++) out.push(r.snapshotItem(i));
+        return out;
+      } catch (_) { return []; }
+    },
+  };
 
   function applyProcedural(sel) {
+    if (!globalThis.__sbProc) return; // engine not loaded — skip (never mis-target)
     try {
-      let p;
-
-      // :has-text — removes elements whose text content matches a pattern
-      if ((p = extractProc(sel, 'has-text'))) {
-        const re = toRe(p.arg); if (!re) return;
-        document.querySelectorAll(p.base || '*').forEach(el => {
-          if (re.test(el.textContent)) el.remove();
-        });
-        return;
-      }
-
-      // :matches-css — removes elements with matching computed style property
-      if ((p = extractProc(sel, 'matches-css'))) {
-        const cssM = p.arg.match(/^([a-z-]+)\s*:\s*(.+)$/);
-        if (!cssM) return;
-        const re = toRe(cssM[2]); if (!re) return;
-        document.querySelectorAll(p.base || '*').forEach(el => {
-          try { if (re.test(window.getComputedStyle(el).getPropertyValue(cssM[1]))) el.remove(); }
-          catch (_) {}
-        });
-        return;
-      }
-
-      // :upward(n|selector) — removes the nth ancestor (or closest matching ancestor) of each match
-      if ((p = extractProc(sel, 'upward'))) {
-        const steps = parseInt(p.arg, 10);
-        const toRemove = new Set();
-        document.querySelectorAll(p.base || '*').forEach(el => {
-          let node = el;
-          if (!isNaN(steps)) {
-            for (let i = 0; i < steps; i++) node = node?.parentElement;
-            if (node) toRemove.add(node);
-          } else {
-            const ancestor = el.closest(p.arg.trim());
-            if (ancestor) toRemove.add(ancestor);
-          }
-        });
-        toRemove.forEach(el => el.remove());
-        return;
-      }
-
-      // :xpath — XPath-based element selection and removal
-      if ((p = extractProc(sel, 'xpath'))) {
-        try {
-          const result = document.evaluate(p.arg, document, null,
-            XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-          for (let i = 0; i < result.snapshotLength; i++) result.snapshotItem(i)?.remove();
-        } catch (_e) { console.warn('[SB:procedural]', _e?.message ?? _e); }
-      }
+      __sbProc.evaluate(sel, _ctx).forEach(el => { try { el && el.remove && el.remove(); } catch (_) {} });
     } catch (_e) { console.warn('[SB:procedural]', _e?.message ?? _e); }
   }
 

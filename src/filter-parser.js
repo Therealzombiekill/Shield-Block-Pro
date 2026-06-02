@@ -67,7 +67,7 @@ function isDomainProtected(filter) {
 // per-domain by the procedural engine, which reads them straight out of the
 // `domainCosmetics` store. Keep this list in sync with PROCEDURAL_MARKERS in
 // content-procedural.js.
-export const ENGINE_PROCEDURAL_PSEUDOS = [':has-text(', ':matches-css(', ':upward(', ':xpath('];
+export const ENGINE_PROCEDURAL_PSEUDOS = [':has-text(', ':matches-css(', ':upward(', ':xpath(', ':matches-attr(', ':min-text-length('];
 
 export function isProceduralSelector(selector) {
   return ENGINE_PROCEDURAL_PSEUDOS.some(m => selector.includes(m));

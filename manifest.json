@@ -164,6 +164,7 @@
       ],
       "js": [
         "src/browser-compat.js",
+        "src/procedural-engine.js",
         "src/content-procedural.js"
       ],
       "run_at": "document_idle",

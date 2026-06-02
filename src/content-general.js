@@ -204,6 +204,11 @@
   }
 
   // ── Interstitial / high-z-index ad removal ───────────────────────────────────
+  // Ad/annoyance class names matched with WORD BOUNDARIES. The old pattern used a
+  // bare /ad/ substring, which matched legit UI like "header", "loading",
+  // "download", "thread", plus generic "modal"/"overlay"/"popup" — so real login
+  // modals, lightboxes, and cookie overlays at high z-index were being deleted.
+  const INTERSTITIAL_CLASS_RE = /\bads?\b|\badvert|\bpromo|\binterstitial|\bsponsor|\bnewsletter|\bad[-_]?(overlay|modal|popup|wall|frame|slot|unit|banner)|\b(overlay|modal|popup|banner)[-_]?ads?\b/i;
   function cleanInterstitials() {
     if (!document.body) return;
     for (const el of document.body.children) {
@@ -212,7 +217,7 @@
       if (!inlineStyle.includes('fixed') && !inlineStyle.includes('z-index')) continue;
       // Quick class/id check before touching computed style
       const cls = ((el.className || '') + ' ' + (el.id || '')).toLowerCase();
-      if (!/ad|promo|interstitial|popup|overlay|modal|newsletter|subscribe|sponsor/i.test(cls)) continue;
+      if (!INTERSTITIAL_CLASS_RE.test(cls)) continue;
       try {
         if (window.getComputedStyle(el).position !== 'fixed') continue;
         const z = parseInt(el.style.zIndex, 10) || parseInt(window.getComputedStyle(el).zIndex, 10);

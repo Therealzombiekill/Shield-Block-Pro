@@ -20,6 +20,16 @@ See `CLAUDE.md` for architecture, storage layout, DNR rule ID ranges, and manual
 
 Nothing is started from the terminal. The only runtime is the browser extension service worker (`src/background.js`), which starts when the extension is loaded.
 
+### Cloud VM Chrome launch
+
+On Cursor Cloud VMs, start Chrome with sandbox/GPU flags if the default launcher fails:
+
+```bash
+google-chrome --no-sandbox --disable-gpu
+```
+
+The desktop session uses `DISPLAY=:1`; use the GUI (not headless) so **Load unpacked** and the popup work.
+
 ### Loading the extension for development
 
 1. Open Chrome → `chrome://extensions`

@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The extension has no dependencies, so there's nothing to install.
+      - name: Syntax-check all extension JS
+        run: |
+          set -e
+          for f in $(find src tools -name '*.js' -o -name '*.mjs') popup.js; do
+            node --check "$f"
+          done
+
+      - name: Run test suite
+        run: npm test

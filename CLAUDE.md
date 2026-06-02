@@ -129,6 +129,7 @@ Firefox-specific callouts in the codebase:
 - `chrome.declarativeNetRequest.getMatchedRules` is not implemented in Firefox — guarded with `if (!chrome.declarativeNetRequest.getMatchedRules)`
 - AdGuard filter URLs are browser-specific (chromium vs firefox path): see `adGuardUrl()` in background.js
 - `browser.contextMenus.removeAll()` in Firefox is Promise-only — always `await` it
+- **CNAME uncloaking** (`src/cname-uncloak.js`) is Firefox-only: it uses `browser.dns.resolve()` + a blocking `webRequest` listener to unmask first-party-disguised trackers (a request to `metrics.example.com` that's a CNAME for a tracker). Chrome MV3 has neither API, so `installCnameUncloaking()` returns `null` and it's a no-op. The `dns`/`webRequest`/`webRequestBlocking` permissions are **optional** (declared in `optional_permissions`); the popup's "CNAME Uncloaking" toggle requests them from a user gesture and then messages `CNAME_PERMS_GRANTED`. The matching logic is pure and unit-tested in `test/cname.test.js`. Chrome may log a harmless "unknown permission" warning for the optional Firefox-only entries at load.
 
 ### Popup architecture
 

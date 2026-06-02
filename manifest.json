@@ -17,6 +17,11 @@
   "host_permissions": [
     "<all_urls>"
   ],
+  "optional_permissions": [
+    "dns",
+    "webRequest",
+    "webRequestBlocking"
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },

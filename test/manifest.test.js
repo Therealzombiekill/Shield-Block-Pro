@@ -40,6 +40,18 @@ test('every content-script file referenced by the manifest exists', () => {
   }
 });
 
+test('CNAME uncloaking permissions are opt-in (declared as optional, not required)', () => {
+  // These must NOT be in required permissions — webRequestBlocking/dns would break
+  // or warn on Chrome at load. They live in optional_permissions, requested at
+  // runtime on Firefox only.
+  const required = new Set(manifest.permissions ?? []);
+  const optional = new Set(manifest.optional_permissions ?? []);
+  for (const p of ['dns', 'webRequest', 'webRequestBlocking']) {
+    assert.ok(optional.has(p), `${p} should be in optional_permissions`);
+    assert.ok(!required.has(p), `${p} must not be a required permission`);
+  }
+});
+
 test('the procedural cosmetic engine is registered as a content script', () => {
   // Gap #1 fix is pointless if content-procedural.js never runs. Pin the wiring.
   const wired = manifest.content_scripts.some(cs => cs.js.includes('src/content-procedural.js'));

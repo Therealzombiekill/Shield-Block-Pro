@@ -308,6 +308,39 @@ async function loadSettings() {
   });
 }
 
+// ── CNAME uncloaking toggle (Firefox only — needs opt-in permissions) ──
+// Chrome MV3 can't uncloak CNAMEs (no DNS API, no blocking webRequest), so the
+// row stays hidden there. On Firefox, enabling requests the optional permissions
+// from this click (a user gesture) and tells the SW to install the listener.
+(function initCnameToggle() {
+  const row = document.getElementById('cname-row');
+  const box = document.getElementById('t-cname');
+  if (!row || !box) return;
+  const isFirefox = /Firefox/.test(navigator.userAgent) || typeof browser !== 'undefined';
+  if (!isFirefox) return;
+  const PERMS = { permissions: ['dns', 'webRequest', 'webRequestBlocking'] };
+  row.style.display = '';
+
+  (async () => {
+    try {
+      const [s, granted] = await Promise.all([msg('GET_SETTINGS'), chrome.permissions.contains(PERMS)]);
+      box.checked = granted && s?.cnameUncloak !== false;
+    } catch (_) {}
+  })();
+
+  box.addEventListener('change', async e => {
+    if (e.target.checked) {
+      let granted = false;
+      try { granted = await chrome.permissions.request(PERMS); } catch (_) {}
+      if (!granted) { e.target.checked = false; return; }
+      await msg('SET_SETTINGS', { settings: { cnameUncloak: true } });
+      await msg('CNAME_PERMS_GRANTED');
+    } else {
+      await msg('SET_SETTINGS', { settings: { cnameUncloak: false } });
+    }
+  });
+})();
+
 // ── Whitelist ─────────────────────────────────────────────────────────
 async function getCurrentTabDomain() {
   try {

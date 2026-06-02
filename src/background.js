@@ -4,6 +4,7 @@
 
 import './browser-compat.js';
 import { parseFilterList, isProceduralSelector } from './filter-parser.js';
+import { installCnameUncloaking } from './cname-uncloak.js';
 
 const MAX_DYNAMIC_RULES = 5000;
 // ID reserved for the global pause-all DNR allow rule. Must be outside all filter
@@ -210,6 +211,7 @@ const DEFAULT_SETTINGS = {
   httpsUpgrade: true,   // upgrade http:// navigations to https://
   timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)
   privacyHeaders: true, // send DNT: 1 and Sec-GPC: 1 on every request
+  cnameUncloak: true,   // unmask first-party CNAME-cloaked trackers (Firefox only; needs opt-in perms)
 };
 
 // ── Per-domain block stats (in-memory, lost on SW restart — used for top-domains panel) ─
@@ -343,6 +345,42 @@ async function purgeFilterListDynamicRules() {
   } catch (e) {
     logEvent('settings', 'warn', `purgeFilterListDynamicRules failed: ${e.message}`);
   }
+}
+
+// ── CNAME uncloaking (Firefox only) ─────────────────────────────────────────
+// Requires the opt-in dns + webRequest + webRequestBlocking permissions (declared
+// as optional_permissions). The popup requests them from a user gesture, then
+// messages CNAME_PERMS_GRANTED. On Chrome this is always a no-op: chrome.dns and
+// blocking webRequest don't exist, and installCnameUncloaking() returns null.
+const CNAME_PERMS = ['dns', 'webRequest', 'webRequestBlocking'];
+let _cnameListener = null;
+
+async function _initCnameUncloaking() {
+  if (!_IS_FIREFOX || _cnameListener) return;
+  try {
+    const has = await chrome.permissions.contains({ permissions: CNAME_PERMS });
+    if (!has) return;
+    const s = await getSettings();
+    if (s?.cnameUncloak === false) return;
+    _cnameListener = installCnameUncloaking({
+      isFirefox: true,
+      webRequest: chrome.webRequest,
+      dns: chrome.dns,
+      getSettings,
+      onBlocked: (tracker, host) => {
+        incrementStat('tracking');
+        logEvent('cname', 'info', `CNAME uncloaked tracker: ${host} → ${tracker}`);
+      },
+    });
+    if (_cnameListener) logEvent('cname', 'info', 'CNAME uncloaking active (Firefox)');
+  } catch (e) { logEvent('cname', 'warn', `CNAME init failed: ${e.message}`); }
+}
+
+function _teardownCnameUncloaking() {
+  if (_cnameListener && chrome.webRequest?.onBeforeRequest?.removeListener) {
+    try { chrome.webRequest.onBeforeRequest.removeListener(_cnameListener); } catch (_) {}
+  }
+  _cnameListener = null;
 }
 
 async function reapplyFeatureRules() {
@@ -2067,9 +2105,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if ('referrerStrip'   in msg.settings) applyReferrerRule(merged.referrerStrip !== false);
         if ('httpsUpgrade'    in msg.settings) applyHttpsUpgradeRule(merged.httpsUpgrade !== false);
         if ('privacyHeaders'  in msg.settings) applyPrivacyHeadersRule(merged.privacyHeaders !== false);
+        if ('cnameUncloak'    in msg.settings) {
+          if (merged.cnameUncloak === false) _teardownCnameUncloaking();
+          else _initCnameUncloaking();
+        }
         // Auto-push updated settings to chrome.storage.sync (fire-and-forget)
         pushToCloud().catch(() => {});
         sendResponse({ ok: true });
+        break;
+      }
+
+      // Popup grants the optional CNAME permissions from a user gesture, then
+      // tells the SW to install the listener. Firefox only.
+      case 'CNAME_PERMS_GRANTED': {
+        await _initCnameUncloaking();
+        sendResponse({ ok: true, active: !!_cnameListener });
         break;
       }
 
@@ -2822,6 +2872,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     applyUserFilterRules(),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
+    _initCnameUncloaking(),
   ]);
   await restoreGlobalPauseIfActive();
 
@@ -2931,6 +2982,7 @@ chrome.runtime.onStartup.addListener(async () => {
     applyUserFilterRules(),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
+    _initCnameUncloaking(),
   ]);
   await restoreGlobalPauseIfActive();
 

@@ -447,12 +447,12 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 
   <!-- NAV -->
   <div class="nav">
-    <button class="nb active" data-panel="stats">Stats</button>
-    <button class="nb" data-panel="blockers">Blockers</button>
-    <button class="nb" data-panel="whitelist">Whitelist</button>
-    <button class="nb" data-panel="filters">Filters</button>
-    <button class="nb" data-panel="log">Log</button>
-    <button class="nb" data-panel="support">Support</button>
+    <button data-i18n="stats" class="nb active" data-panel="stats">Stats</button>
+    <button data-i18n="blockers" class="nb" data-panel="blockers">Blockers</button>
+    <button data-i18n="whitelist" class="nb" data-panel="whitelist">Whitelist</button>
+    <button data-i18n="filters" class="nb" data-panel="filters">Filters</button>
+    <button data-i18n="log" class="nb" data-panel="log">Log</button>
+    <button data-i18n="support" class="nb" data-panel="support">Support</button>
   </div>
 
   <!-- ── STATS PANEL ──────────────────────────────────────────────── -->
@@ -461,84 +461,84 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <div class="hero">
       <div class="hero-count-row">
         <span class="hero-num" id="stat-total">0</span>
-        <span class="hero-label"><strong>Session</strong>ads blocked</span>
+        <span class="hero-label"><strong data-i18n="session">Session</strong>ads blocked</span>
       </div>
       <div class="stat-grid">
         <div class="sc yt">
           <span class="sc-n" id="s-yt">0</span>
-          <span class="sc-l">YouTube</span>
+          <span data-i18n="youtube" class="sc-l">YouTube</span>
         </div>
         <div class="sc tw">
           <span class="sc-n" id="s-tw">0</span>
-          <span class="sc-l">Twitch</span>
+          <span data-i18n="twitch" class="sc-l">Twitch</span>
         </div>
         <div class="sc sp">
           <span class="sc-n" id="s-sp">0</span>
-          <span class="sc-l">Spotify</span>
+          <span data-i18n="spotify" class="sc-l">Spotify</span>
         </div>
         <div class="sc az">
           <span class="sc-n" id="s-az">0</span>
-          <span class="sc-l">Amazon</span>
+          <span data-i18n="amazon" class="sc-l">Amazon</span>
         </div>
         <div class="sc hl">
           <span class="sc-n" id="s-hl">0</span>
-          <span class="sc-l">Hulu</span>
+          <span data-i18n="hulu" class="sc-l">Hulu</span>
         </div>
         <div class="sc kk">
           <span class="sc-n" id="s-kk">0</span>
-          <span class="sc-l">Kick</span>
+          <span data-i18n="kick" class="sc-l">Kick</span>
         </div>
         <div class="sc sc">
           <span class="sc-n" id="s-sc">0</span>
-          <span class="sc-l">Social</span>
+          <span data-i18n="social" class="sc-l">Social</span>
         </div>
         <div class="sc ck">
           <span class="sc-n" id="s-ck">0</span>
-          <span class="sc-l">Cookies</span>
+          <span data-i18n="cookies" class="sc-l">Cookies</span>
         </div>
         <div class="sc wb">
           <span class="sc-n" id="s-wb">0</span>
-          <span class="sc-l">Web</span>
+          <span data-i18n="web" class="sc-l">Web</span>
         </div>
       </div>
     </div>
 
     <div class="info-rows">
       <div class="info-row">
-        <span class="info-label">This page</span>
+        <span data-i18n="this_page" class="info-label">This page</span>
         <span class="info-val green" id="stat-page">—</span>
       </div>
       <div class="info-row">
-        <span class="info-label">Lifetime total</span>
+        <span data-i18n="lifetime_total" class="info-label">Lifetime total</span>
         <span class="info-val" id="stat-lifetime">0</span>
       </div>
       <div class="info-row">
-        <span class="info-label">Time saved</span>
+        <span data-i18n="time_saved" class="info-label">Time saved</span>
         <span class="info-val green" id="stat-time-saved">—</span>
       </div>
       <div class="info-row">
-        <span class="info-label">Filters synced</span>
+        <span data-i18n="filters_synced" class="info-label">Filters synced</span>
         <span class="info-val" id="stat-last-sync">—</span>
       </div>
     </div>
     <!-- ── Per-page blocked requests ──────────────────────────────── -->
     <div class="ss">
-      <div class="ss-hd">Blocked on this page</div>
+      <div data-i18n="blocked_on_this_page" class="ss-hd">Blocked on this page</div>
       <div id="page-log-list">—</div>
     </div>
 
     <!-- ── Top blocked domains ─────────────────────────────────────── -->
     <div class="ss">
       <div class="ss-hd-row">
-        <span class="ss-hd">Top blocked this session</span>
-        <span id="sb-indicator" title="Safe browsing status" style="display:none">🛡 Safe Browsing</span>
+        <span data-i18n="top_blocked_this_session" class="ss-hd">Top blocked this session</span>
+        <span data-i18n="safe_browsing" id="sb-indicator" title="Safe browsing status" style="display:none">🛡 Safe Browsing</span>
       </div>
-      <div id="top-domains-list">No blocks recorded yet</div>
+      <div data-i18n="no_blocks_recorded_yet" id="top-domains-list">No blocks recorded yet</div>
     </div>
 
     <!-- ── 7-day chart ─────────────────────────────────────────────── -->
     <div class="ss ss-chart">
-      <div class="ss-hd">7-day activity</div>
+      <div data-i18n="t_7_day_activity" class="ss-hd">7-day activity</div>
       <canvas id="spark-chart" height="36"></canvas>
     </div>
 
@@ -549,17 +549,17 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <span class="ftext" id="ftext"><strong>—</strong> rules active</span>
         </div>
         <div class="fbar-btns">
-          <button class="ghost" id="pause-btn" title="Pause blocking on this site">⏸ pause</button>
+          <button data-i18n="pause" class="ghost" id="pause-btn" title="Pause blocking on this site">⏸ pause</button>
           <select id="pause-dur" title="Pause duration">
-            <option value="30">30m</option>
-            <option value="60">1h</option>
-            <option value="180">3h</option>
-            <option value="480">8h</option>
+            <option data-i18n="t_30m" value="30">30m</option>
+            <option data-i18n="t_1h" value="60">1h</option>
+            <option data-i18n="t_3h" value="180">3h</option>
+            <option data-i18n="t_8h" value="480">8h</option>
           </select>
-          <button class="ghost" id="pause-all-btn" title="Pause ALL blocking for 30 minutes">⏸ all</button>
-          <button class="ghost" id="pick-btn" title="Hide an element by clicking it">⊕ pick</button>
-          <button class="ghost" id="sync-btn">↺ sync</button>
-          <button class="ghost" id="reset-btn">↺ reset</button>
+          <button data-i18n="all" class="ghost" id="pause-all-btn" title="Pause ALL blocking for 30 minutes">⏸ all</button>
+          <button data-i18n="pick" class="ghost" id="pick-btn" title="Hide an element by clicking it">⊕ pick</button>
+          <button data-i18n="sync" class="ghost" id="sync-btn">↺ sync</button>
+          <button data-i18n="reset" class="ghost" id="reset-btn">↺ reset</button>
         </div>
       </div>
     </div>
@@ -567,8 +567,8 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <!-- ── Domain filtering matrix ──────────────────────────────────── -->
     <div class="matrix-sec">
       <div class="matrix-sec-hd">
-        <span class="matrix-sec-label">3rd-party blocking</span>
-        <button class="ghost" id="matrix-clear" title="Reset all matrix rules for this site">↺ reset</button>
+        <span data-i18n="t_3rd_party_blocking" class="matrix-sec-label">3rd-party blocking</span>
+        <button data-i18n="reset" class="ghost" id="matrix-clear" title="Reset all matrix rules for this site">↺ reset</button>
       </div>
       <div id="matrix-grid"></div>
       <div id="matrix-status"></div>
@@ -580,14 +580,14 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <div class="panel" id="panel-blockers">
     <div class="blockers">
 
-      <div class="sec-hd">Network & Web</div>
+      <div data-i18n="network_web" class="sec-hd">Network & Web</div>
 
       <label class="tr" for="t-az">
         <div class="tr-info">
           <div class="ti ti-az">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0a500"><path d="M.045 18c.072-.116.187-.124.348-.022 3.636 2.11 7.594 3.17 11.87 3.17 2.852 0 5.668-.534 8.447-1.595.315-.14.39-.1.494.124.102.167.066.334-.12.496-2.7 1.861-5.937 2.797-9.713 2.797-2.997 0-5.805-.668-8.426-2.003z"/></svg>
           </div>
-          <div class="ttxt"><strong>Amazon</strong><span>Sponsored products removed</span></div>
+          <div class="ttxt"><strong data-i18n="amazon">Amazon</strong><span data-i18n="sponsored_products_removed">Sponsored products removed</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-az" data-s="amazon" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -597,7 +597,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-net">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1 17.9c-4-.5-7-3.9-7-7.9 0-.6.1-1.2.2-1.8L9 15v1c0 1.1.9 2 2 2v1.9zm6.9-2.5c-.3-.8-1-1.4-1.9-1.4h-1v-3c0-.6-.4-1-1-1H8V8h2c.6 0 1-.5 1-1V5h2c1.1 0 2-.9 2-2v-.4c2.9 1.2 5 4.1 5 7.4 0 2.1-.8 4-2.1 5.4z"/></svg>
           </div>
-          <div class="ttxt"><strong>Network Block</strong><span id="rules-desc">EasyList + 22 filter lists</span></div>
+          <div class="ttxt"><strong data-i18n="network_block">Network Block</strong><span data-i18n="easylist_22_filter_lists" id="rules-desc">EasyList + 22 filter lists</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-wb" data-s="general" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -607,7 +607,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-soc">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#ec4899"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
           </div>
-          <div class="ttxt"><strong>Social Media</strong><span>FB · Instagram · Reddit · X · TikTok</span></div>
+          <div class="ttxt"><strong data-i18n="social_media">Social Media</strong><span data-i18n="fb_instagram_reddit_x_tiktok">FB · Instagram · Reddit · X · TikTok</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-sm" data-s="social" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -616,7 +616,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-cks">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#34d399"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
           </div>
-          <div class="ttxt"><strong>Cookie Banners</strong><span>Auto-reject GDPR · 60+ CMPs</span></div>
+          <div class="ttxt"><strong data-i18n="cookie_banners">Cookie Banners</strong><span data-i18n="auto_reject_gdpr_60_cmps">Auto-reject GDPR · 60+ CMPs</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-ck" data-s="cookies" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -626,7 +626,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-fp">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#00d97e"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93-2.67-1.14-5-4.43-5-7.93V7.18L12 5z"/></svg>
           </div>
-          <div class="ttxt"><strong>Anti-Fingerprint</strong><span>Canvas · WebGL · AudioContext</span></div>
+          <div class="ttxt"><strong data-i18n="anti_fingerprint">Anti-Fingerprint</strong><span data-i18n="canvas_webgl_audiocontext">Canvas · WebGL · AudioContext</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-pr" data-s="privacy" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -636,7 +636,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-url">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#f5c542"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
           </div>
-          <div class="ttxt"><strong>URL Tracker Removal</strong><span>Strip UTM, fbclid, ttclid, 40+ params</span></div>
+          <div class="ttxt"><strong data-i18n="url_tracker_removal">URL Tracker Removal</strong><span data-i18n="strip_utm_fbclid_ttclid_40_params">Strip UTM, fbclid, ttclid, 40+ params</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-tr" data-s="tracking" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -646,19 +646,19 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-cos">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M2 6h20v2H2zm2 5h16v2H4zm3 5h10v2H7z"/></svg>
           </div>
-          <div class="ttxt"><strong>Cosmetic Hiding</strong><span>CSS element removal &amp; domain rules</span></div>
+          <div class="ttxt"><strong data-i18n="cosmetic_hiding">Cosmetic Hiding</strong><span data-i18n="css_element_removal_domain_rules">CSS element removal &amp; domain rules</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-cos" data-s="cosmetic" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
 
-      <div class="sec-hd">Platforms</div>
+      <div data-i18n="platforms" class="sec-hd">Platforms</div>
 
       <label class="tr" for="t-yt">
         <div class="tr-info">
           <div class="ti ti-yt">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
           </div>
-          <div class="ttxt"><strong>YouTube</strong><span>Skip &amp; mute ads · remove overlays</span></div>
+          <div class="ttxt"><strong data-i18n="youtube">YouTube</strong><span data-i18n="skip_mute_ads_remove_overlays">Skip &amp; mute ads · remove overlays</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-yt" data-s="youtube" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -668,7 +668,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-tw">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#9147ff"><path d="M11.6 4.7h1.7v5.1h-1.7zm4.7 0H18v5.1h-1.7zM6 0L1.7 4.3v15.4h5.1V24l4.3-4.3h3.4l8.2-8.2V0H6zm14.6 11.1l-3.4 3.5H13.8l-3 3v-3H6.9V1.7h13.7v9.4z"/></svg>
           </div>
-          <div class="ttxt"><strong>Twitch</strong><span>Stream ad mute + swap</span></div>
+          <div class="ttxt"><strong data-i18n="twitch">Twitch</strong><span data-i18n="stream_ad_mute_swap">Stream ad mute + swap</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-tw" data-s="twitch" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -678,7 +678,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-sp">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#1db954"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 14.36c-.2.32-.62.43-.94.24-2.57-1.57-5.8-1.93-9.61-1.06-.37.09-.73-.14-.82-.51-.09-.37.14-.73.51-.82 4.17-.96 7.74-.55 10.63 1.22.33.2.44.62.23.93zm1.24-2.76c-.25.41-.77.53-1.18.29-2.94-1.81-7.43-2.33-10.91-1.28-.46.14-.94-.12-1.08-.57-.13-.46.12-.95.57-1.08 3.98-1.2 8.93-.62 12.32 1.46.41.25.53.77.28 1.18zm.1-2.88c-3.53-2.1-9.33-2.29-12.7-1.27-.54.16-1.1-.14-1.27-.68-.16-.54.14-1.1.68-1.27 3.87-1.17 10.3-.95 14.36 1.47.49.29.65.92.36 1.41-.29.49-.92.65-1.43.34z"/></svg>
           </div>
-          <div class="ttxt"><strong>Spotify</strong><span>Ad mute + skip</span></div>
+          <div class="ttxt"><strong data-i18n="spotify">Spotify</strong><span data-i18n="ad_mute_skip">Ad mute + skip</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-sp" data-s="spotify" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -688,7 +688,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-hl">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#1ca8ff"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zM9 12l6-3.5v7z"/></svg>
           </div>
-          <div class="ttxt"><strong>Hulu</strong><span>Ad mute during breaks</span></div>
+          <div class="ttxt"><strong data-i18n="hulu">Hulu</strong><span data-i18n="ad_mute_during_breaks">Ad mute during breaks</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-hl" data-s="hulu" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -698,19 +698,19 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-kk">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#53fc4e"><path d="M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm4 5v10l9-5-9-5z"/></svg>
           </div>
-          <div class="ttxt"><strong>Kick</strong><span>Ad mute during breaks</span></div>
+          <div class="ttxt"><strong data-i18n="kick">Kick</strong><span data-i18n="ad_mute_during_breaks">Ad mute during breaks</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-kk" data-s="kick" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
 
-      <div class="sec-hd">Privacy & Advanced</div>
+      <div data-i18n="privacy_advanced" class="sec-hd">Privacy & Advanced</div>
 
       <label class="tr" for="t-sb">
         <div class="tr-info">
           <div class="ti ti-sbs">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#f87171"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 14l-3-3 1.41-1.41L11 12.17l4.59-4.58L17 9l-6 6z"/></svg>
           </div>
-          <div class="ttxt"><strong>Safe Browsing</strong><span>Block malware &amp; phishing URLs</span></div>
+          <div class="ttxt"><strong data-i18n="safe_browsing_2">Safe Browsing</strong><span data-i18n="block_malware_phishing_urls">Block malware &amp; phishing URLs</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-sb" data-s="safeBrowsing" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -720,7 +720,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-dnt">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#34d399"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
           </div>
-          <div class="ttxt"><strong>DNT + Sec-GPC Headers</strong><span>Signal opt-out to every site (legally binding in CA)</span></div>
+          <div class="ttxt"><strong data-i18n="dnt_sec_gpc_headers">DNT + Sec-GPC Headers</strong><span data-i18n="signal_opt_out_to_every_site_legally_bin">Signal opt-out to every site (legally binding in CA)</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-dnt" data-s="privacyHeaders" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -730,7 +730,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-hts">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#34d399"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm1 13H11V11h2v3zm0-5H11V7h2v2z"/></svg>
           </div>
-          <div class="ttxt"><strong>HTTPS Upgrading</strong><span>Upgrade http:// links to https://</span></div>
+          <div class="ttxt"><strong data-i18n="https_upgrading">HTTPS Upgrading</strong><span data-i18n="upgrade_http_links_to_https">Upgrade http:// links to https://</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-https" data-s="httpsUpgrade" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -740,7 +740,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-dnt">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93C7.06 19.43 4 16.07 4 12c0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41C17.92 5.77 20 8.65 20 12c0 2.08-.81 3.98-2.1 5.39z"/></svg>
           </div>
-          <div class="ttxt"><strong>CNAME Uncloaking</strong><span>Unmask first-party-disguised trackers (Firefox)</span></div>
+          <div class="ttxt"><strong data-i18n="cname_uncloaking">CNAME Uncloaking</strong><span data-i18n="unmask_first_party_disguised_trackers_fi">Unmask first-party-disguised trackers (Firefox)</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-cname"><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -750,7 +750,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-tz">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
           </div>
-          <div class="ttxt"><strong>Timezone Spoofing</strong><span>Report UTC timezone to all sites (opt-in)</span></div>
+          <div class="ttxt"><strong data-i18n="timezone_spoofing">Timezone Spoofing</strong><span data-i18n="report_utc_timezone_to_all_sites_opt_in">Report UTC timezone to all sites (opt-in)</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-tz" data-s="timezoneSpoof"><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -760,7 +760,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-pw">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#fbbf24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
           </div>
-          <div class="ttxt"><strong>Soft Paywall Bypass</strong><span>Remove blur overlays (opt-in)</span></div>
+          <div class="ttxt"><strong data-i18n="soft_paywall_bypass">Soft Paywall Bypass</strong><span data-i18n="remove_blur_overlays_opt_in">Remove blur overlays (opt-in)</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-pw" data-s="paywall"><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
@@ -774,15 +774,15 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       <div class="site-card">
         <div class="site-url" id="site-url">—</div>
         <div class="site-row">
-          <span class="site-lbl">Block ads on this site</span>
+          <span data-i18n="block_ads_on_this_site" class="site-lbl">Block ads on this site</span>
           <div class="sw lg">
             <input type="checkbox" id="site-toggle" checked>
             <div class="sw-t"><div class="sw-k"></div></div>
           </div>
         </div>
       </div>
-      <div class="wl-hd">Whitelisted sites</div>
-      <div id="wl-list"><div class="wl-empty">No sites whitelisted</div></div>
+      <div data-i18n="whitelisted_sites" class="wl-hd">Whitelisted sites</div>
+      <div id="wl-list"><div data-i18n="no_sites_whitelisted" class="wl-empty">No sites whitelisted</div></div>
     </div>
   </div>
 
@@ -793,56 +793,56 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       <!-- ── Health check ─────────────────────────────────────────────── -->
       <div class="sup-card sup-card-sm">
         <div class="sup-hd">
-          <div class="sup-label">Extension Health</div>
-          <button class="ghost sup-ghost-sm" id="run-health-check">Run check</button>
+          <div data-i18n="extension_health" class="sup-label">Extension Health</div>
+          <button data-i18n="run_check" class="ghost sup-ghost-sm" id="run-health-check">Run check</button>
         </div>
-        <div id="health-summary">Click 'Run check' to test all subsystems</div>
+        <div data-i18n="click_run_check_to_test_all_subsystems" id="health-summary">Click 'Run check' to test all subsystems</div>
         <div id="health-checks"></div>
       </div>
 
       <div class="sup-card">
-        <div class="sup-label">Free Software</div>
-        <p>ShieldBlock is completely free — no subscription, no license, no tricks.</p>
-        <p class="sup-p-note">If it saves you time, a tip is always appreciated but never required.</p>
+        <div data-i18n="free_software" class="sup-label">Free Software</div>
+        <p data-i18n="shieldblock_is_completely_free_no_subscr">ShieldBlock is completely free — no subscription, no license, no tricks.</p>
+        <p data-i18n="if_it_saves_you_time_a_tip_is_always_app" class="sup-p-note">If it saves you time, a tip is always appreciated but never required.</p>
       </div>
 
       <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener" class="tip-btn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="white" opacity=".9"><path d="M8.5 8L7 16h1.5l.5-3h2.14c2.21 0 4-1.79 4-4a3 3 0 00-3-3H9L8.5 8z"/></svg>
         <div>
-          <div class="tip-title">TIP VIA PAYPAL</div>
-          <div class="tip-sub">paypal.me/BronsonBissell</div>
+          <div data-i18n="tip_via_paypal" class="tip-title">TIP VIA PAYPAL</div>
+          <div data-i18n="paypal_me_bronsonbissell" class="tip-sub">paypal.me/BronsonBissell</div>
         </div>
       </a>
 
       <a href="mailto:zombiekillacrew@gmail.com" target="_blank" rel="noopener" class="dev-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
         <div>
-          <div class="dev-title">Developer</div>
-          <div class="dev-sub">zombiekillacrew@gmail.com</div>
+          <div data-i18n="developer" class="dev-title">Developer</div>
+          <div data-i18n="zombiekillacrew_gmail_com" class="dev-sub">zombiekillacrew@gmail.com</div>
         </div>
       </a>
 
       <div class="sup-card sup-card-sm">
-        <div class="sup-label">Preferences</div>
+        <div data-i18n="preferences" class="sup-label">Preferences</div>
         <label class="pref-row">
-          <span class="pref-lbl">Show block count badge</span>
+          <span data-i18n="show_block_count_badge" class="pref-lbl">Show block count badge</span>
           <div class="sw"><input type="checkbox" id="t-badge" data-s="badgeEnabled" checked><div class="sw-t"><div class="sw-k"></div></div></div>
         </label>
       </div>
 
       <div class="sup-card sup-card-sm">
-        <div class="sup-label">Cloud Sync</div>
-        <p class="sup-p-desc">Sync settings &amp; whitelist across your Chrome devices. Settings auto-sync on change.</p>
+        <div data-i18n="cloud_sync" class="sup-label">Cloud Sync</div>
+        <p data-i18n="sync_settings_whitelist_across_your_chro" class="sup-p-desc">Sync settings &amp; whitelist across your Chrome devices. Settings auto-sync on change.</p>
         <div class="sup-btn-row">
-          <button class="ghost ghost-bd sup-ghost-full" id="cloud-push-btn">↑ Push</button>
-          <button class="ghost ghost-bd sup-ghost-full" id="cloud-restore-btn">↓ Pull</button>
+          <button data-i18n="push" class="ghost ghost-bd sup-ghost-full" id="cloud-push-btn">↑ Push</button>
+          <button data-i18n="pull" class="ghost ghost-bd sup-ghost-full" id="cloud-restore-btn">↓ Pull</button>
         </div>
         <div id="cloud-status"></div>
       </div>
 
       <div class="sup-card sup-card-sm">
-        <div class="sup-label">Import uBlock Origin</div>
-        <p class="sup-p-desc">Migrate your rules &amp; whitelist from a uBO backup file</p>
+        <div data-i18n="import_ublock_origin" class="sup-label">Import uBlock Origin</div>
+        <p data-i18n="migrate_your_rules_whitelist_from_a_ubo_" class="sup-p-desc">Migrate your rules &amp; whitelist from a uBO backup file</p>
         <label class="ghost ghost-bd sup-file-label">
           ↑ Select uBO backup (.json)
           <input type="file" id="ubo-import-btn" accept=".json" style="display:none">
@@ -851,32 +851,32 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
 
       <div class="sup-card sup-card-sm">
-        <div class="sup-label">Backup &amp; Restore</div>
+        <div data-i18n="backup_restore" class="sup-label">Backup &amp; Restore</div>
         <div class="sup-btn-row mb6">
-          <button class="ghost ghost-bd sup-ghost-full" id="export-btn">⬇ Export settings</button>
+          <button data-i18n="export_settings" class="ghost ghost-bd sup-ghost-full" id="export-btn">⬇ Export settings</button>
           <label class="ghost ghost-bd sup-ghost-full" style="cursor:pointer;text-align:center">
             ⬆ Import
             <input type="file" id="import-btn" accept=".json" style="display:none">
           </label>
         </div>
         <div class="mb6">
-          <button class="ghost ghost-bd" id="export-diagnostic" style="width:100%;text-align:center;color:var(--muted);font-size:10px" title="Export full diagnostic snapshot (settings + stats + filter status + recent log) for debugging">🔍 Export diagnostic report</button>
+          <button data-i18n="export_diagnostic_report" class="ghost ghost-bd" id="export-diagnostic" style="width:100%;text-align:center;color:var(--muted);font-size:10px" title="Export full diagnostic snapshot (settings + stats + filter status + recent log) for debugging">🔍 Export diagnostic report</button>
         </div>
         <div class="mb6">
-          <button class="ghost ghost-bd" id="export-stats-csv" style="width:100%;text-align:center;color:var(--muted);font-size:10px" title="Export 30-day blocking stats as CSV">📊 Export stats CSV</button>
+          <button data-i18n="export_stats_csv" class="ghost ghost-bd" id="export-stats-csv" style="width:100%;text-align:center;color:var(--muted);font-size:10px" title="Export 30-day blocking stats as CSV">📊 Export stats CSV</button>
         </div>
         <div id="import-status"></div>
       </div>
       <div class="sup-card sup-card-sm">
         <div class="sup-info">
-          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.10.1<br>
-          <a href="https://astonishing-swan-da7249.netlify.app" target="_blank" rel="noopener"
+          Built by <span data-i18n="bronson_bissell" style="color:var(--text)">Bronson Bissell</span> · v2.10.1<br>
+          <a data-i18n="privacy_policy" href="https://astonishing-swan-da7249.netlify.app" target="_blank" rel="noopener"
              style="color:var(--accent2);text-decoration:none;font-size:10px">Privacy Policy ↗</a>
         </div>
       </div>
 
-      <div class="wl-hd wl-hd-mt">Custom hidden elements</div>
-      <div id="custom-rules-list"><div class="wl-empty">None — use ⊕ pick to hide elements</div></div>
+      <div data-i18n="custom_hidden_elements" class="wl-hd wl-hd-mt">Custom hidden elements</div>
+      <div id="custom-rules-list"><div data-i18n="none_use_pick_to_hide_elements" class="wl-empty">None — use ⊕ pick to hide elements</div></div>
     </div>
   </div>
 
@@ -884,10 +884,10 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
    <div class="panel" id="panel-filters">
      <div class="fil-sec">
        <div class="fil-sec-hd">
-         <span class="fil-label">My Filter Rules</span>
+         <span data-i18n="my_filter_rules" class="fil-label">My Filter Rules</span>
          <div class="fil-btns">
-           <button class="ghost fil-ghost-sm" id="import-ub-btn" title="Import rules from clipboard (uBlock Origin / ABP format)">⬆ Import</button>
-           <button class="ghost fil-ghost-sm" id="export-ub-btn" title="Copy all rules to clipboard">⬇ Copy</button>
+           <button data-i18n="import" class="ghost fil-ghost-sm" id="import-ub-btn" title="Import rules from clipboard (uBlock Origin / ABP format)">⬆ Import</button>
+           <button data-i18n="copy" class="ghost fil-ghost-sm" id="export-ub-btn" title="Copy all rules to clipboard">⬇ Copy</button>
          </div>
        </div>
        <textarea id="filters-text" spellcheck="false" placeholder="# One rule per line. Supports uBlock / ABP / ABP+ format:
@@ -897,36 +897,36 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
  ||bad-domain.com^
  $removeparam=fbclid"></textarea>
        <div class="fil-btn-row">
-         <button class="ghost ghost-accent" id="filters-save" style="flex:1;text-align:center">Apply rules</button>
-         <button class="ghost" id="filters-clear">Clear all</button>
+         <button data-i18n="apply_rules" class="ghost ghost-accent" id="filters-save" style="flex:1;text-align:center">Apply rules</button>
+         <button data-i18n="clear_all" class="ghost" id="filters-clear">Clear all</button>
        </div>
        <div id="filters-status"></div>
      </div>
 
      <!-- ── Import from URL ──────────────────────────────────────────── -->
      <div class="fil-divider">
-       <div class="fil-label fil-label-top">Import from URL</div>
+       <div data-i18n="import_from_url" class="fil-label fil-label-top">Import from URL</div>
        <div class="fil-input-row">
          <input type="text" id="import-url-input" placeholder="https://… (any .txt filter list)">
-         <button class="ghost ghost-accent" id="import-url-btn" style="white-space:nowrap">Fetch</button>
+         <button data-i18n="fetch" class="ghost ghost-accent" id="import-url-btn" style="white-space:nowrap">Fetch</button>
        </div>
        <div id="import-url-status"></div>
      </div>
 
      <div class="fil-divider fil-divider-lg">
-       <div class="fil-label fil-label-top">Supported filter types</div>
+       <div data-i18n="supported_filter_types" class="fil-label fil-label-top">Supported filter types</div>
        <div class="fil-types">
-         <div>##<span>.selector</span> — global hide</div>
-         <div>site.com##<span>.selector</span> — site hide</div>
-         <div>||<span>domain.com</span>^ — block domain</div>
-         <div>##+js(<span>scriptlet, args</span>) — scriptlet</div>
-         <div>$removeparam=<span>param</span> — strip tracking param</div>
+         <div>##<span data-i18n="selector">.selector</span> — global hide</div>
+         <div>site.com##<span data-i18n="selector">.selector</span> — site hide</div>
+         <div>||<span data-i18n="domain_com">domain.com</span>^ — block domain</div>
+         <div>##+js(<span data-i18n="scriptlet_args">scriptlet, args</span>) — scriptlet</div>
+         <div>$removeparam=<span data-i18n="param">param</span> — strip tracking param</div>
        </div>
      </div>
     <div class="fil-divider">
       <div class="fil-sec-hd fil-label-top">
-        <span class="fil-label">Subscribe to Filter Lists</span>
-        <button class="ghost fil-ghost-sm" id="catalog-toggle">Browse catalog</button>
+        <span data-i18n="subscribe_to_filter_lists" class="fil-label">Subscribe to Filter Lists</span>
+        <button data-i18n="browse_catalog" class="ghost fil-ghost-sm" id="catalog-toggle">Browse catalog</button>
       </div>
       <!-- Curated catalog browser — hidden until toggled -->
       <div id="catalog-panel" style="display:none">
@@ -937,7 +937,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       <input type="text" id="cl-url" placeholder="https://example.com/filters.txt">
       <div class="fil-input-row">
         <input type="text" id="cl-name" placeholder="List name (optional)">
-        <button class="ghost ghost-accent" id="cl-add-btn">Add</button>
+        <button data-i18n="add" class="ghost ghost-accent" id="cl-add-btn">Add</button>
       </div>
       <div id="cl-status"></div>
     </div>
@@ -956,17 +956,17 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <div class="panel" id="panel-log">
     <div class="log-hdr">
       <div id="log-filters">
-        <button class="log-ftag active" data-src="all">all</button>
-        <button class="log-ftag" data-src="network">net</button>
-        <button class="log-ftag" data-src="general">web</button>
+        <button data-i18n="all_2" class="log-ftag active" data-src="all">all</button>
+        <button data-i18n="net" class="log-ftag" data-src="network">net</button>
+        <button data-i18n="web_2" class="log-ftag" data-src="general">web</button>
         <button class="log-ftag" data-src="cookies">🍪</button>
         <button class="log-ftag" data-src="social">📱</button>
         <button class="log-ftag" data-src="amazon">📦</button>
         <button class="log-ftag" data-src="picker">🎯</button>
       </div>
       <div class="log-hdr-btns">
-        <button class="ghost ghost-bd" id="download-log-txt" title="Download full log as .txt file">⬇ txt</button>
-        <button class="ghost" id="clear-log">clear</button>
+        <button data-i18n="txt" class="ghost ghost-bd" id="download-log-txt" title="Download full log as .txt file">⬇ txt</button>
+        <button data-i18n="clear" class="ghost" id="clear-log">clear</button>
       </div>
     </div>
     <div id="log-list"></div>
@@ -975,15 +975,16 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <!-- FOOTER -->
   <div class="ftr">
     <div class="ftr-l">
-      <span class="ftr-badge">FREE</span>
-      <span class="ver">ShieldBlock v2.10.1</span>
+      <span data-i18n="free" class="ftr-badge">FREE</span>
+      <span data-i18n="shieldblock_v2_10_1" class="ver">ShieldBlock v2.10.1</span>
     </div>
-    <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
+    <a data-i18n="tip" href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
        class="ghost" style="text-decoration:none">tip ❤</a>
   </div>
 
 </div>
 
+<script src="src/i18n.js"></script>
 <script src="src/browser-compat.js"></script>
 <script src="popup.js"></script>
 </body>

@@ -1,0 +1,485 @@
+{
+  "activate_element_picker": {
+    "message": "Activate element picker"
+  },
+  "ad_mute_during_breaks": {
+    "message": "Ad mute during breaks"
+  },
+  "ad_mute_skip": {
+    "message": "Ad mute + skip"
+  },
+  "add": {
+    "message": "Add"
+  },
+  "ads_blocked_privacy_secured": {
+    "message": "Ads blocked. Privacy secured."
+  },
+  "all": {
+    "message": "⏸ all"
+  },
+  "all_2": {
+    "message": "all"
+  },
+  "alt_shift_b": {
+    "message": "Alt + Shift + B"
+  },
+  "alt_shift_p": {
+    "message": "Alt + Shift + P"
+  },
+  "alt_shift_s": {
+    "message": "Alt + Shift + S"
+  },
+  "amazon": {
+    "message": "Amazon"
+  },
+  "anti_fingerprint": {
+    "message": "Anti-Fingerprint"
+  },
+  "anti_fingerprinting": {
+    "message": "Anti-Fingerprinting"
+  },
+  "api_level": {
+    "message": "API-level"
+  },
+  "appDesc": {
+    "message": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in."
+  },
+  "appName": {
+    "message": "ShieldBlock Pro"
+  },
+  "apply_rules": {
+    "message": "Apply rules"
+  },
+  "auto_reject_gdpr_60_cmps": {
+    "message": "Auto-reject GDPR · 60+ CMPs"
+  },
+  "backup_restore": {
+    "message": "Backup & Restore"
+  },
+  "block_ads_on_this_site": {
+    "message": "Block ads on this site"
+  },
+  "block_malware_phishing_urls": {
+    "message": "Block malware & phishing URLs"
+  },
+  "blocked_on_this_page": {
+    "message": "Blocked on this page"
+  },
+  "blocked_url": {
+    "message": "Blocked URL"
+  },
+  "blockers": {
+    "message": "Blockers"
+  },
+  "bronson_bissell": {
+    "message": "Bronson Bissell"
+  },
+  "browse_catalog": {
+    "message": "Browse catalog"
+  },
+  "canvas_webgl_audiocontext": {
+    "message": "Canvas · WebGL · AudioContext"
+  },
+  "canvas_webgl_audiocontext_battery_api_an": {
+    "message": "Canvas, WebGL, AudioContext, Battery API, and Screen all spoofed"
+  },
+  "clear": {
+    "message": "clear"
+  },
+  "clear_all": {
+    "message": "Clear all"
+  },
+  "click_run_check_to_test_all_subsystems": {
+    "message": "Click 'Run check' to test all subsystems"
+  },
+  "cloud_sync": {
+    "message": "Cloud Sync"
+  },
+  "cname_uncloaking": {
+    "message": "CNAME Uncloaking"
+  },
+  "cookie_auto_reject": {
+    "message": "Cookie Auto-Reject"
+  },
+  "cookie_banners": {
+    "message": "Cookie Banners"
+  },
+  "cookies": {
+    "message": "Cookies"
+  },
+  "copy": {
+    "message": "⬇ Copy"
+  },
+  "cosmetic_hiding": {
+    "message": "Cosmetic Hiding"
+  },
+  "css_element_removal_domain_rules": {
+    "message": "CSS element removal & domain rules"
+  },
+  "css_overlay_paywalls_removed_from_news_s": {
+    "message": "CSS-overlay paywalls removed from news sites (enable in Settings)"
+  },
+  "custom_hidden_elements": {
+    "message": "Custom hidden elements"
+  },
+  "dangerous_site_blocked": {
+    "message": "Dangerous Site Blocked"
+  },
+  "developer": {
+    "message": "Developer"
+  },
+  "dnt_sec_gpc_headers": {
+    "message": "DNT + Sec-GPC Headers"
+  },
+  "domain_com": {
+    "message": "domain.com"
+  },
+  "easylist_22_filter_lists": {
+    "message": "EasyList + 22 filter lists"
+  },
+  "everywhere_else": {
+    "message": "Everywhere else"
+  },
+  "export_diagnostic_report": {
+    "message": "🔍 Export diagnostic report"
+  },
+  "export_settings": {
+    "message": "⬇ Export settings"
+  },
+  "export_stats_csv": {
+    "message": "📊 Export stats CSV"
+  },
+  "extension_health": {
+    "message": "Extension Health"
+  },
+  "fb_instagram_reddit_x_tiktok": {
+    "message": "FB · Instagram · Reddit · X · TikTok"
+  },
+  "fetch": {
+    "message": "Fetch"
+  },
+  "filters": {
+    "message": "Filters"
+  },
+  "filters_synced": {
+    "message": "Filters synced"
+  },
+  "free": {
+    "message": "FREE"
+  },
+  "free_software": {
+    "message": "Free Software"
+  },
+  "go_back_to_safety": {
+    "message": "← Go Back to Safety"
+  },
+  "hls_worker": {
+    "message": "HLS worker"
+  },
+  "https_upgrading": {
+    "message": "HTTPS Upgrading"
+  },
+  "hulu": {
+    "message": "Hulu"
+  },
+  "if_it_saves_you_time_a_tip_is_always_app": {
+    "message": "If it saves you time, a tip is always appreciated but never required."
+  },
+  "import": {
+    "message": "⬆ Import"
+  },
+  "import_from_url": {
+    "message": "Import from URL"
+  },
+  "import_ublock_origin": {
+    "message": "Import uBlock Origin"
+  },
+  "keyboard_shortcuts": {
+    "message": "Keyboard shortcuts"
+  },
+  "kick": {
+    "message": "Kick"
+  },
+  "lifetime_total": {
+    "message": "Lifetime total"
+  },
+  "live_stats_logs": {
+    "message": "Live Stats & Logs"
+  },
+  "log": {
+    "message": "Log"
+  },
+  "malware": {
+    "message": "⚠ Malware"
+  },
+  "migrate_your_rules_whitelist_from_a_ubo_": {
+    "message": "Migrate your rules & whitelist from a uBO backup file"
+  },
+  "muted": {
+    "message": "muted"
+  },
+  "my_filter_rules": {
+    "message": "My Filter Rules"
+  },
+  "net": {
+    "message": "net"
+  },
+  "network_block": {
+    "message": "Network Block"
+  },
+  "network_web": {
+    "message": "Network & Web"
+  },
+  "no_blocks_recorded_yet": {
+    "message": "No blocks recorded yet"
+  },
+  "no_sites_whitelisted": {
+    "message": "No sites whitelisted"
+  },
+  "none_use_pick_to_hide_elements": {
+    "message": "None — use ⊕ pick to hide elements"
+  },
+  "open_shieldblock": {
+    "message": "Open ShieldBlock"
+  },
+  "param": {
+    "message": "param"
+  },
+  "pause": {
+    "message": "⏸ pause"
+  },
+  "paypal_me_bronsonbissell": {
+    "message": "paypal.me/BronsonBissell"
+  },
+  "paywall_bypass": {
+    "message": "Paywall Bypass"
+  },
+  "per_platform_ad_counts_time_saved_and_a_": {
+    "message": "Per-platform ad counts, time saved, and a full debug log — all in the popup"
+  },
+  "phishing": {
+    "message": "🎣 Phishing"
+  },
+  "pick": {
+    "message": "⊕ pick"
+  },
+  "platform_ad_blocking": {
+    "message": "Platform ad blocking"
+  },
+  "platforms": {
+    "message": "Platforms"
+  },
+  "preferences": {
+    "message": "Preferences"
+  },
+  "privacy_advanced": {
+    "message": "Privacy & Advanced"
+  },
+  "privacy_policy": {
+    "message": "Privacy Policy ↗"
+  },
+  "privacy_web_protection": {
+    "message": "Privacy & web protection"
+  },
+  "proceed_anyway_not_recommended": {
+    "message": "Proceed anyway (not recommended)"
+  },
+  "pull": {
+    "message": "↓ Pull"
+  },
+  "push": {
+    "message": "↑ Push"
+  },
+  "remove_blur_overlays_opt_in": {
+    "message": "Remove blur overlays (opt-in)"
+  },
+  "report_utc_timezone_to_all_sites_opt_in": {
+    "message": "Report UTC timezone to all sites (opt-in)"
+  },
+  "reset": {
+    "message": "↺ reset"
+  },
+  "run_check": {
+    "message": "Run check"
+  },
+  "safe_browsing": {
+    "message": "🛡 Safe Browsing"
+  },
+  "safe_browsing_2": {
+    "message": "Safe Browsing"
+  },
+  "scriptlet_args": {
+    "message": "scriptlet, args"
+  },
+  "selector": {
+    "message": ".selector"
+  },
+  "session": {
+    "message": "Session"
+  },
+  "settings": {
+    "message": "Settings"
+  },
+  "shieldblock_detected_this_url_in_active_": {
+    "message": "ShieldBlock detected this URL in active malware and phishing threat lists. Visiting may expose your device to malicious software or credential theft."
+  },
+  "shieldblock_hide_this_element": {
+    "message": "ShieldBlock: Hide this element"
+  },
+  "shieldblock_is_completely_free_no_subscr": {
+    "message": "ShieldBlock is completely free — no subscription, no license, no tricks."
+  },
+  "shieldblock_pro": {
+    "message": "ShieldBlock Pro"
+  },
+  "shieldblock_pro_is_running_no_setup_need": {
+    "message": "ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now."
+  },
+  "shieldblock_v2_10_1": {
+    "message": "ShieldBlock v2.10.1"
+  },
+  "show_block_count_badge": {
+    "message": "Show block count badge"
+  },
+  "signal_opt_out_to_every_site_legally_bin": {
+    "message": "Signal opt-out to every site (legally binding in CA)"
+  },
+  "skip_mute_ads_remove_overlays": {
+    "message": "Skip & mute ads · remove overlays"
+  },
+  "social": {
+    "message": "Social"
+  },
+  "social_media": {
+    "message": "Social Media"
+  },
+  "soft_paywall_bypass": {
+    "message": "Soft Paywall Bypass"
+  },
+  "sponsored": {
+    "message": "sponsored"
+  },
+  "sponsored_posts_removed_from_facebook_in": {
+    "message": "Sponsored posts removed from Facebook, Instagram, Reddit, X, LinkedIn, TikTok"
+  },
+  "sponsored_products_removed": {
+    "message": "Sponsored products removed"
+  },
+  "spotify": {
+    "message": "Spotify"
+  },
+  "start_browsing": {
+    "message": "Start browsing →"
+  },
+  "stats": {
+    "message": "Stats"
+  },
+  "stream_ad_mute_swap": {
+    "message": "Stream ad mute + swap"
+  },
+  "strip_utm_fbclid_ttclid_40_params": {
+    "message": "Strip UTM, fbclid, ttclid, 40+ params"
+  },
+  "subscribe_to_filter_lists": {
+    "message": "Subscribe to Filter Lists"
+  },
+  "support": {
+    "message": "Support"
+  },
+  "supported_filter_types": {
+    "message": "Supported filter types"
+  },
+  "sync": {
+    "message": "↺ sync"
+  },
+  "sync_settings_whitelist_across_your_chro": {
+    "message": "Sync settings & whitelist across your Chrome devices. Settings auto-sync on change."
+  },
+  "t_1h": {
+    "message": "1h"
+  },
+  "t_30_filter_lists": {
+    "message": "30+ filter lists"
+  },
+  "t_30m": {
+    "message": "30m"
+  },
+  "t_3h": {
+    "message": "3h"
+  },
+  "t_3rd_party_blocking": {
+    "message": "3rd-party blocking"
+  },
+  "t_60_consent_platforms_rejected_automatica": {
+    "message": "60+ consent platforms rejected automatically — banners gone, not just hidden"
+  },
+  "t_7_day_activity": {
+    "message": "7-day activity"
+  },
+  "t_80_tracking_params_stripped_fbclid_utm_g": {
+    "message": "80+ tracking params stripped — fbclid, utm_*, gclid, ttclid, and more"
+  },
+  "t_8h": {
+    "message": "8h"
+  },
+  "this_page": {
+    "message": "This page"
+  },
+  "time_saved": {
+    "message": "Time saved"
+  },
+  "timezone_spoofing": {
+    "message": "Timezone Spoofing"
+  },
+  "tip": {
+    "message": "tip ❤"
+  },
+  "tip_via_paypal": {
+    "message": "TIP VIA PAYPAL"
+  },
+  "toggle_blocking_on_current_site": {
+    "message": "Toggle blocking on current site"
+  },
+  "top_blocked_this_session": {
+    "message": "Top blocked this session"
+  },
+  "twitch": {
+    "message": "Twitch"
+  },
+  "txt": {
+    "message": "⬇ txt"
+  },
+  "unmask_first_party_disguised_trackers_fi": {
+    "message": "Unmask first-party-disguised trackers (Firefox)"
+  },
+  "upgrade_http_links_to_https": {
+    "message": "Upgrade http:// links to https://"
+  },
+  "url_cleaning": {
+    "message": "URL Cleaning"
+  },
+  "url_tracker_removal": {
+    "message": "URL Tracker Removal"
+  },
+  "v2_10_1_free_forever": {
+    "message": "v2.10.1 · Free forever"
+  },
+  "web": {
+    "message": "Web"
+  },
+  "web_2": {
+    "message": "web"
+  },
+  "whitelist": {
+    "message": "Whitelist"
+  },
+  "whitelisted_sites": {
+    "message": "Whitelisted sites"
+  },
+  "youtube": {
+    "message": "YouTube"
+  },
+  "zombiekillacrew_gmail_com": {
+    "message": "zombiekillacrew@gmail.com"
+  }
+}

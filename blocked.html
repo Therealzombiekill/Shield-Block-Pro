@@ -40,30 +40,31 @@
 <body>
 <div class="card">
   <span class="icon">🛡</span>
-  <h1>Dangerous Site Blocked</h1>
-  <p class="subtitle">ShieldBlock detected this URL in active malware and phishing threat lists. Visiting may expose your device to malicious software or credential theft.</p>
+  <h1 data-i18n="dangerous_site_blocked">Dangerous Site Blocked</h1>
+  <p data-i18n="shieldblock_detected_this_url_in_active_" class="subtitle">ShieldBlock detected this URL in active malware and phishing threat lists. Visiting may expose your device to malicious software or credential theft.</p>
 
   <div class="badges">
-    <span class="badge badge-malware" id="badge-malware">⚠ Malware</span>
-    <span class="badge badge-phishing" id="badge-phishing" style="display:none">🎣 Phishing</span>
+    <span data-i18n="malware" class="badge badge-malware" id="badge-malware">⚠ Malware</span>
+    <span data-i18n="phishing" class="badge badge-phishing" id="badge-phishing" style="display:none">🎣 Phishing</span>
   </div>
 
   <div class="url-box">
-    <div class="url-label">Blocked URL</div>
+    <div data-i18n="blocked_url" class="url-label">Blocked URL</div>
     <div id="blocked-url">—</div>
   </div>
 
   <div class="actions">
-    <button class="btn btn-back">← Go Back to Safety</button>
-    <button class="btn btn-proceed" id="proceed-btn">Proceed anyway (not recommended)</button>
+    <button data-i18n="go_back_to_safety" class="btn btn-back">← Go Back to Safety</button>
+    <button data-i18n="proceed_anyway_not_recommended" class="btn btn-proceed" id="proceed-btn">Proceed anyway (not recommended)</button>
   </div>
 
   <div class="footer">
-    Blocked by <a href="https://shieldblock.io" target="_blank" rel="noreferrer">ShieldBlock Pro</a> safe browsing. 
+    Blocked by <a data-i18n="shieldblock_pro" href="https://shieldblock.io" target="_blank" rel="noreferrer">ShieldBlock Pro</a> safe browsing. 
     Data sources: urlhaus.abuse.ch · openphish.com · ShieldBlock Pro v2.10.1
   </div>
 </div>
 
+<script src="src/i18n.js"></script>
 <script src="src/blocked.js"></script>
 </body>
 </html>

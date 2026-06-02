@@ -24,21 +24,19 @@
     catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   const _wl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return; // global pause active — skip all processing
-
-  if (!settings?.youtube) {
-    // Signal MAIN world to stop intercepting
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return;
-  }
-  // Signal MAIN world to ensure interception is active (handles re-enable after toggle)
-  window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
-
   const _host = location.hostname.replace(/^www\./, '');
-  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) {
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return;
-  }
+  const _whitelisted = _wl.some(d => _host === d || _host.endsWith('.' + d));
+
+  // Effective YouTube ad-blocking state. inject-youtube.js (MAIN world) now
+  // defaults ENABLED so it catches the first player response, so we must
+  // EXPLICITLY disable it whenever blocking shouldn't run (toggle off, global
+  // pause, or this host whitelisted). Mirror the state into a synchronous
+  // localStorage hint the injector reads at document_start on the next load, and
+  // postMessage it for the current load / same-session toggles.
+  const _ytEnabled = !!settings?.youtube && !settings?.globalPause && !_whitelisted;
+  try { localStorage.setItem('__sbYtBlock', _ytEnabled ? '1' : '0'); } catch (_) {}
+  window.postMessage({ type: _ytEnabled ? 'SB_YOUTUBE_ENABLE' : 'SB_YOUTUBE_DISABLE' }, '*');
+  if (!_ytEnabled) return;
 
   _sbLog('info', `Init — ${_host}`, { ytMusic: _host.includes('music.') });
 
@@ -218,6 +216,7 @@
         try { if (media) media.muted = false; } catch (_) {}
         _muted = false; _ytmAdActive = false;
       }
+      try { localStorage.setItem('__sbYtBlock', '0'); } catch (_) {}
       window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
     }
   });

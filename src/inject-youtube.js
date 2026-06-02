@@ -16,10 +16,17 @@
   // ── Disable flag ──────────────────────────────────────────────────────────────
   // MAIN world can't call chrome APIs. content-youtube.js reads settings and
   // posts SB_YOUTUBE_DISABLE / SB_YOUTUBE_ENABLE here.
-  // Starts disabled until content-youtube.js sends SB_YOUTUBE_ENABLE. Starts disabled until ENABLE.
-  // NOTE: NOT using {once:true} — the user may toggle the youtube setting on/off
-  // within the same session and we need to respond to both messages.
-  let _disabled = true;
+  //
+  // Default to ENABLED. YouTube sets ytInitialPlayerResponse (the first video's
+  // ad payload) during the initial document parse — BEFORE content-youtube.js can
+  // read settings at document_idle and post ENABLE. Starting disabled meant the
+  // primary InnerTube strip silently missed the first, most-visible pre-roll on
+  // every fresh page load. To still honor an off / whitelisted / paused state from
+  // the first byte, content-youtube.js caches the effective state in a synchronous
+  // localStorage hint we read here; the postMessage path covers same-session
+  // toggles. NOT using {once:true} — the user may toggle youtube on/off mid-session.
+  let _disabled = false;
+  try { if (localStorage.getItem('__sbYtBlock') === '0') _disabled = true; } catch (_) {}
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     if (e.data?.type === 'SB_YOUTUBE_DISABLE') _disabled = true;

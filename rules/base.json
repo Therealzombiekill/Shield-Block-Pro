@@ -4733,5 +4733,36 @@
         "xmlhttprequest"
       ]
     }
+  },
+  {
+    "id": 9310,
+    "priority": 1000,
+    "action": {
+      "type": "allowAllRequests"
+    },
+    "condition": {
+      "requestDomains": [
+        "amazon.com",
+        "amazon.co.uk",
+        "amazon.de",
+        "amazon.ca",
+        "amazon.com.au",
+        "amazon.co.jp",
+        "amazon.in",
+        "amazon.fr",
+        "amazon.es",
+        "amazon.it",
+        "amazon.com.mx",
+        "amazon.com.br",
+        "amazon.nl",
+        "amazon.pl",
+        "amazon.se",
+        "amazon.sg"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame"
+      ]
+    }
   }
 ]

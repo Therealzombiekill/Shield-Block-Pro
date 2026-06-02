@@ -1,34 +1,39 @@
 /**
- * Amazon cosmetic safety — src/content-amazon.js
+ * Amazon is fully excluded from blocking — manifest + rules/base.json
  *
- * content-amazon.js removes matched elements outright (querySelectorAll().remove()).
- * A selector that matches more than ads therefore deletes real page content. The
- * generic Amazon CSA attributes [data-csa-c-slot-id] and [data-csa-c-content-id]
- * are present on huge numbers of legitimate modules — removing by them blanks the
- * page. Guard that the ad-selector list stays specific.
+ * Amazon's own ad/cosmetic handling repeatedly broke the site, so per request the
+ * extension does NOT touch Amazon at all: the Amazon content script is removed,
+ * every broad content script excludes Amazon hosts, and a high-priority
+ * allowAllRequests rule exempts Amazon pages from all network blocking.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const SRC = readFileSync(fileURLToPath(new URL('../src/content-amazon.js', import.meta.url)), 'utf8');
-const block = SRC.match(/const AD_SELECTORS = \[([\s\S]*?)\];/);
-assert.ok(block, 'AD_SELECTORS not found in content-amazon.js');
-const selectors = [...block[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const manifest = JSON.parse(readFileSync(`${ROOT}manifest.json`, 'utf8'));
+const base = JSON.parse(readFileSync(`${ROOT}rules/base.json`, 'utf8'));
+const AMZ_HOST = '*://*.amazon.com/*';
+const BROAD = new Set(['<all_urls>', '*://*/*', 'http://*/*', 'https://*/*']);
 
-test('Amazon ad-selector list is present and non-trivial', () => {
-  assert.ok(selectors.length >= 10, `expected the ad-selector list, got ${selectors.length}`);
+test('the Amazon-specific content script is no longer injected', () => {
+  const loaded = manifest.content_scripts.some(cs => (cs.js || []).some(j => j.includes('content-amazon.js')));
+  assert.equal(loaded, false, 'content-amazon.js must not be registered — Amazon is fully excluded');
 });
 
-test('Amazon ad selectors never match generic CSA modules (would blank the page)', () => {
-  // Selectors known to match huge numbers of legitimate Amazon modules.
-  const banned = ['[data-csa-c-slot-id]', '[data-csa-c-content-id*="sp-"]', '#rhf'];
-  for (const b of banned) {
-    assert.ok(!selectors.includes(b), `dangerous Amazon selector present: ${b}`);
+test('every broad content script excludes Amazon hosts', () => {
+  for (const cs of manifest.content_scripts) {
+    if (!(cs.matches || []).some(p => BROAD.has(p))) continue;
+    const ex = new Set(cs.exclude_matches || []);
+    assert.ok(ex.has(AMZ_HOST), `content script ${(cs.js || []).join(',')} must exclude Amazon`);
   }
-  // And no bare attribute-presence on the generic CSA slot attribute.
-  for (const s of selectors) {
-    assert.ok(!/^\[data-csa-c-slot-id\]$/.test(s), `over-broad selector: ${s}`);
-  }
+});
+
+test('a high-priority allowAllRequests rule disables network blocking on Amazon', () => {
+  const r = base.find(x => x.action && x.action.type === 'allowAllRequests'
+    && (x.condition && x.condition.requestDomains || []).includes('amazon.com'));
+  assert.ok(r, 'missing allowAllRequests rule for amazon.com');
+  assert.ok(r.priority >= 100, 'the allow rule must outrank block rules');
+  assert.deepEqual(r.condition.resourceTypes, ['main_frame', 'sub_frame']);
 });

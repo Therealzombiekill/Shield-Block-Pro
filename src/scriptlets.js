@@ -578,6 +578,23 @@
       } catch(_) {}
     },
 
+    // remove-attr (ra) — strip attribute(s) from matching elements (e.g. onclick,
+    // data-ad). `attrs` is a '|'-separated list of attribute names; selector optional.
+    'remove-attr': ([attrs, selector]) => {
+      if (!attrs) return;
+      const list = attrs.split('|').map(a => a.trim()).filter(Boolean);
+      const sel = selector || '*';
+      const apply = () => {
+        try { document.querySelectorAll(sel).forEach(el => list.forEach(a => el.removeAttribute(a))); }
+        catch (_) {}
+      };
+      apply();
+      try {
+        new MutationObserver(apply).observe(document.documentElement || document,
+          { attributes: true, childList: true, subtree: true });
+      } catch (_) {}
+    },
+
   };
 
   // Aliases
@@ -586,6 +603,16 @@
   IMPL['aopw'] = IMPL['abort-on-property-write'];
   IMPL['sc']   = IMPL['set-constant'];
   IMPL['acis'] = IMPL['abort-current-inline-script'];
+  // Common uBO short/long aliases so more real-world +js() rules resolve.
+  IMPL['set']               = IMPL['set-constant'];
+  IMPL['no-setTimeout-if']  = IMPL['prevent-setTimeout'];
+  IMPL['nostif']            = IMPL['prevent-setTimeout'];
+  IMPL['no-setInterval-if'] = IMPL['prevent-setInterval'];
+  IMPL['nosiif']            = IMPL['prevent-setInterval'];
+  IMPL['no-window-open-if'] = IMPL['prevent-window-open'];
+  IMPL['nowoif']            = IMPL['prevent-window-open'];
+  IMPL['rc']                = IMPL['remove-class'];
+  IMPL['ra']                = IMPL['remove-attr'];
 
   // ── Public API ────────────────────────────────────────────────────────────────
   // Called by background.js via chrome.scripting.executeScript after domain lookup
@@ -593,7 +620,10 @@
     if (!Array.isArray(scriptlets)) return;
     for (const { name, args } of scriptlets) {
       try {
-        const fn = IMPL[name];
+        if (!name) continue;
+        // uBO/AdGuard filter rules write scriptlet names with or without a .js
+        // suffix (e.g. "set-constant.js"); normalize so both resolve to the impl.
+        const fn = IMPL[name] || IMPL[name.replace(/\.js$/, '')];
         if (typeof fn === 'function') fn(args || []);
       } catch (_) {}
     }

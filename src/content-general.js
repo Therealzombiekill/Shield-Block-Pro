@@ -85,7 +85,7 @@
     '.onetrust-pc-dark-filter',
     // High-confidence network / slot markers
     '[id*="google_ads_iframe"]', '[id^="aswift_"]', '[id*="gpt-ad"]', '.gpt-ad',
-    '[aria-label="Advertisement"]', '[aria-label="advertisement"]',
+    '[aria-label="Advertisement" i]',
     '[data-ad]', '[data-adunit]', '[data-ad-unit]', '[data-ad-region]',
     '.ad-placeholder', '.ads-container', '[class*="trc_related_container"]',
     '.ob-widget', '[class*="pubexchange"]',

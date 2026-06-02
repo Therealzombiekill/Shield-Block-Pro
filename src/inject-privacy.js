@@ -81,6 +81,47 @@
       } catch (_) {}
       return d;
     };
+
+    // toBlob — fingerprinters read the canvas through toBlob too. Route it through
+    // the already-noised toDataURL so the blob carries the same per-session noise,
+    // without touching the canvas pixels. Async callback semantics preserved.
+    const _toBlob = HTMLCanvasElement.prototype.toBlob;
+    if (_toBlob) {
+      HTMLCanvasElement.prototype.toBlob = function (cb, type, quality) {
+        if (_isYT || typeof cb !== 'function') return _toBlob.apply(this, arguments);
+        let url;
+        try { url = this.toDataURL(type || 'image/png', quality); }
+        catch (_) { return _toBlob.apply(this, arguments); }
+        try {
+          const comma = url.indexOf(',');
+          if (comma === -1) return _toBlob.apply(this, arguments);
+          const mime = (url.match(/^data:([^;,]+)/) || [])[1] || type || 'image/png';
+          const bin = atob(url.slice(comma + 1));
+          const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          Promise.resolve().then(() => cb(new Blob([arr], { type: mime })));
+        } catch (_) { return _toBlob.apply(this, arguments); }
+      };
+    }
+
+    // OffscreenCanvas 2D readback — same copy-based noise as the on-screen 2D ctx,
+    // so offscreen-canvas fingerprinting can't bypass the noise.
+    if (window.OffscreenCanvasRenderingContext2D) {
+      const _ogid = OffscreenCanvasRenderingContext2D.prototype.getImageData;
+      OffscreenCanvasRenderingContext2D.prototype.getImageData = function () {
+        if (_isYT) return _ogid.apply(this, arguments);
+        const d = _ogid.apply(this, arguments);
+        try {
+          const p = Math.floor(stableNoise(SESSION_SEED + 'off' + arguments[0] + arguments[1]) * 3) + 1;
+          if (d.data.length >= 4) {
+            const copy = new ImageData(new Uint8ClampedArray(d.data), d.width, d.height);
+            copy.data[0] = (copy.data[0] + p) % 256;
+            return copy;
+          }
+        } catch (_) {}
+        return d;
+      };
+    }
   } catch (_) {}
 
   // ── 2. WebGL fingerprint spoofing ────────────────────────────────────────────

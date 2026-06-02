@@ -974,7 +974,7 @@
       "type": "block"
     },
     "condition": {
-      "urlFilter": "||analytics.google.com/g/collect",
+      "urlFilter": "||analytics.google.com/g/collect^",
       "resourceTypes": [
         "image",
         "media",

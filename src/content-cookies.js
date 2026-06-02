@@ -185,6 +185,24 @@
     '[data-testid="metomic-reject-all"]', '[class*="metomic"][class*="decline"]',
     // Moove GDPR
     '#moove_gdpr_decline_cookies',
+    // Iubenda
+    '.iubenda-cs-reject-btn', '[class*="iubenda"][class*="reject"]',
+    // Tarteaucitron
+    '#tarteaucitronAllDenied2', '.tarteaucitronDeny',
+    // Cookie-Script
+    '#cookiescript_reject',
+    // Osano
+    '.osano-cm-denyAll', '.osano-cm-button--type_denyAll',
+    // Didomi — "continue without agreeing"
+    '.didomi-continue-without-agreeing',
+    // Usercentrics (v2 banner)
+    '#uc-btn-deny-banner', '.uc-deny-button',
+    // WordPress Cookie Notice
+    '#cn-refuse-cookie',
+    // Cookie Information
+    '.coi-banner__decline',
+    // Secure Privacy
+    '[class*="secureprivacy"][class*="reject"]',
   ];
 
   // ── Text patterns for reject buttons ──────────────────────────────────────

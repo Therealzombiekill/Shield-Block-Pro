@@ -1202,10 +1202,39 @@ async function fetchSafeBrowsingLists() {
   } finally { _stopKeepAlive(); }
 }
 
+// Major legitimate domains that must NEVER be flagged by the downloaded threat
+// lists. Those feeds sometimes contain a registrable domain (e.g. google.com)
+// because ONE subdomain hosted phishing — and the parent-domain match below would
+// then block all of Drive/Gmail/Docs/etc. Trusted domains short-circuit to safe.
+const SB_TRUSTED = new Set([
+  'google.com', 'gmail.com', 'googleusercontent.com', 'gstatic.com', 'youtube.com',
+  'amazon.com', 'microsoft.com', 'live.com', 'office.com', 'microsoftonline.com',
+  'apple.com', 'icloud.com', 'github.com', 'gitlab.com', 'cloudflare.com',
+  'mozilla.org', 'wikipedia.org', 'facebook.com', 'instagram.com', 'twitter.com',
+  'x.com', 'linkedin.com', 'reddit.com', 'netflix.com', 'spotify.com', 'dropbox.com',
+  'paypal.com', 'adobe.com', 'yahoo.com', 'bing.com', 'twitch.tv', 'whatsapp.com',
+  'zoom.us', 'slack.com', 'wordpress.com', 'cloudfront.net',
+]);
+
+// Hostnames the user explicitly chose to proceed to (this session). Without this,
+// clicking "Proceed" on the warning page re-navigates to the URL, which re-fires
+// onBeforeNavigate → re-blocks → the user is trapped. Cleared on SW restart.
+const _sbProceed = new Set();
+
+function _sbHostAllowed(hostname) {
+  if (_sbProceed.has(hostname)) return true;
+  const parts = hostname.split('.');
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (SB_TRUSTED.has(parts.slice(i).join('.'))) return true;
+  }
+  return false;
+}
+
 function checkSafeBrowsing(url) {
   if (!_safeBrowsingDomains.size) return false;
   try {
     const hostname = new URL(url).hostname.replace(/^www\./, '');
+    if (_sbHostAllowed(hostname)) return false; // trusted or user-approved — never block
     if (_safeBrowsingDomains.has(hostname)) return true;
     // Check parent domains (e.g. sub.evil.com → evil.com)
     const parts = hostname.split('.');
@@ -2140,6 +2169,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'CNAME_PERMS_GRANTED': {
         await _initCnameUncloaking();
         sendResponse({ ok: true, active: !!_cnameListener });
+        break;
+      }
+
+      // User clicked "Proceed" on the Safe Browsing warning page. Allow this host
+      // for the session so onBeforeNavigate doesn't immediately re-block it.
+      case 'SB_PROCEED': {
+        try { _sbProceed.add(new URL(msg.url).hostname.replace(/^www\./, '')); } catch (_) {}
+        sendResponse({ ok: true });
         break;
       }
 

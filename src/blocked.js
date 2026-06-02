@@ -32,17 +32,24 @@
     }
   });
 
-  document.getElementById('proceed-btn').addEventListener('click', () => {
+  document.getElementById('proceed-btn').addEventListener('click', async () => {
     if (!blocked) return;
     const confirmed = confirm(
       'This site may contain malware or phishing content.\n\n' +
       'Are you absolutely sure you want to continue to:\n' + blocked
     );
-    if (confirmed) {
+    if (!confirmed) return;
+    try {
+      const u = new URL(blocked);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
+      // Tell the service worker to stop re-blocking this host this session,
+      // THEN navigate — otherwise onBeforeNavigate immediately re-blocks it and
+      // the user is trapped on this page.
       try {
-        const u = new URL(blocked);
-        if (u.protocol === 'http:' || u.protocol === 'https:') location.href = u.href;
+        const api = (typeof browser !== 'undefined' && browser.runtime) ? browser.runtime : chrome.runtime;
+        await api.sendMessage({ type: 'SB_PROCEED', url: u.href });
       } catch (_) {}
-    }
+      location.href = u.href;
+    } catch (_) {}
   });
 })();

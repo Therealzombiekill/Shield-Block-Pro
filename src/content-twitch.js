@@ -91,6 +91,31 @@
     toastTimeout = setTimeout(() => { toast?.remove(); toast = null; }, 220);
   }
 
+  // ── Opaque cover over the player during ads ────────────────────────────────────
+  // SSAI ads are stitched into the same video stream, so muting alone still SHOWS
+  // the ad. Cover the player with an opaque panel for the ad's duration so it's
+  // neither seen nor heard. Tied to adActive (removed on ad end + 90s safety).
+  let cover = null;
+  function showCover() {
+    if (cover) return;
+    const player = document.querySelector(
+      '.video-player__container, [data-a-target="video-player"], .video-player'
+    );
+    if (!player) return;
+    try { if (getComputedStyle(player).position === 'static') player.style.position = 'relative'; } catch (_) {}
+    cover = document.createElement('div');
+    cover.id = '_sb_twitch_cover';
+    cover.style.cssText = [
+      'position:absolute', 'inset:0', 'z-index:9000', 'background:#0e0e10',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'color:#9b9bb0', 'font-family:system-ui,sans-serif', 'font-size:14px',
+      'letter-spacing:.03em', 'text-align:center', 'padding:0 24px',
+    ].join(';');
+    cover.textContent = 'Ad blocked — stream resumes shortly…';
+    player.appendChild(cover);
+  }
+  function hideCover() { cover?.remove(); cover = null; }
+
   // ── Video mute/unmute ─────────────────────────────────────────────────────────
   function muteVideo() {
     const video = document.querySelector('video');
@@ -159,8 +184,11 @@
     if (!player) return false;
     const text = player.textContent || '';
     if (AD_TEXT.some(t => text.includes(t))) return true;
-    if (player.querySelector('[data-test-selector="ad-banner-default-wrapper"]')) return true;
-    if (player.querySelector('[data-a-target="video-ad-label"]')) return true;
+    // Consolidated DOM signal: video-ad-label / video-ad-countdown / video-ad-button,
+    // plus the classic ad-banner wrapper and ad-countdown container.
+    if (player.querySelector(
+      '[data-a-target*="video-ad"], [data-test-selector="ad-banner-default-wrapper"], [data-test-selector*="ad-countdown"]'
+    )) return true;
     return false;
   }
 
@@ -175,6 +203,7 @@
       adActive    = true;
       adStartTime = Date.now();
       muteVideo();
+      showCover();
       showToast();
       sendStat();
       _sbLog('warn', 'Ad start (DOM detection)', { channel: location.pathname.replace('/', '') });
@@ -182,6 +211,7 @@
       const dur = adStartTime ? `${((Date.now() - adStartTime) / 1000).toFixed(1)}s` : '?';
       adActive = false;
       unmuteVideo();
+      hideCover();
       hideToast();
       _sbLog('info', `Ad end — duration ${dur}`);
     }
@@ -192,6 +222,7 @@
     if (adActive && Date.now() - adStartTime > 90000) {
       adActive = false;
       unmuteVideo();
+      hideCover();
       hideToast();
       _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
     }
@@ -247,6 +278,7 @@
       clearTimeout(debounce);
       clearTimeout(toastTimeout);
       hideToast();
+      hideCover();
       unmuteVideo();
     }
   });

@@ -160,23 +160,29 @@
   let _ytmWasMuted = false;
   function handleYTMusicAd() {
     if (!location.hostname.includes('music.youtube.com')) return;
-    const playerBar = document.querySelector('ytmusic-player-bar');
-    if (!playerBar?.hasAttribute('ad-playing')) {
+    // BUG FIX: YT Music plays through a <video> element (even for audio-only), so
+    // the old `querySelector('audio')` was null and the mute never fired — audio
+    // ads played at full volume. Target video|audio and SKIP the ad by seeking.
+    const media = document.querySelector('video, audio');
+    const adActive = !!document.querySelector('ytmusic-player-bar[ad-playing], ytmusic-player-bar[player-ui-state="AD"]');
+    if (!adActive) {
       if (_ytmAdActive) {
         _ytmAdActive = false;
-        const audio = document.querySelector('audio');
-        try { if (audio) audio.muted = _ytmWasMuted; } catch (_) {}
-        _sbLog('info', 'YT Music audio ad cleared — audio restored');
+        try { if (media) media.muted = _ytmWasMuted; } catch (_) {}
+        _sbLog('info', 'YT Music ad cleared — audio restored');
       }
       return;
     }
-    const audio = document.querySelector('audio');
     try {
-      if (audio && !_ytmAdActive) {
-        _ytmWasMuted = audio.muted;
-        audio.muted = true;
-        _ytmAdActive = true;
-        _sbLog('warn', 'YT Music audio ad — muted');
+      if (media) {
+        if (!_ytmAdActive) { _ytmWasMuted = media.muted; _ytmAdActive = true; }
+        media.muted = true;
+        // Skip the ad: seek to the end of the ad track so the next song starts.
+        // Guarded by the high-confidence ad-playing state, so it won't skip songs.
+        if (isFinite(media.duration) && media.duration > 0 && media.currentTime < media.duration - 0.3) {
+          media.currentTime = media.duration;
+        }
+        _sbLog('warn', 'YT Music ad — muted + skipped');
       }
     } catch (_) {}
   }

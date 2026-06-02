@@ -50,6 +50,14 @@ test('protected playback/CDN domains are never turned into block rules', () => {
   assert.equal(rules.length, 0);
 });
 
+test('core Google app domains are protected, but Google ad/tracking domains stay blockable', () => {
+  // Regression: apis.google.com / boq.google.com were blocked, which broke Google Drive/Docs.
+  const protectedG = parseFilterList('||apis.google.com^\n||accounts.google.com^\n||boq.google.com^', 1000);
+  assert.equal(protectedG.rules.length, 0, 'core Google app infra must not be blockable');
+  const adsG = parseFilterList('||analytics.google.com^\n||adservice.google.com^', 1000);
+  assert.equal(adsG.rules.length, 2, 'Google ad/tracking domains must still be blockable');
+});
+
 // ── Cosmetic filters ─────────────────────────────────────────────────────────
 
 test('global cosmetic ##.selector lands in cosmetics', () => {

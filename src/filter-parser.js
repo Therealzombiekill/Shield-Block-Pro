@@ -33,6 +33,10 @@ const PROTECTED_DOMAINS = new Set([
   'gvt1.com', 'gvt2.com', 'gvt3.com',
   // Google APIs used by YouTube player
   'googleapis.com', 'gstatic.com', 'ggpht.com',
+  // Core Google app infrastructure — never block (breaks Drive/Docs/Gmail/Sign-in).
+  // These are first-party app domains, NOT ad/tracking endpoints like
+  // analytics.google.com or adservice.google.com (which stay blockable).
+  'apis.google.com', 'accounts.google.com', 'boq.google.com',
   // Twitch
   'twitch.tv', 'twitchsvc.net', 'jtvnw.net', 'twitchapps.com',
   // CDNs never blocked

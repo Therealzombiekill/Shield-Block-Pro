@@ -2857,31 +2857,6 @@
     }
   },
   {
-    "id": 4971,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||boq.google.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ],
-      "excludedInitiatorDomains": [
-        "youtube.com",
-        "youtu.be",
-        "youtube-nocookie.com",
-        "music.youtube.com",
-        "tv.youtube.com"
-      ]
-    }
-  },
-  {
     "id": 4972,
     "priority": 2,
     "action": {
@@ -13266,31 +13241,6 @@
         "sub_frame",
         "media",
         "ping"
-      ]
-    }
-  },
-  {
-    "id": 5757,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||apis.google.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ],
-      "excludedInitiatorDomains": [
-        "youtube.com",
-        "youtu.be",
-        "youtube-nocookie.com",
-        "music.youtube.com",
-        "tv.youtube.com"
       ]
     }
   },

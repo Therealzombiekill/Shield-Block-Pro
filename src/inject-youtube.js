@@ -16,10 +16,14 @@
   // ── Disable flag ──────────────────────────────────────────────────────────────
   // MAIN world can't call chrome APIs. content-youtube.js reads settings and
   // posts SB_YOUTUBE_DISABLE / SB_YOUTUBE_ENABLE here.
-  // Starts disabled until content-youtube.js sends SB_YOUTUBE_ENABLE. Starts disabled until ENABLE.
+  // Default ENABLED so the FIRST player response — ytInitialPlayerResponse, set at
+  // document_start — gets stripped too. content-youtube.js runs at document_idle, so
+  // waiting for its SB_YOUTUBE_ENABLE let the first track/video's ads slip through
+  // (very noticeable on YouTube Music). content-youtube.js posts SB_YOUTUBE_DISABLE
+  // if the toggle is off or the site is whitelisted.
   // NOTE: NOT using {once:true} — the user may toggle the youtube setting on/off
   // within the same session and we need to respond to both messages.
-  let _disabled = true;
+  let _disabled = false;
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     if (e.data?.type === 'SB_YOUTUBE_DISABLE') _disabled = true;
@@ -41,6 +45,7 @@
     if (Array.isArray(obj.playerAds)     && obj.playerAds.length)     { obj.playerAds = [];     stripped = true; }
     if (Array.isArray(obj.adSlots)       && obj.adSlots.length)       { obj.adSlots = [];       stripped = true; }
     if (obj.auxiliaryUi)                                               { delete obj.auxiliaryUi; stripped = true; }
+    if (obj.adBreakHeartbeatParams)                                    { delete obj.adBreakHeartbeatParams; stripped = true; }
     // Some responses nest ad data inside playerResponse
     if (obj.playerResponse)               stripAds(obj.playerResponse);
     return stripped;

@@ -98,17 +98,16 @@ function _removeAmazonCss() {
     '[id*="sponsored-products-visually"]',
     '[cel_widget_id*="MAIN-SPONSORED_PRODUCTS"]',
     '[cel_widget_id*="MAIN-SP_DETAIL"]',
-    '#rhf', '#amsDetailRight',
+    '#amsDetailRight',
     '.sopp_theme', '[id*="ad_feature_div"]',
     // 2025 Amazon ad slots
-    '[data-csa-c-slot-id]',
     '#centerBanner-sp-ads_feature_div',
     '[class*="s-sponsored-header"]',
-    '#sp-cc', '#sp-cc-aboveTheFold',
-    // 2025 Amazon ad formats
+    // 2025 Amazon ad formats — keep these SPECIFIC. Do NOT add bare
+    // [data-csa-c-slot-id] or [data-csa-c-content-id*="sp-"]: those CSA attributes
+    // are on huge numbers of legit Amazon modules and removing them blanks the page.
     '[data-csa-c-rtype="sponsored"]',
     '[cel_widget_id*="BOTTOM_APEX-SPONSORED"]',
-    '[data-csa-c-content-id*="sp-"]',
     '#dp-ads-bottom-mobile-shoveler_feature_div',
   ];
 

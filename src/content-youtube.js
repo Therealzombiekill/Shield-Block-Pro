@@ -115,6 +115,7 @@
     '.ytp-ce-element',                      // end-cards
     '.ytp-suggested-action',                // "Visit advertiser" CTA
     '.ytp-ad-image-overlay',
+    '.ytp-ad-player-overlay-layout',        // modern in-player ad overlay UI
     // Page-level ad placements
     '#masthead-ad',
     '#player-ads',
@@ -127,6 +128,12 @@
     // Search page sponsored results
     'ytd-search-pyv-renderer',
     'ytd-promoted-video-renderer',
+    'ytd-promoted-sparkles-text-search-renderer',
+    // Current (2024+) feed / companion ad-slot renderers — home feed, watch-next
+    // sidebar, and the companion banner shown alongside in-stream ads.
+    'ytd-ad-slot-renderer',
+    'ytd-in-feed-ad-layout-renderer',
+    'ytd-companion-slot-renderer',
     // ── YouTube Music ad selectors ───────────────────────────────────────────
     // YTM uses a different component prefix (ytmusic-) and injects ads as
     // interstitial overlays and in-shelf promotions in the song queue.

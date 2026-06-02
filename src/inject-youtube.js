@@ -41,14 +41,16 @@
 
   // ── Strip ad data from an InnerTube player response ───────────────────────────
   function stripAds(obj) {
-    if (!obj || typeof obj !== 'object') return;
+    if (!obj || typeof obj !== 'object') return false;
     let stripped = false;
     if (Array.isArray(obj.adPlacements)  && obj.adPlacements.length)  { obj.adPlacements = [];  stripped = true; }
     if (Array.isArray(obj.playerAds)     && obj.playerAds.length)     { obj.playerAds = [];     stripped = true; }
     if (Array.isArray(obj.adSlots)       && obj.adSlots.length)       { obj.adSlots = [];       stripped = true; }
-    if (obj.auxiliaryUi)                                               { delete obj.auxiliaryUi; stripped = true; }
-    // Some responses nest ad data inside playerResponse
-    if (obj.playerResponse)               stripAds(obj.playerResponse);
+    if (obj.adBreakHeartbeatParams)                                   { delete obj.adBreakHeartbeatParams; stripped = true; }
+    if (obj.auxiliaryUi)                                              { delete obj.auxiliaryUi; stripped = true; }
+    // Some responses nest the player payload (and its ad data) one level deeper.
+    // Propagate the nested result so callers know the object was modified.
+    if (obj.playerResponse && stripAds(obj.playerResponse))           stripped = true;
     return stripped;
   }
 
@@ -78,7 +80,10 @@
       if (url.includes('/youtubei/') && url.includes('/player')) {
         const json = await res.clone().json();
         const stripped = stripAds(json);
-        if (stripped) _sbLog('info', 'InnerTube fetch: stripped ad placements', { path: url.split('?')[0].split('/').slice(-3).join('/') });
+        // Nothing to change — serve the original response untouched rather than
+        // round-tripping every /player payload through JSON (cheaper + safer).
+        if (!stripped) return res;
+        _sbLog('info', 'InnerTube fetch: stripped ad placements', { path: url.split('?')[0].split('/').slice(-3).join('/') });
         return new Response(JSON.stringify(json), {
           status:     res.status,
           statusText: res.statusText,

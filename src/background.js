@@ -111,43 +111,36 @@ function adGuardUrl(filterId) {
 }
 
 // ── Filter list registry ──────────────────────────────────────────────────────
-// Rules are pulled from each list up to `max` entries.
-// ID ranges MUST NOT overlap — each list's [start, start+max-1] must be disjoint.
-// Chrome hard-caps updateDynamicRules at 5,000 total; sum of all `max` values ≤ 5,000.
+// Each list contributes up to `max` DNR network rules, plus cosmetics, scriptlets
+// and removeparams (those have their own caps in parseFilterList, independent of
+// `max`). The array below is the single source of truth — no duplicated table.
 //
-//   List                │ start  │ max  │ end (exclusive)
-//   ────────────────────┼────────┼──────┼────────────────
-//   EasyList            │ 10000  │ 1600 │ 11600
-//   EasyPrivacy         │ 12000  │  700 │ 12700
-//   Peter Lowe          │ 13000  │  200 │ 13200
-//   AdGuard Tracking    │ 13500  │  350 │ 13850   ← new, replaces AdGuard Annoyances
-//   uBlock Annoyances   │ 14000  │  150 │ 14150
-//   uBlock Filters      │ 14500  │  550 │ 15050   ← new: uBO main list
-//   Fanboy Social       │ 15500  │  120 │ 15620   ← new: social widget blocking
-//   AdGuard Base        │ 16000  │  300 │ 16300
-//   uBlock Badware      │ 16500  │  150 │ 16650
-//   Liste FR            │ 17000  │   80 │ 17080
-//   EasyList Germany    │ 17200  │   80 │ 17280
-//   RU AdList           │ 17400  │   80 │ 17480
-//   AdGuard Annoyances  │ 17600  │  300 │ 17900   ← kept but after the new ones
-//   ────────────────────┼────────┼──────┼────────────────
-//   Total               │        │~4950 │          (≤ 5000 ✓)
+// Invariants (verified at startup by _checkRanges):
+//   • ID ranges MUST NOT overlap — each list's [start, start+max-1] is disjoint.
+//   • Chrome hard-caps updateDynamicRules at 5,000 total, so the sum of all `max`
+//     values must stay ≤ 5,000 (with headroom for the 30000+ feature rules).
+//
+// EasyList and EasyPrivacy use `max: 0`: their NETWORK rules now ship as bundled
+// static rulesets (rules/static/*.json, see manifest + build-static-rulesets.mjs),
+// which don't count against the 5,000 cap. The entries are kept here only so their
+// cosmetics/scriptlets keep syncing (maxRules: 0 skips DNR but still harvests
+// those). The freed ~1,640-rule budget is reallocated to the lists below.
 
 const FILTER_LISTS = [
   // Core ad blocking
-  { name: 'EasyList',              url: 'https://easylist.to/easylist/easylist.txt',                                                                                   key: 'easylist',      max: 1100, start: 10000 },
-  { name: 'EasyPrivacy',           url: 'https://easylist.to/easylist/easyprivacy.txt',                                                                                key: 'easyprivacy',   max:  540, start: 12000 },
-  { name: 'Peter Lowe',            url: 'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext',                         key: 'peterlow',      max:  200, start: 13000 },
+  { name: 'EasyList',              url: 'https://easylist.to/easylist/easylist.txt',                                                                                   key: 'easylist',      max:    0, start: 10000 }, // DNR via static ruleset; entry kept for cosmetics/scriptlets
+  { name: 'EasyPrivacy',           url: 'https://easylist.to/easylist/easyprivacy.txt',                                                                                key: 'easyprivacy',   max:    0, start: 12000 }, // DNR via static ruleset; entry kept for cosmetics/scriptlets
+  { name: 'Peter Lowe',            url: 'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext',                         key: 'peterlow',      max:  400, start: 13000 },
   // Tracking & privacy
-  { name: 'AdGuard Tracking',      url: adGuardUrl(3),                                                                                                                  key: 'adguard_track', max:  350, start: 13500 },
+  { name: 'AdGuard Tracking',      url: adGuardUrl(3),                                                                                                                  key: 'adguard_track', max:  500, start: 13500 },
   { name: 'uBlock Annoyances',     url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt',                               key: 'ublock_ann',    max:  150, start: 14000 },
   // uBlock Origin main filter list — high-quality, minimal overlap with EasyList
-  { name: 'uBlock Filters',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',                                           key: 'ublock_main',   max:  300, start: 14500 },
+  { name: 'uBlock Filters',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',                                           key: 'ublock_main',   max:  900, start: 14500 },
   // Social widget & share-button tracking
   { name: 'Fanboy Social',         url: 'https://easylist.to/easylist/fanboy-social.txt',                                                                              key: 'fanboy_social', max:  120, start: 15500 },
   // Broader ad network coverage
-  { name: 'AdGuard Base',          url: adGuardUrl(2),                                                                                                                  key: 'adguard_base',  max:  300, start: 16000 },
-  { name: 'uBlock Badware',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt',                                           key: 'ublock_bad',    max:  150, start: 16500 },
+  { name: 'AdGuard Base',          url: adGuardUrl(2),                                                                                                                  key: 'adguard_base',  max:  500, start: 16000 },
+  { name: 'uBlock Badware',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt',                                           key: 'ublock_bad',    max:  300, start: 16500 },
   // Regional lists
   { name: 'Liste FR',              url: 'https://easylist-downloads.adblockplus.org/liste_fr.txt',                                                                     key: 'listefr',       max:   80, start: 17000 },
   { name: 'EasyList Germany',      url: 'https://easylist.to/easylistgermany/easylistgermany.txt',                                                                     key: 'easylistde',    max:   80, start: 17200 },
@@ -155,8 +148,8 @@ const FILTER_LISTS = [
   // Annoyances (newsletter popups, notification prompts, cookie notices)
   { name: 'AdGuard Annoyances',    url: adGuardUrl(14),                                                                                                                 key: 'adguard_ann',   max:  300, start: 17600 },
   // Scriptlet-heavy lists — these provide ##+js() rules that defuse anti-adblock scripts
-  { name: 'uBlock Origin Filters 2', url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters-2024.txt',                                     key: 'ublock_2024',   max:  200, start: 17900 },
-  { name: 'uBlock Annoyances Full',  url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances.txt',                                       key: 'ublock_ann2',   max:  150, start: 18200 },
+  { name: 'uBlock Origin Filters 2', url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters-2024.txt',                                     key: 'ublock_2024',   max:  300, start: 17900 },
+  { name: 'uBlock Annoyances Full',  url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances.txt',                                       key: 'ublock_ann2',   max:  200, start: 18200 },
   // Anti-adblock bypass rules
   { name: 'Anti-Adblock Killer',    url: 'https://raw.githubusercontent.com/reek/anti-adblock-killer/master/anti-adblock-killer-filters.txt',                           key: 'anti_adblock',  max:  100, start: 18400 },
   // Regional lists

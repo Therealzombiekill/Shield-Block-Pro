@@ -36,6 +36,7 @@ document.querySelectorAll('.nb').forEach(btn => {
         refreshMatrix();
         refreshPageLog();
         refreshTopDomains();
+        refreshSiteBar();
         _pauseCheckInterval = setInterval(() => { checkPauseStatus(); checkGlobalPause(); }, 10000);
         break;
       case 'whitelist':
@@ -367,6 +368,88 @@ function renderWhitelistItems(whitelist, currentDomain) {
   });
 }
 
+// Shared whitelist mutation used by BOTH the stats site-bar toggle and the
+// whitelist-tab toggle so the two controls can never drift out of sync.
+// `block === true` means "block ads here" (remove from whitelist); false means
+// "allow ads here" (add to whitelist). Reloads the active tab so the change
+// takes effect immediately — network rules and cosmetics re-evaluate on load.
+async function setSiteBlocking(domain, block, { reload = true } = {}) {
+  if (!domain) return;
+  const { whitelist: wl = [] } = await chrome.storage.local.get('whitelist');
+  if (block) {
+    const i = wl.indexOf(domain);
+    if (i !== -1) wl.splice(i, 1);
+    // Clear any active pause too — RESUME_SITE is a no-op when not paused.
+    await msg('RESUME_SITE', { domain });
+  } else if (!wl.includes(domain)) {
+    wl.push(domain);
+  }
+  await chrome.storage.local.set({ whitelist: wl });
+  await msg('WHITELIST_UPDATED', { whitelist: wl });
+  if (reload) {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (tab?.id) await chrome.tabs.reload(tab.id);
+    } catch (_) {}
+  }
+}
+
+// Refresh the prominent current-site toggle on the Stats panel.
+async function refreshSiteBar() {
+  const toggle = $('site-toggle-main');
+  const icon   = $('site-bar-icon');
+  const domEl  = $('sb-domain');
+  const stEl   = $('sb-state');
+  if (!toggle || !domEl || !stEl) return;
+
+  const [domain, stored] = await Promise.all([
+    getCurrentTabDomain(),
+    chrome.storage.local.get(['whitelist', 'pauseWhitelisted']),
+  ]);
+  const { whitelist = [], pauseWhitelisted = [] } = stored;
+
+  if (!domain) {
+    domEl.textContent = 'Not available here';
+    stEl.textContent  = 'System or browser page';
+    stEl.className    = '';
+    toggle.checked    = false;
+    toggle.disabled   = true;
+    icon?.classList.add('off');
+    return;
+  }
+
+  const matches = list => list.some(d => domain === d || domain.endsWith('.' + d));
+  const whitelisted = matches(whitelist);
+  const paused      = matches(pauseWhitelisted);
+
+  toggle.disabled  = false;
+  toggle.checked   = !whitelisted;
+  domEl.textContent = domain;
+
+  if (paused) {
+    stEl.textContent = 'Paused — temporarily allowed';
+    stEl.className   = 'off';
+    icon?.classList.add('off');
+  } else if (whitelisted) {
+    stEl.textContent = 'Ads allowed on this site';
+    stEl.className   = 'off';
+    icon?.classList.add('off');
+  } else {
+    stEl.textContent = 'Blocking active';
+    stEl.className   = 'on';
+    icon?.classList.remove('off');
+  }
+}
+
+$('site-toggle-main')?.addEventListener('change', async (e) => {
+  const domain = await getCurrentTabDomain();
+  if (!domain) return;
+  await setSiteBlocking(domain, e.target.checked);
+  // refreshWhitelist() also refreshes the site bar + header pill, keeping the
+  // stats toggle, whitelist-tab toggle and status pill all consistent.
+  await refreshWhitelist();
+});
+
 async function refreshWhitelist() {
   const [domain, stored] = await Promise.all([
     getCurrentTabDomain(),
@@ -386,16 +469,7 @@ async function refreshWhitelist() {
     $('site-toggle').checked = !_isWhitelisted(whitelist);
     $('site-toggle').disabled = false;
     $('site-toggle').onchange = async (e) => {
-      const { whitelist: wl = [] } = await chrome.storage.local.get('whitelist');
-      if (!e.target.checked) { if (!wl.includes(domain)) wl.push(domain); }
-      else {
-        const i = wl.indexOf(domain); if (i !== -1) wl.splice(i, 1);
-        // If this domain was paused, clean up pause state too —
-        // RESUME_SITE is safe to call when not paused (no-op on missing entry).
-        msg('RESUME_SITE', { domain });
-      }
-      await chrome.storage.local.set({ whitelist: wl });
-      await msg('WHITELIST_UPDATED', { whitelist: wl });
+      await setSiteBlocking(domain, e.target.checked);
       await refreshWhitelist();
     };
   } else {
@@ -404,6 +478,7 @@ async function refreshWhitelist() {
   }
   renderWhitelistItems(permanentList, domain);
   updateStatusPill(domain, whitelist); // full list — paused sites correctly show as PAUSED
+  refreshSiteBar(); // keep the stats-panel site toggle in lock-step
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────

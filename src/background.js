@@ -1462,17 +1462,50 @@ async function rebuildAggregatedFilterCaches() {
   return { repaired: true, cosmeticCount: cosmeticsDeduped.length };
 }
 
-async function ensureFilterHealthMetadata() {
+async function repairFilterHealthForCheck() {
+  let cosmeticCount = 0;
+  let syncQueued = false;
   try {
+    const rebuilt = await rebuildAggregatedFilterCaches();
+    if (rebuilt.repaired) cosmeticCount = rebuilt.cosmeticCount;
+
+    const all = await chrome.storage.local.get(null);
+    let latestFm = 0;
+    for (const k of Object.keys(all)) {
+      if (k.startsWith('fm_') && all[k]?.at > latestFm) latestFm = all[k].at;
+    }
+
     const { filterSyncedAt, cosmeticSelectors = [] } =
       await chrome.storage.local.get(['filterSyncedAt', 'cosmeticSelectors']);
     const dyn = await chrome.declarativeNetRequest.getDynamicRules();
-    const filterRules = dyn.filter(r => isFilterListRuleId(r.id)).length;
-    if (filterRules > 100 && (!filterSyncedAt || cosmeticSelectors.length < 50)) {
-      return rebuildAggregatedFilterCaches();
+    const filterRuleCount = dyn.filter(r => isFilterListRuleId(r.id)).length;
+    cosmeticCount = cosmeticSelectors.length || cosmeticCount;
+
+    const ts = Number(filterSyncedAt);
+    const tsValid = Number.isFinite(ts) && ts > 1_000_000_000_000;
+    const patch = {};
+
+    if (filterRuleCount > 100 && !tsValid) {
+      patch.filterSyncedAt = latestFm > 0 ? latestFm : Date.now();
     }
-  } catch (_) {}
-  return { repaired: false };
+    if (Object.keys(patch).length) {
+      await chrome.storage.local.set(patch);
+      logEvent('filter-sync', 'info', 'Health check restored filterSyncedAt from list metadata');
+    }
+
+    if (filterRuleCount > 100 && cosmeticCount < 50 && !_syncLock) {
+      syncQueued = true;
+      syncFilterLists(true).catch(e =>
+        logEvent('filter-sync', 'warn', `Health-triggered sync failed: ${e?.message ?? e}`));
+    }
+  } catch (e) {
+    logEvent('filter-sync', 'warn', `Health repair failed: ${e?.message ?? e}`);
+  }
+  return { cosmeticCount, syncQueued };
+}
+
+async function ensureFilterHealthMetadata() {
+  return repairFilterHealthForCheck();
 }
 
 async function syncFilterLists(force = false) {
@@ -2456,7 +2489,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const warn = (name, detail) => checks.push({ name, status: 'warn', detail });
         const fail = (name, detail) => checks.push({ name, status: 'fail', detail });
 
-        await ensureFilterHealthMetadata();
+        const healthRepair = await repairFilterHealthForCheck();
 
         // 1. Dynamic filter rules loaded
         try {
@@ -2473,27 +2506,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else warn('Static rulesets', `Only ${enabled.length} rulesets enabled`);
         } catch (e) { warn('Static rulesets', e.message); }
 
-        // 3. Filter sync recency
+        // 3. Filter sync recency (never show "Infinityh" — invalid/missing ts is repaired above)
         try {
           const { filterSyncedAt, syncFailures = 0 } = await chrome.storage.local.get(['filterSyncedAt','syncFailures']);
           const dynFilterCount = (await chrome.declarativeNetRequest.getDynamicRules())
             .filter(r => isFilterListRuleId(r.id)).length;
-          if (!filterSyncedAt) {
+          const ts = Number(filterSyncedAt);
+          const tsValid = Number.isFinite(ts) && ts > 1_000_000_000_000;
+
+          if (!tsValid) {
             if (dynFilterCount > 100) {
-              warn('Last sync', `No sync timestamp — ${dynFilterCount} rules active; use ↺ sync in Stats to refresh`);
+              if (healthRepair.syncQueued) {
+                warn('Last sync', `Sync in progress — ${dynFilterCount} network rules already active`);
+              } else {
+                warn('Last sync', `${dynFilterCount} rules active — click ↺ sync in Stats if lists look stale`);
+              }
             } else {
-              fail('Last sync', 'Never synced — open Stats tab and click ↺ sync');
+              fail('Last sync', 'Never synced — open Stats and click ↺ sync');
             }
           } else {
-            const ageHours = (Date.now() - filterSyncedAt) / 3600000;
-            if (!Number.isFinite(ageHours) || ageHours < 0) {
-              warn('Last sync', 'Invalid sync timestamp — run ↺ sync');
+            const ageHours = (Date.now() - ts) / 3600000;
+            if (ageHours < 0) {
+              warn('Last sync', 'Clock skew detected — run ↺ sync');
             } else if (ageHours < 13) {
               pass('Last sync', `${ageHours < 1 ? '<1h' : Math.round(ageHours) + 'h'} ago${syncFailures > 0 ? ` (${syncFailures} failures)` : ''}`);
             } else if (ageHours < 48) {
               warn('Last sync', `${Math.round(ageHours)}h ago — consider force sync`);
             } else {
-              fail('Last sync', `${Math.round(ageHours)}h ago — stale filter lists`);
+              warn('Last sync', `${Math.round(ageHours)}h ago — run ↺ sync in Stats`);
             }
           }
         } catch (e) { warn('Last sync', e.message); }
@@ -2503,14 +2543,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const { cosmeticSelectors = [] } = await chrome.storage.local.get('cosmeticSelectors');
           const cosCount = cosmeticSelectors.length;
           if (cosCount > 500) pass('Cosmetics', `${cosCount.toLocaleString()} selectors`);
-          else if (cosCount > 0) warn('Cosmetics', `${cosCount} selectors — low; run ↺ sync for full cosmetic lists`);
-          else {
+          else if (cosCount > 0) warn('Cosmetics', `${cosCount} selectors — run ↺ sync for full lists`);
+          else if (healthRepair.syncQueued) {
+            warn('Cosmetics', 'Syncing filter lists now — re-run health check in ~1 min');
+          } else {
             const dynFilterCount = (await chrome.declarativeNetRequest.getDynamicRules())
               .filter(r => isFilterListRuleId(r.id)).length;
             if (dynFilterCount > 100) {
-              warn('Cosmetics', '0 selectors in cache — network rules OK; run ↺ sync for on-page hiding');
+              warn('Cosmetics', '0 cosmetic selectors — network blocking OK; run ↺ sync in Stats');
             } else {
-              fail('Cosmetics', 'No cosmetics loaded — run ↺ sync in Stats');
+              fail('Cosmetics', 'No cosmetics — run ↺ sync in Stats');
             }
           }
         } catch (e) { warn('Cosmetics', e.message); }
@@ -3339,17 +3381,17 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== '2.11.2') {
+    if (sbRulesVersion !== '2.11.3') {
       const all = await chrome.storage.local.get(null);
       const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
       if (stale.length) await chrome.storage.local.remove(stale);
       await rebuildAggregatedFilterCaches();
-      await chrome.storage.local.set({ sbRulesVersion: '2.11.2' });
-      logEvent('startup', 'info', 'Upgraded to v2.11.2 — rebuilt filter metadata caches');
+      await chrome.storage.local.set({ sbRulesVersion: '2.11.3' });
+      logEvent('startup', 'info', 'Upgraded to v2.11.3 — filter health metadata repair');
     }
   } catch (_) {}
 
-  await ensureFilterHealthMetadata();
+  await repairFilterHealthForCheck();
 
   setTimeout(() => {
     syncFilterLists(false).catch(e => {

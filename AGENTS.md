@@ -66,17 +66,17 @@ DevTools: service worker console on the extension card; popup via right-click to
 | GA dashboard | `analytics.google.com` loads reports (third-party trackers still blocked elsewhere) |
 | Safe browsing | Health: GitHub/Drive/GA not in malware cache |
 
-### YouTube — do not oscillate strategies
+### YouTube — play-first (v2.11.1+)
 
-**Stable design** — do **not** re-add `fetch`/`XHR` `Response` rewriting in `inject-youtube.js` (black screen + 282054944):
+**Let the player start, then block ads.** Do **not** re-add `fetch`/`XHR` `Response` rewriting (black screen + 282054944).
 
-| Layer | File | Role |
-|-------|------|------|
-| First paint | `inject-youtube.js` | In-place `ytInitialPlayerResponse` prune only |
-| Player | `content-youtube.js` | Skip, mute, overlays, 282054944 recovery |
-| Privacy | `inject-privacy.js` | No generic anti-adblock on YouTube |
+| Phase | Behavior |
+|-------|----------|
+| Until `playing` | No overlay removal, no skip/mute, no `ytInitial` prune |
+| After playback + ~2s grace | `SB_YT_PLAYBACK_READY` → DOM ad handling + optional `ytInitial` prune on later SPA sets |
+| Browse / no video | After 12s, feed-only overlay cleanup (no in-player touches) |
 
-Never remove all `tp-yt-iron-overlay-backdrop` nodes. Never merge “full InnerTube fetch hook” branches without playback proof.
+Log tag: `2.11.1-playfirst`. Never remove all `tp-yt-iron-overlay-backdrop` nodes.
 
 ### Chrome on cloud VMs
 

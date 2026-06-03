@@ -1,24 +1,21 @@
 /**
  * ShieldBlock Pro — YouTube Content Script
  *
- * DOM-level ad skip and mute. inject-youtube.js handles the primary
- * interception at the InnerTube API level; this script is the fallback
- * for ads that slip through (e.g. live-stream ads, promo cards) and also
- * signals inject-youtube.js to disable itself when the toggle is off.
+ * Play-first: nothing touches the player until video/audio is actually playing,
+ * then DOM skip/mute/overlay removal runs. inject-youtube.js only prunes
+ * ytInitial after the same signal (SB_YT_PLAYBACK_READY).
  */
 
 (async () => {
-  // Playback-safe: InnerTube fetch is NOT hooked (see inject-youtube.js). DOM handles player ads.
-  const SB_YT_BUILD = '2.11.0-stable';
+  const SB_YT_BUILD = '2.11.1-playfirst';
   const YT_PLAYER_ERR = '282054944';
+  const PLAYBACK_GRACE_MS = 2000;
+  const NO_VIDEO_FALLBACK_MS = 12000;
 
-  // ── Log helper ────────────────────────────────────────────────────────────────
   function _sbLog(level, message, data) {
     chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'youtube', level, message, data: data ?? {} }).catch(() => {});
   }
 
-  // If SW is waking up when this fires, sendMessage throws and the IIFE crashes
-  // silently — no ad blocking runs at all. Retry once after 300ms.
   let settings;
   try {
     settings = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
@@ -31,7 +28,7 @@
   const _host = location.hostname.replace(/^www\./, '');
   const _whitelisted = _wl.some(d => _host === d || _host.endsWith('.' + d));
 
-  const _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
+  let _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
 
   if (settings) {
     try {
@@ -49,12 +46,78 @@
   window.postMessage({ type: _shouldDisable ? 'SB_YOUTUBE_DISABLE' : 'SB_YOUTUBE_ENABLE' }, '*');
   if (_shouldDisable) return;
 
-  _sbLog('info', `Init — ${_host} [${SB_YT_BUILD}]`, { ytMusic: _host.includes('music.'), build: SB_YT_BUILD });
+  _sbLog('info', `Init — ${_host} [${SB_YT_BUILD}] (play-first)`, { build: SB_YT_BUILD });
 
   window.addEventListener('message', e => {
     if (e.source !== window || e.data?.type !== 'SB_YT_LOG') return;
     _sbLog(e.data.level ?? 'info', e.data.message, e.data.data);
   });
+
+  let _blockingActive = false;
+  let _feedOnly = false;
+  let _armTimer = null;
+
+  function armBlocking(feedOnly = false) {
+    if (_blockingActive) return;
+    _blockingActive = true;
+    _feedOnly = feedOnly;
+    window.postMessage({ type: 'SB_YT_PLAYBACK_READY' }, '*');
+    _sbLog('info', feedOnly
+      ? 'Feed/browse mode — non-player ad blocking active'
+      : 'Playback started — ad blocking active');
+  }
+
+  function scheduleArm(feedOnly = false) {
+    if (_blockingActive || _armTimer) return;
+    _armTimer = setTimeout(() => {
+      _armTimer = null;
+      armBlocking(feedOnly);
+    }, feedOnly ? 0 : PLAYBACK_GRACE_MS);
+  }
+
+  function watchForPlayback() {
+    const isMusic = location.hostname.includes('music.youtube.com');
+
+    const tryMedia = () => {
+      if (_blockingActive) return true;
+      const media = document.querySelector(isMusic ? 'audio' : 'video');
+      if (!media) return false;
+
+      const playing = !media.paused && media.readyState >= 2 &&
+        (media.currentTime > 0.15 || media.readyState >= 3);
+      if (playing) {
+        scheduleArm(false);
+        return true;
+      }
+
+      const onReady = () => scheduleArm(false);
+      media.addEventListener('playing', onReady, { once: true });
+      media.addEventListener('timeupdate', function onTU() {
+        if (media.currentTime > 0.2) {
+          media.removeEventListener('timeupdate', onTU);
+          scheduleArm(false);
+        }
+      });
+      return true;
+    };
+
+    if (tryMedia()) return;
+
+    const mo = new MutationObserver(() => {
+      if (tryMedia()) mo.disconnect();
+    });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+
+    setTimeout(() => {
+      mo.disconnect();
+      if (!_blockingActive) {
+        const hasPlayer = !!document.querySelector('video, audio');
+        scheduleArm(!hasPlayer);
+      }
+    }, NO_VIDEO_FALLBACK_MS);
+  }
+
+  watchForPlayback();
 
   function isAdPlaying() {
     return !!(
@@ -110,7 +173,6 @@
     '.ytp-ad-overlay-container', '.ytp-ad-overlay-slot',
     '.ytp-suggested-action',
     '.ytp-ad-image-overlay',
-    // Do NOT remove .ytp-ad-player-overlay-layout or #player-ads — player shell.
     '#masthead-ad',
     'ytd-display-ad-renderer',
     'ytd-banner-promo-renderer',
@@ -187,6 +249,8 @@
   function enterPlaybackRecovery() {
     if (_playbackRecovery) return;
     _playbackRecovery = true;
+    _blockingActive = false;
+    if (_armTimer) { clearTimeout(_armTimer); _armTimer = null; }
     try { sessionStorage.setItem('__sbYtRecovery', '1'); } catch (_) {}
     try { localStorage.setItem('__sbYtOff', '1'); } catch (_) {}
     window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
@@ -194,8 +258,7 @@
     if (!_recoveryLogged) {
       _recoveryLogged = true;
       _sbLog('error',
-        `YouTube error ${YT_PLAYER_ERR} — paused ad blocking on this tab for playback. ` +
-        'Hard-refresh the page (do not clear cookies). Toggle YouTube off/on in popup to retry.',
+        `YouTube error ${YT_PLAYER_ERR} — ad blocking paused on this tab. Hard-refresh to retry.`,
         { code: YT_PLAYER_ERR });
     }
     const retry = document.querySelector(
@@ -215,7 +278,6 @@
     if (!enforcement) return;
     const dialog = enforcement.closest('tp-yt-paper-dialog');
     try { (dialog || enforcement).remove(); } catch (_) {}
-    // Do NOT remove every iron-overlay-backdrop on the page — that blanks the video player.
     try {
       document.documentElement.style.removeProperty('overflow');
       if (document.body) document.body.style.removeProperty('overflow');
@@ -231,25 +293,37 @@
   function tick() {
     if (hasPlayerError282()) { enterPlaybackRecovery(); return; }
     if (_playbackRecovery) return;
-    handleAd(); removeOverlays(); handleYTMusicAd(); dismissAdblockPopup();
+    if (!_blockingActive) return;
+
+    if (_feedOnly) {
+      removeOverlays();
+      handleYTMusicAd();
+      return;
+    }
+
+    handleAd();
+    removeOverlays();
+    handleYTMusicAd();
+    dismissAdblockPopup();
   }
 
   const _tickInterval = setInterval(tick, 750);
-  tick();
 
   let _lastSkipClick = 0;
   const _skipObserver = new MutationObserver(() => {
+    if (!_blockingActive || _feedOnly) return;
     if (Date.now() - _lastSkipClick < 1000) return;
     const skip = document.querySelector(
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
     if (skip) { skip.click(); _lastSkipClick = Date.now(); _sbLog('info', 'Ad: skip button clicked'); }
-    dismissAdblockPopup();
+    if (_blockingActive && !_feedOnly) dismissAdblockPopup();
   });
   _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
 
   let _wasAd = false;
   const _statInterval = setInterval(() => {
+    if (!_blockingActive || _feedOnly) return;
     const ad = isAdPlaying();
     if (ad && !_wasAd) {
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'youtube' }).catch(() => {});
@@ -261,6 +335,7 @@
     clearInterval(_tickInterval);
     clearInterval(_statInterval);
     _skipObserver.disconnect();
+    if (_armTimer) clearTimeout(_armTimer);
   }
   function _restoreAudio() {
     if (_muted || _ytmAdActive) {
@@ -301,6 +376,7 @@
     try { localStorage.setItem('__sbYtOff', nowDisabled ? '1' : '0'); } catch (_) {}
     if (!nowDisabled) {
       try { sessionStorage.removeItem('__sbYtRecovery'); } catch (_) {}
+      watchForPlayback();
       return;
     }
     _disableNow();

@@ -46,12 +46,27 @@ Useful DevTools entry points:
 
 After loading unpacked:
 
-1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.10.1).
+1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.10.2).
 2. Open the extension popup from the toolbar.
 3. Go to the **Support** tab → **Extension Health** → click **Run check**.
 4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.
 
 Filter sync uses remote CDNs (EasyList, uBlock, AdGuard, etc.) and requires network access. Bundled static DNR rules in `rules/*.json` work offline.
+
+### YouTube ad blocking (v2.10.2+)
+
+- **Strategy:** InnerTube API strip in `src/inject-youtube.js` (MAIN world) plus DOM skip/mute in `src/content-youtube.js`.
+- **After updating YouTube-related files:** reload the extension **and** hard-refresh every open YouTube tab.
+- **Verify in logs:** Support → Log tab should show init with build tag `2.10.2-innertube` (not `dom-only`).
+- **Toggle off/on:** turning YouTube blocking back on in the popup still requires a **tab reload** to restart the DOM loop; MAIN-world hooks update via `localStorage.__sbYtOff` on the next navigation.
+
+### Chrome on cloud VMs (GUI testing)
+
+```bash
+google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps &
+```
+
+Then load unpacked from `/workspace`. MV3 service worker may show **Inactive** when idle — normal.
 
 ### Reload gotchas
 

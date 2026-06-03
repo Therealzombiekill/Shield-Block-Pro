@@ -32,17 +32,20 @@
     }
   });
 
-  document.getElementById('proceed-btn').addEventListener('click', () => {
+  document.getElementById('proceed-btn').addEventListener('click', async () => {
     if (!blocked) return;
     const confirmed = confirm(
       'This site may contain malware or phishing content.\n\n' +
       'Are you absolutely sure you want to continue to:\n' + blocked
     );
-    if (confirmed) {
-      try {
-        const u = new URL(blocked);
-        if (u.protocol === 'http:' || u.protocol === 'https:') location.href = u.href;
-      } catch (_) {}
-    }
+    if (!confirmed) return;
+    try {
+      const u = new URL(blocked);
+      // Only ever navigate to http(s) — never javascript:, data:, etc.
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
+      // Tell the background to allow this URL so safe-browsing doesn't re-block it.
+      try { await chrome.runtime.sendMessage({ type: 'ALLOW_SAFE_BROWSING_URL', url: blocked }); } catch (_) {}
+      location.href = u.href;
+    } catch (_) {}
   });
 })();

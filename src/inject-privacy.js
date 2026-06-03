@@ -6,19 +6,19 @@
  *   1.  Canvas fingerprint noise (toDataURL + getImageData)
  *   2.  WebGL renderer/vendor + parameter spoofing
  *   3.  AudioContext fingerprint noise
- *   4.  WebRTC IP leak prevention
+ *   4.  WebRTC: left to browser permissions (no global ICE stripping)
  *   5.  Navigator API normalization (hardwareConcurrency, deviceMemory, languages)
  *   6.  navigator.connection spoofing
  *   7.  Screen dimension normalization (width, height, colorDepth, availWidth/H)
  *   8.  Battery API fake data
  *   9.  URL tracking parameter cleanup (initial + SPA pushState/replaceState)
  *   10. Click redirect bypass (Google, Facebook, Twitter t.co, LinkedIn, Bing, Yahoo, DuckDuckGo)
- *   11. Notification + Push permission auto-deny
+ *   11. Notifications / Push: left to browser permission prompts
  *   12. Popup ad blocker (window.open)
  *   13. Chat widget removal
  *   14. Anti-adblock wall bypass
  *   15. Global Privacy Control (GPC) signal — navigator.globalPrivacyControl = true
- *   16. Geolocation auto-deny
+ *   16. Geolocation: left to browser permission prompts
  *   17. Font enumeration protection
  *   18. Sensor API blocking (DeviceMotion, DeviceOrientation, IdleDetector)
  *   19. document.referrer stripping (cross-origin)
@@ -26,6 +26,18 @@
 
 (function () {
   'use strict';
+
+  // Effective privacy/tracking state. MAIN world can't read chrome.storage, so
+  // content-privacy.js (ISOLATED world) reads settings — honoring whitelist and
+  // global pause — and forwards the result via SB_PRIVACY_CONFIG. Every patch
+  // below self-gates on these flags, so they can be toggled at runtime.
+  let _privacyEnabled = true;
+  let _trackingEnabled = true;
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || e.data?.type !== 'SB_PRIVACY_CONFIG') return;
+    _privacyEnabled = e.data.privacy !== false;
+    _trackingEnabled = e.data.tracking !== false;
+  });
 
   let _privacyInstalled = false;
   function installPrivacyPatches() {
@@ -53,7 +65,7 @@
     const _isYT = location.hostname.includes('youtube.com') || location.hostname.includes('youtu.be');
     const _toDataURL = HTMLCanvasElement.prototype.toDataURL;
     HTMLCanvasElement.prototype.toDataURL = function () {
-      if (_isYT) return _toDataURL.apply(this, arguments);
+      if (_isYT || !_privacyEnabled) return _toDataURL.apply(this, arguments);
       const r = _toDataURL.apply(this, arguments);
       try {
         const idx = r.indexOf('base64,');
@@ -68,7 +80,7 @@
 
     const _getImageData = CanvasRenderingContext2D.prototype.getImageData;
     CanvasRenderingContext2D.prototype.getImageData = function () {
-      if (_isYT) return _getImageData.apply(this, arguments); // inject-youtube.js handles YouTube
+      if (_isYT || !_privacyEnabled) return _getImageData.apply(this, arguments); // inject-youtube.js handles YouTube
       const d = _getImageData.apply(this, arguments);
       try {
         const noise = stableNoise(SESSION_SEED + arguments[0] + arguments[1]);
@@ -114,6 +126,7 @@
     try {
       const _gp = ctx.prototype.getParameter;
       ctx.prototype.getParameter = function (p) {
+        if (!_privacyEnabled) return _gp.apply(this, arguments);
         if (p === 37446) return SPOOFED_RENDERER; // UNMASKED_RENDERER_WEBGL
         if (p === 37445) return SPOOFED_VENDOR;   // UNMASKED_VENDOR_WEBGL
         if (GL_PARAM_OVERRIDES.has(p)) return GL_PARAM_OVERRIDES.get(p);
@@ -134,6 +147,7 @@
       const _noised = new WeakMap();
       AudioBuffer.prototype.getChannelData = function (ch) {
         const data = _gcd.call(this, ch);
+        if (!_privacyEnabled) return data;
         let s = _noised.get(this);
         if (!s) { s = new Set(); _noised.set(this, s); }
         if (!s.has(ch)) {
@@ -147,25 +161,16 @@
       const _gffd = AnalyserNode.prototype.getFloatFrequencyData;
       AnalyserNode.prototype.getFloatFrequencyData = function (arr) {
         _gffd.call(this, arr);
+        if (!_privacyEnabled) return;
         const noise = (stableNoise(SESSION_SEED + 'freq' + arr.length) - 0.5) * 0.0001;
         for (let i = 0; i < arr.length; i += 10) arr[i] += noise;
       };
     }
   } catch (_) {}
 
-  // ── 4. WebRTC IP leak prevention ─────────────────────────────────────────────
-  // Strips iceServers from RTCPeerConnection config so STUN requests don't
-  // reveal the real IP address through VPNs/proxies.
-  try {
-    const _RPC = window.RTCPeerConnection;
-    if (_RPC) {
-      window.RTCPeerConnection = function (config, constraints) {
-        if (config?.iceServers) config = { ...config, iceServers: [] };
-        return new _RPC(config, constraints);
-      };
-      window.RTCPeerConnection.prototype = _RPC.prototype;
-    }
-  } catch (_) {}
+  // ── 4. WebRTC ────────────────────────────────────────────────────────────────
+  // Do not strip RTCPeerConnection/ICE servers globally. That broke legitimate
+  // calls and live playback on Meet, Discord, Zoom, Twitch, and similar apps.
 
   // ── 5. Navigator API normalization ───────────────────────────────────────────
   // Round hardwareConcurrency and deviceMemory to reduce fingerprint uniqueness.
@@ -175,7 +180,7 @@
     const _hc = navigator.hardwareConcurrency;
     const normCores = [2, 4, 8, 16].reduce((p, c) => Math.abs(c - _hc) < Math.abs(p - _hc) ? c : p);
     if (normCores !== _hc) {
-      Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => normCores, configurable: true });
+      Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => _privacyEnabled ? normCores : _hc, configurable: true });
     }
   } catch (_) {}
 
@@ -184,7 +189,7 @@
       const mem = navigator.deviceMemory;
       const norm = mem <= 2 ? 2 : mem <= 4 ? 4 : 8;
       if (norm !== mem) {
-        Object.defineProperty(navigator, 'deviceMemory', { get: () => norm, configurable: true });
+        Object.defineProperty(navigator, 'deviceMemory', { get: () => _privacyEnabled ? norm : mem, configurable: true });
       }
     }
   } catch (_) {}
@@ -194,21 +199,23 @@
     // Keeps the user's actual language but removes rare combinations like
     // ['en-US', 'fr-CA', 'de-AT', 'zh-TW'] that uniquely identify a user.
     const lang  = navigator.language || 'en-US';
+    const originalLanguages = [...navigator.languages];
     const base  = lang.split('-')[0];
     const normLangs = lang === base ? [lang] : [lang, base];
-    if (JSON.stringify([...navigator.languages]) !== JSON.stringify(normLangs)) {
-      Object.defineProperty(navigator, 'languages', { get: () => normLangs, configurable: true });
+    if (JSON.stringify(originalLanguages) !== JSON.stringify(normLangs)) {
+      Object.defineProperty(navigator, 'languages', { get: () => _privacyEnabled ? normLangs : originalLanguages, configurable: true });
     }
   } catch (_) {}
 
   // ── 6. navigator.connection spoofing ─────────────────────────────────────────
   try {
     if (navigator.connection) {
+      const _origConn = navigator.connection;
       const _spoofConn = Object.assign(
         Object.create(Object.getPrototypeOf(navigator.connection)),
         { effectiveType: '4g', downlink: 10, rtt: 50, saveData: false }
       );
-      Object.defineProperty(navigator, 'connection', { get: () => _spoofConn, configurable: true });
+      Object.defineProperty(navigator, 'connection', { get: () => _privacyEnabled ? _spoofConn : _origConn, configurable: true });
     }
   } catch (_) {}
 
@@ -218,16 +225,22 @@
   // (which reveal taskbar size — a unique fingerprint on desktop).
   try {
     const roundTo = (n, step) => Math.round(n / step) * step;
-    const fw = roundTo(screen.width,  100);
-    const fh = roundTo(screen.height, 100);
-    if (fw !== screen.width)  Object.defineProperty(screen, 'width',  { get: () => fw, configurable: true });
-    if (fh !== screen.height) Object.defineProperty(screen, 'height', { get: () => fh, configurable: true });
+    const ow = screen.width;
+    const oh = screen.height;
+    const oaw = screen.availWidth;
+    const oah = screen.availHeight;
+    const ocd = screen.colorDepth;
+    const opd = screen.pixelDepth;
+    const fw = roundTo(ow,  100);
+    const fh = roundTo(oh, 100);
+    if (fw !== ow) Object.defineProperty(screen, 'width',  { get: () => _privacyEnabled ? fw : ow, configurable: true });
+    if (fh !== oh) Object.defineProperty(screen, 'height', { get: () => _privacyEnabled ? fh : oh, configurable: true });
     // availWidth/availHeight expose taskbar size — normalize to full screen dimensions
-    if (screen.availWidth  !== screen.width)  Object.defineProperty(screen, 'availWidth',  { get: () => fw, configurable: true });
-    if (screen.availHeight !== screen.height) Object.defineProperty(screen, 'availHeight', { get: () => fh, configurable: true });
+    if (oaw !== ow) Object.defineProperty(screen, 'availWidth',  { get: () => _privacyEnabled ? fw : oaw, configurable: true });
+    if (oah !== oh) Object.defineProperty(screen, 'availHeight', { get: () => _privacyEnabled ? fh : oah, configurable: true });
     // colorDepth is always 24 on modern hardware — normalize to remove edge cases
-    Object.defineProperty(screen, 'colorDepth', { get: () => 24, configurable: true });
-    Object.defineProperty(screen, 'pixelDepth', { get: () => 24, configurable: true });
+    Object.defineProperty(screen, 'colorDepth', { get: () => _privacyEnabled ? 24 : ocd, configurable: true });
+    Object.defineProperty(screen, 'pixelDepth', { get: () => _privacyEnabled ? 24 : opd, configurable: true });
   } catch (_) {}
 
 
@@ -240,13 +253,13 @@
       /wss?:\/\/.*\.(adsrvr|casalemedia|openx|appnexus)\./, 
       /wss?:\/\/(spade|collector)\.(twitch|mixpanel|amplitude)\./,
     ];
-    // Never interfere with YouTube or Google WebSockets
-    const WS_SAFE = /youtube\.com|googlevideo\.com|googleapis\.com|ytimg\.com/;
+    // Never interfere with video platform playback / heartbeat WebSockets.
+    const WS_SAFE = /youtube\.com|googlevideo\.com|googleapis\.com|ytimg\.com|twitch\.tv|ttvnw\.net|jtvnw\.net|twitchsvc\.net/;
     const _WS = window.WebSocket;
     window.WebSocket = function (url, protocols) {
       const urlStr = String(url);
       if (WS_SAFE.test(urlStr)) return new _WS(url, protocols); // always allow
-      if (WS_AD_PATTERNS.some(p => p.test(urlStr))) {
+      if (_trackingEnabled && WS_AD_PATTERNS.some(p => p.test(urlStr))) {
         // Return a no-op fake WebSocket
         const fake = { send:()=>{}, close:()=>{}, addEventListener:()=>{},
           removeEventListener:()=>{}, dispatchEvent:()=>false,
@@ -270,13 +283,14 @@
   // time — together these form a unique fingerprint. Return plausible fixed values.
   try {
     if (navigator.getBattery) {
+      const _origGetBattery = navigator.getBattery.bind(navigator);
       const fakeBattery = {
         charging: true, chargingTime: 0, dischargingTime: Infinity,
         level: 1.0,
         addEventListener: () => {}, removeEventListener: () => {},
         dispatchEvent: () => false,
       };
-      navigator.getBattery = () => Promise.resolve(fakeBattery);
+      navigator.getBattery = () => _privacyEnabled ? Promise.resolve(fakeBattery) : _origGetBattery();
     }
   } catch (_) {}
 
@@ -352,6 +366,7 @@
   ]);
 
   function cleanURL(urlStr) {
+    if (!_trackingEnabled) return null;
     try {
       const url = new URL(urlStr);
       let changed = false;
@@ -410,6 +425,7 @@
   // Major platforms wrap outbound links in tracking redirects. Intercept clicks
   // and navigate directly to the destination — no tracking ping sent.
   document.addEventListener('click', (e) => {
+    if (!_trackingEnabled) return;
     const link = e.target?.closest('a');
     if (!link?.href) return;
     try {
@@ -488,43 +504,24 @@
     } catch (_) {}
   }, true);
 
-  // ── 11. Notification + Push permission auto-deny ──────────────────────────────
-  try {
-    Notification.requestPermission = (cb) => {
-      if (typeof cb === 'function') cb('denied');
-      return Promise.resolve('denied');
-    };
-    Object.defineProperty(Notification, 'permission', { get: () => 'denied', configurable: true });
-  } catch (_) {}
-
-  if (typeof PushManager !== 'undefined') {
-    try {
-      PushManager.prototype.subscribe = () =>
-        Promise.reject(Object.assign(new Error('NotAllowedError'), { name: 'NotAllowedError' }));
-    } catch (_) {}
-  }
+  // ── 11. Notifications / Push ─────────────────────────────────────────────────
+  // Leave browser permission prompts intact. Hard-denying these APIs globally
+  // breaks legitimate web apps and makes the privacy toggle possible to honor.
 
   // ── 15. Global Privacy Control (GPC) ─────────────────────────────────────────
   // Legally significant in California (CCPA), Colorado (CPA), Connecticut, and EU (GDPR).
   // Major publishers (NYT, WashPost, etc.) are legally required to respect this signal.
   // Ghostery and DuckDuckGo ship this; uBlock Origin does not.
   try {
+    const _origGPC = navigator.globalPrivacyControl;
     Object.defineProperty(navigator, 'globalPrivacyControl', {
-      get: () => true, configurable: false, enumerable: true,
+      get: () => _privacyEnabled ? true : _origGPC, configurable: false, enumerable: true,
     });
   } catch (_) {}
 
-  // ── 16. Geolocation auto-deny ─────────────────────────────────────────────────
-  // Sites frequently request precise location for ad targeting.
-  // Override to immediately return a PermissionDeniedError — same as if user clicks "Block".
-  try {
-    const _GEO_ERR = Object.assign(
-      new Error('User denied Geolocation'),
-      { code: 1, PERMISSION_DENIED: 1 }
-    );
-    const _fakegeo = { getCurrentPosition: (_, err) => err?.(_GEO_ERR), watchPosition: (_, err) => { err?.(_GEO_ERR); return 0; }, clearWatch: () => {} };
-    Object.defineProperty(navigator, 'geolocation', { get: () => _fakegeo, configurable: true });
-  } catch (_) {}
+  // ── 16. Geolocation ───────────────────────────────────────────────────────────
+  // Leave geolocation under the browser's native permission prompt. Hard-denying
+  // globally broke maps, delivery, and local-search flows.
 
   // ── 17. Font enumeration protection ───────────────────────────────────────────
   // document.fonts.check() reveals which fonts are installed — a unique fingerprint.
@@ -535,6 +532,7 @@
   try {
     const _origFontCheck = document.fonts.check.bind(document.fonts);
     document.fonts.check = function (font, text) {
+      if (!_privacyEnabled) return _origFontCheck(font, text);
       const name = (font || '').toLowerCase().replace(/['"]/g, '').replace(/\d+px\s*/, '').trim();
       if (_SAFE_FONTS.has(name)) return _origFontCheck(font, text);
       return false; // deny fingerprinting of non-standard fonts
@@ -545,12 +543,17 @@
   // DeviceMotion/Orientation reveal device type and orientation — fingerprint vector.
   // IdleDetector tells sites when the user is away from keyboard.
   try {
-    window.addEventListener('devicemotion', e => e.stopImmediatePropagation(), true);
-    window.addEventListener('deviceorientation', e => e.stopImmediatePropagation(), true);
+    window.addEventListener('devicemotion', e => { if (_privacyEnabled) e.stopImmediatePropagation(); }, true);
+    window.addEventListener('deviceorientation', e => { if (_privacyEnabled) e.stopImmediatePropagation(); }, true);
   } catch (_) {}
   try {
     if (typeof IdleDetector !== 'undefined') {
-      IdleDetector.prototype.start = () => Promise.reject(new DOMException('Not allowed', 'NotAllowedError'));
+      const _origIdleStart = IdleDetector.prototype.start;
+      IdleDetector.prototype.start = function () {
+        return _privacyEnabled
+          ? Promise.reject(new DOMException('Not allowed', 'NotAllowedError'))
+          : _origIdleStart.apply(this, arguments);
+      };
     }
   } catch (_) {}
 
@@ -560,7 +563,8 @@
   // the JS-readable document.referrer for same-process navigations.
   try {
     if (document.referrer && new URL(document.referrer).origin !== location.origin) {
-      Object.defineProperty(document, 'referrer', { get: () => '', configurable: true });
+      const _origReferrer = document.referrer;
+      Object.defineProperty(document, 'referrer', { get: () => _privacyEnabled ? '' : _origReferrer, configurable: true });
     }
   } catch (_) {}
 
@@ -585,7 +589,7 @@
   // ── 13. Chat widget removal ───────────────────────────────────────────────────
   const CHAT_SEL = [
     '#intercom-frame', '#intercom-container', '.intercom-lightweight-app',
-    '#launcher', '#webWidget', '#ze-snippet', '.zEWidget-launcher',
+    '#webWidget', '#ze-snippet', '.zEWidget-launcher',
     '#drift-widget', '#drift-frame-controller', '#drift-widget-container',
     '.crisp-client', '#crisp-chatbox',
     '#hubspot-messages-iframe-container', '.hs-messages-widget',
@@ -687,31 +691,40 @@
   // coordinator when the user enables the setting.
   // NOTE: This uses a postMessage from the isolated-world content script
   // because we can't read chrome.storage in MAIN world directly.
+  let _timezoneSpoofEnabled = false;
+  let _timezonePatched = false;
   window.addEventListener('message', (e) => {
     if (e.source !== window || e.data?.type !== 'SB_TIMEZONE_SPOOF') return;
-    if (!e.data.enabled) return;
+    _timezoneSpoofEnabled = !!e.data.enabled;
+    if (!_timezoneSpoofEnabled || _timezonePatched) return;
+    _timezonePatched = true;
     try {
       const _OrigDTF = Intl.DateTimeFormat;
-      // Override Intl.DateTimeFormat to always resolve to UTC
+      const _origOffset = Date.prototype.getTimezoneOffset;
+      const _origLocaleString = Date.prototype.toLocaleString;
+      const _origLocaleDateString = Date.prototype.toLocaleDateString;
+      const _origLocaleTimeString = Date.prototype.toLocaleTimeString;
+      // Override Intl.DateTimeFormat to resolve to UTC only while the setting is enabled.
       const PatchedDTF = function (locale, opts) {
-        return new _OrigDTF(locale, { ...opts, timeZone: 'UTC' });
+        return new _OrigDTF(locale, _timezoneSpoofEnabled ? { ...opts, timeZone: 'UTC' } : opts);
       };
       PatchedDTF.prototype          = _OrigDTF.prototype;
       PatchedDTF.supportedLocalesOf = _OrigDTF.supportedLocalesOf.bind(_OrigDTF);
-      // Best-effort — some envs protect Intl
       try { Object.defineProperty(Intl, 'DateTimeFormat', { value: PatchedDTF, writable: true, configurable: true }); } catch (_) {}
 
-      // getTimezoneOffset returns minutes behind UTC — 0 for UTC itself
-      Date.prototype.getTimezoneOffset = function () { return 0; };
-      // toLocaleString / toLocaleDateString / toLocaleTimeString
+      Date.prototype.getTimezoneOffset = function () {
+        return _timezoneSpoofEnabled ? 0 : _origOffset.apply(this, arguments);
+      };
       const _patchLocale = (fn) => function (...args) {
-        if (!args[1]) args[1] = {};
-        args[1].timeZone = 'UTC';
+        if (_timezoneSpoofEnabled) {
+          if (!args[1]) args[1] = {};
+          args[1].timeZone = 'UTC';
+        }
         return fn.apply(this, args);
       };
-      Date.prototype.toLocaleString     = _patchLocale(Date.prototype.toLocaleString);
-      Date.prototype.toLocaleDateString = _patchLocale(Date.prototype.toLocaleDateString);
-      Date.prototype.toLocaleTimeString = _patchLocale(Date.prototype.toLocaleTimeString);
+      Date.prototype.toLocaleString     = _patchLocale(_origLocaleString);
+      Date.prototype.toLocaleDateString = _patchLocale(_origLocaleDateString);
+      Date.prototype.toLocaleTimeString = _patchLocale(_origLocaleTimeString);
     } catch (_) {}
   });
 
@@ -724,6 +737,7 @@
   // architecture / platform version / full build version return generic values.
   try {
     if (typeof navigator.userAgentData !== 'undefined') {
+      const _origUAData = navigator.userAgentData;
       const _genericBrands = [
         { brand: 'Chromium',    version: '99' },
         { brand: 'Not A;Brand', version: '99' },
@@ -748,7 +762,7 @@
         toJSON:              () => ({ brands: _genericBrands, mobile: false, platform: 'Windows' }),
       };
       Object.defineProperty(navigator, 'userAgentData', {
-        get: () => _fakeUAData, configurable: true, enumerable: true,
+        get: () => _privacyEnabled ? _fakeUAData : _origUAData, configurable: true, enumerable: true,
       });
     }
   } catch (_) {}
@@ -764,6 +778,7 @@
       const _origEnum = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
       navigator.mediaDevices.enumerateDevices = async function () {
         const devices = await _origEnum();
+        if (!_privacyEnabled) return devices;
         return devices.map(d => ({
           kind:     d.kind,
           label:    d.label,  // already blank until permission granted
@@ -783,8 +798,9 @@
 
   } // installPrivacyPatches
 
-  window.addEventListener('message', function (e) {
-    if (e.source !== window) return;
-    if (e.data?.type === 'SB_PRIVACY_ENABLE') installPrivacyPatches();
-  });
+  // Install all hooks immediately at document_start. Each patch self-gates on
+  // _privacyEnabled / _trackingEnabled, which content-privacy.js keeps in sync
+  // via SB_PRIVACY_CONFIG — so blocking pauses when the user toggles privacy off,
+  // whitelists the site, or activates global pause, without re-injecting.
+  installPrivacyPatches();
 })();

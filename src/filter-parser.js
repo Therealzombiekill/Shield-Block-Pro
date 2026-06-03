@@ -126,17 +126,40 @@ function parseLine(line, idCounter) {
   // ── Network (DNR) rules ────────────────────────────────────────────────────
   let filter = line;
   let resourceTypes = null;
+  const excludedResourceTypes = new Set();
+  let domainType = null;
+  const initiatorDomains = [];
+  const excludedInitiatorDomains = ['youtube.com', 'youtu.be', 'youtube-nocookie.com'];
 
   const optIdx = filter.lastIndexOf('$');
   if (optIdx !== -1) {
     const opts = filter.slice(optIdx + 1);
     filter = filter.slice(0, optIdx);
     const types = [];
-    for (const opt of opts.split(',')) {
-      const t = RESOURCE_TYPE_MAP[opt.trim().replace(/^~/, '')];
-      if (t && !opt.startsWith('~')) types.push(t);
+    for (const rawOpt of opts.split(',')) {
+      const opt = rawOpt.trim();
+      const negated = opt.startsWith('~');
+      const optName = opt.replace(/^~/, '');
+      const t = RESOURCE_TYPE_MAP[optName];
+      if (t && !negated) types.push(t);
+      if (t && negated) excludedResourceTypes.add(t);
+      if (optName === 'third-party') domainType = negated ? 'firstParty' : 'thirdParty';
+      if (opt.startsWith('domain=')) {
+        for (const d of opt.slice(7).split('|')) {
+          const rawDomain = d.trim();
+          const negatedDomain = rawDomain.startsWith('~');
+          const domain = (negatedDomain ? rawDomain.slice(1) : rawDomain).replace(/^www\./, '');
+          if (!domain) continue;
+          if (negatedDomain) excludedInitiatorDomains.push(domain);
+          else initiatorDomains.push(domain);
+        }
+      }
     }
     if (types.length) resourceTypes = types;
+    else if (excludedResourceTypes.size) {
+      resourceTypes = DEFAULT_RESOURCE_TYPES.filter(t => !excludedResourceTypes.has(t));
+      if (!resourceTypes.length) return null;
+    }
     // $removeparam — extract param name and domain constraints, handle separately
     // Format: $removeparam=paramname or $removeparam=paramname,domain=x.com
     const rpOpt = opts.split(',').find(o => o.trim().startsWith('removeparam'));
@@ -159,7 +182,7 @@ function parseLine(line, idCounter) {
       }
       return { type: 'removeparam', param: paramName, initDomains, exclDomains };
     }
-    // Skip other unsupported option types
+    // Skip other unsupported option types that would change the action semantics
     if (opts.includes('redirect') || opts.includes('csp') || opts.includes('replace')) return null;
   }
 
@@ -177,18 +200,22 @@ function parseLine(line, idCounter) {
 
   if (urlFilter.length < 4 || urlFilter.length > 512) return null;
 
+  const condition = {
+    urlFilter,
+    resourceTypes: resourceTypes ?? DEFAULT_RESOURCE_TYPES,
+    // Never block resources when the initiator is YouTube
+    excludedInitiatorDomains: [...new Set(excludedInitiatorDomains)],
+  };
+  if (initiatorDomains.length) condition.initiatorDomains = [...new Set(initiatorDomains)];
+  if (domainType) condition.domainType = domainType;
+
   return {
     type: 'dnr',
     rule: {
       id: idCounter,
       priority: 2,
       action: { type: 'block' },
-      condition: {
-        urlFilter,
-        resourceTypes: resourceTypes ?? DEFAULT_RESOURCE_TYPES,
-        // Never block resources when the initiator is YouTube
-        excludedInitiatorDomains: ['youtube.com', 'youtu.be', 'youtube-nocookie.com'],
-      },
+      condition,
     },
   };
   } catch (_) { return null; }

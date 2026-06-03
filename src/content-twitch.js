@@ -28,19 +28,21 @@
   }
 
   const _wl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return;
+  const _hostname = location.hostname.replace(/^www\./, '');
+  if (settings?.globalPause) {
+    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
+    return;
+  }
 
   if (!settings?.twitch) {
     window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
     return;
   }
-  window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
-
-  const _hostname = location.hostname.replace(/^www\./, '');
   if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) {
     window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
     return;
   }
+  window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
 
   _sbLog('info', `Init — ${_hostname}`);
 
@@ -238,8 +240,9 @@
   observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
   const interval = setInterval(domTick, 1000);
 
-  chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.twitch === false) {
+  let stopped = false;
+  function stopTwitchBlocking() {
+    if (!stopped) {
       observer.disconnect();
       clearInterval(interval);
       clearInterval(safetyInterval);
@@ -248,6 +251,24 @@
       clearTimeout(toastTimeout);
       hideToast();
       unmuteVideo();
+      stopped = true;
+    }
+    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
+  }
+
+  chrome.storage.onChanged.addListener((changes) => {
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (changes.settings?.newValue?.twitch === false || isWhitelisted || paused) {
+      stopTwitchBlocking();
+    }
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') stopTwitchBlocking();
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) stopTwitchBlocking();
     }
   });
 

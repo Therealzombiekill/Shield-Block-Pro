@@ -93,17 +93,29 @@
     _obs.disconnect(); clearInterval(_int); clearTimeout(_deb);
   }, { once: true });
 
-  // Cleanup on toggle-off — restore audio and disconnect
+  function stopKickBlocking() {
+    _obs.disconnect();
+    clearInterval(_int);
+    clearTimeout(_deb);
+    if (adActive) {
+      const video = document.querySelector('video');
+      if (video) video.muted = wasMuted;
+      adActive = false;
+    }
+  }
+
+  // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.kick === false) {
-      _obs.disconnect();
-      clearInterval(_int);
-      clearTimeout(_deb);
-      if (adActive) {
-        const video = document.querySelector('video');
-        if (video) video.muted = wasMuted;
-        adActive = false;
-      }
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (changes.settings?.newValue?.kick === false || isWhitelisted || paused) stopKickBlocking();
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') stopKickBlocking();
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => _host === d || _host.endsWith('.' + d))) stopKickBlocking();
     }
   });
 

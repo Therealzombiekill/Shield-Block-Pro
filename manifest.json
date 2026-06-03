@@ -36,6 +36,16 @@
     },
     {
       "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/browser-compat.js",
+        "src/content-privacy.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
         "*://*.amazon.com/*",
         "*://*.amazon.co.uk/*",
         "*://*.amazon.de/*",
@@ -72,6 +82,11 @@
     {
       "matches": [
         "<all_urls>"
+      ],
+      "exclude_matches": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*",
+        "*://music.youtube.com/*"
       ],
       "js": [
         "src/browser-compat.js",

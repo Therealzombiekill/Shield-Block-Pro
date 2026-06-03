@@ -18,20 +18,46 @@
     catch (_) { settings = null; }
   }
   const _genWl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return; // global pause active — skip all processing
 
   // Signal inject-privacy.js (MAIN world) to activate timezone spoofing if enabled.
   // Can't read storage in MAIN world, so isolated world posts the signal.
-  if (settings?.timezoneSpoof) {
-    window.postMessage({ type: 'SB_TIMEZONE_SPOOF', enabled: true }, '*');
-  }
+  let _timezoneEnabled = !!settings?.timezoneSpoof;
+  let _globalPaused = !!settings?.globalPause;
+  window.postMessage({ type: 'SB_TIMEZONE_SPOOF', enabled: _timezoneEnabled && !_globalPaused }, '*');
+  chrome.storage.onChanged.addListener((changes) => {
+    if ('settings' in changes || 'globalPause' in changes) {
+      if (changes.settings?.newValue && 'timezoneSpoof' in changes.settings.newValue) {
+        _timezoneEnabled = !!changes.settings.newValue.timezoneSpoof;
+      }
+      if ('globalPause' in changes) {
+        _globalPaused = !!(changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now());
+      }
+      window.postMessage({ type: 'SB_TIMEZONE_SPOOF', enabled: _timezoneEnabled && !_globalPaused }, '*');
+    }
+  });
 
+  if (settings?.globalPause) return; // global pause active — skip all processing
   if (!settings?.cosmetic) return;
 
   const _host = location.hostname.replace(/^www\./, '');
   // Never run on YouTube — our selectors can match player elements and cause black screens
   if (_host.includes('youtube.com') || _host.includes('youtu.be')) return;
   if (_genWl.some(d => _host === d || _host.endsWith('.' + d))) return;
+
+  async function injectBundledCosmeticCSS() {
+    if (document.getElementById('_sb_cosmetic_css')) return;
+    try {
+      const res = await fetch(chrome.runtime.getURL('src/cosmetic.css'));
+      if (!res.ok) return;
+      const css = await res.text();
+      const style = document.createElement('style');
+      style.id = '_sb_cosmetic_css';
+      style.textContent = css;
+      (document.head || document.documentElement).appendChild(style);
+    } catch (_) {}
+  }
+
+  injectBundledCosmeticCSS();
 
   // ── Ad selectors ────────────────────────────────────────────────────────────
   // Combined into a single string for one querySelectorAll call per tick.
@@ -268,9 +294,12 @@
   }
 
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.cosmetic === false) {
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
+    if (changes.settings?.newValue?.cosmetic === false || isWhitelisted) {
       _observer.disconnect();
       clearTimeout(_debounce);
+      document.getElementById('_sb_cosmetic_css')?.remove();
     }
   });
 
@@ -279,10 +308,20 @@
     if (msg.type === 'GLOBAL_PAUSE') {
       _observer.disconnect();
       clearTimeout(_debounce);
+      document.getElementById('_sb_cosmetic_css')?.remove();
     }
     if (msg.type === 'GLOBAL_RESUME') {
       if (_target) _observer.observe(_target, { childList: true, subtree: true });
+      injectBundledCosmeticCSS();
       tick();
+    }
+    if (msg.type === 'WHITELIST_CHANGED') {
+      const wl = msg.whitelist ?? [];
+      if (wl.some(d => _host === d || _host.endsWith('.' + d))) {
+        _observer.disconnect();
+        clearTimeout(_debounce);
+        document.getElementById('_sb_cosmetic_css')?.remove();
+      }
     }
   });
 

@@ -10,6 +10,7 @@
  */
 
 const _AMAZON_CSS = `
+  /* Sponsored products everywhere */
   [data-component-type="sp-sponsored-result"],
   [data-cel-widget*="sp-sponsored"],
   [cel_widget_id*="SPONSORED"],
@@ -178,11 +179,29 @@ function _removeAmazonCss() {
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
+  function stopAmazonBlocking() {
+    observer.disconnect();
+    clearTimeout(debounce);
+    _removeAmazonCss(); // also remove injected CSS
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.amazon === false) {
-      observer.disconnect();
-      clearTimeout(debounce);
-      _removeAmazonCss();
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
+    if (changes.settings?.newValue?.amazon === false || isWhitelisted || paused) {
+      stopAmazonBlocking();
+    }
+  });
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'GLOBAL_PAUSE') {
+      stopAmazonBlocking();
+    }
+    if (message?.type === 'WHITELIST_CHANGED') {
+      const wl = message.whitelist ?? [];
+      if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) {
+        stopAmazonBlocking();
+      }
     }
   });
 

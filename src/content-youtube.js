@@ -8,10 +8,7 @@
  */
 
 (async () => {
-  // Build marker — surfaces in exported logs so we can confirm exactly which
-  // packaged build is running and which YouTube strategy is active. The manifest
-  // version alone was ambiguous (old and patched builds both read 2.10.x).
-  const SB_YT_BUILD = '2.10.2-ytsafe (dom-only)';
+  const SB_YT_BUILD = '2.10.2-innertube';
 
   // ── Log helper ────────────────────────────────────────────────────────────────
   function _sbLog(level, message, data) {
@@ -30,33 +27,24 @@
   }
   const _wl = settings?.whitelist ?? [];
   const _host = location.hostname.replace(/^www\./, '');
-  if (settings?.globalPause) {
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return; // global pause active — skip all processing
+  const _whitelisted = _wl.some(d => _host === d || _host.endsWith('.' + d));
+
+  const _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
+
+  if (settings) {
+    try { localStorage.setItem('__sbYtOff', _shouldDisable ? '1' : '0'); } catch (_) {}
   }
 
-  if (!settings?.youtube) {
-    // Signal MAIN world to stop intercepting
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return;
-  }
-  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) {
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return;
-  }
-  // Signal MAIN world to ensure interception is active (handles re-enable after toggle)
-  window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
+  window.postMessage({ type: _shouldDisable ? 'SB_YOUTUBE_DISABLE' : 'SB_YOUTUBE_ENABLE' }, '*');
+  if (_shouldDisable) return;
 
   _sbLog('info', `Init — ${_host} [${SB_YT_BUILD}]`, { ytMusic: _host.includes('music.'), build: SB_YT_BUILD });
 
-  // ── Relay log messages from inject-youtube.js (MAIN world) ───────────────────
-  // inject-youtube.js cannot call chrome APIs; it postMessages here and we relay.
   window.addEventListener('message', e => {
     if (e.source !== window || e.data?.type !== 'SB_YT_LOG') return;
     _sbLog(e.data.level ?? 'info', e.data.message, e.data.data);
   });
 
-  // ── Ad detection ──────────────────────────────────────────────────────────────
   function isAdPlaying() {
     return !!(
       document.querySelector('.ad-showing') ||
@@ -67,13 +55,11 @@
     );
   }
 
-  // ── Skip / mute ───────────────────────────────────────────────────────────────
   let _muted = false;
   let _origVol = null;
 
   function handleAd() {
     if (!isAdPlaying()) {
-      // Restore volume if we muted for an ad
       if (_muted) {
         const vid = document.querySelector('video');
         if (vid && _origVol !== null) { vid.muted = false; vid.volume = _origVol; }
@@ -84,25 +70,23 @@
       return;
     }
 
-    // 1. Click skip button if visible
     const skip = document.querySelector(
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
     if (skip) { skip.click(); _sbLog('info', 'Ad: clicked skip button'); return; }
 
-    // 2. Seek past short ads.
-    // Guard: only seek if .ad-showing is on the player — this class is set
-    // by YouTube itself and is the most reliable ad signal. The duration < 120
-    // guard prevents accidentally seeking a short legitimate video (Shorts, clips).
     const vid = document.querySelector('video');
     const playerHasAdClass = !!document.querySelector('.ad-showing');
-    if (vid && playerHasAdClass && isFinite(vid.duration) && vid.duration > 0 && vid.duration < 120) {
+    const adUiPresent = !!document.querySelector(
+      '.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-preview-text, ' +
+      '.ytp-ad-text, .ytp-ad-skip-button, .ytp-ad-skip-button-modern'
+    );
+    if (vid && playerHasAdClass && adUiPresent && isFinite(vid.duration) && vid.duration > 0 && vid.duration < 120) {
       vid.currentTime = vid.duration;
       _sbLog('info', `Ad: seeked past (${vid.duration.toFixed(1)}s)`);
       return;
     }
 
-    // 3. Mute unskippable long ads as last resort
     if (vid && !_muted) {
       _origVol = vid.volume;
       vid.muted = true;
@@ -111,17 +95,11 @@
     }
   }
 
-  // ── Remove ad overlay and promoted elements ────────────────────────────────────
   const OVERLAY_SELS = [
-    // In-player overlays
     '.ytp-ad-overlay-container', '.ytp-ad-overlay-slot',
-    '.ytp-ce-element',                      // end-cards
-    '.ytp-suggested-action',                // "Visit advertiser" CTA
+    '.ytp-suggested-action',
     '.ytp-ad-image-overlay',
-    // NOTE: do NOT remove .ytp-ad-player-overlay-layout here — it is structural
-    // in-player markup, and el.remove()'ing it blanks the whole video (black
-    // screen). Ads are handled by mute/skip + the InnerTube strip instead.
-    // Page-level ad placements
+    // Do NOT remove .ytp-ad-player-overlay-layout — structural player markup.
     '#masthead-ad',
     '#player-ads',
     'ytd-display-ad-renderer',
@@ -130,43 +108,33 @@
     '.ytd-banner-promo-renderer',
     '.ytd-promoted-sparkles-web-renderer',
     '.ytd-compact-promoted-item-renderer',
-    // Search page sponsored results
     'ytd-search-pyv-renderer',
     'ytd-promoted-video-renderer',
     'ytd-promoted-sparkles-text-search-renderer',
-    // Current (2024+) feed / companion ad-slot renderers — home feed, watch-next
-    // sidebar, and the companion banner shown alongside in-stream ads.
     'ytd-ad-slot-renderer',
     'ytd-in-feed-ad-layout-renderer',
     'ytd-companion-slot-renderer',
-    // ── YouTube Music ad selectors ───────────────────────────────────────────
-    // YTM uses a different component prefix (ytmusic-) and injects ads as
-    // interstitial overlays and in-shelf promotions in the song queue.
-    'ytmusic-mealbar-promo-renderer',       // "Try YouTube Premium" sticky bar
-    'ytmusic-statement-banner-renderer',    // promotional banners
-    'ytmusic-display-ad-renderer',          // display ads in shelves
-    '.ytmusic-paid-content-overlay-renderer', // paid content gate overlay
-    '[ad-joining-count]',                   // ad queue slots
-    // Audio ad playing indicator + skip
+    'ytmusic-mealbar-promo-renderer',
+    'ytmusic-statement-banner-renderer',
+    'ytmusic-display-ad-renderer',
+    '.ytmusic-paid-content-overlay-renderer',
+    '[ad-joining-count]',
     '.ytmusic-player-bar[ad-playing]',
   ];
 
   let _overlayLogThrottle = 0;
+  const _overlaySel = OVERLAY_SELS.join(',');
   function removeOverlays() {
     let removed = 0;
-    for (const sel of OVERLAY_SELS) {
-      document.querySelectorAll(sel).forEach(el => { try { el.remove(); removed++; } catch (_) {} });
-    }
+    try {
+      document.querySelectorAll(_overlaySel).forEach(el => { try { el.remove(); removed++; } catch (_) {} });
+    } catch (_) {}
     if (removed > 0 && Date.now() - _overlayLogThrottle > 5000) {
       _overlayLogThrottle = Date.now();
       _sbLog('info', `Removed ${removed} ad overlay element(s)`);
     }
   }
 
-  // ── YouTube Music audio ad handling ──────────────────────────────────────────
-  // YTM audio ads: the `ad-playing` attribute appears on the player bar.
-  // We mute the audio element during the ad. Seeking to end was removed —
-  // it's unreliable and the YTM audio element duration resets unpredictably.
   let _ytmAdActive = false;
   let _ytmWasMuted = false;
   function handleYTMusicAd() {
@@ -192,16 +160,32 @@
     } catch (_) {}
   }
 
-  // ── Main loop ─────────────────────────────────────────────────────────────────
-  function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); }
+  let _popupLogThrottle = 0;
+  function dismissAdblockPopup() {
+    const enforcement = document.querySelector(
+      'ytd-enforcement-message-view-model, .ytd-enforcement-message-view-model'
+    );
+    if (!enforcement) return;
+    const dialog = enforcement.closest('tp-yt-paper-dialog');
+    try { (dialog || enforcement).remove(); } catch (_) {}
+    document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(el => { try { el.remove(); } catch (_) {} });
+    try {
+      document.documentElement.style.removeProperty('overflow');
+      if (document.body) document.body.style.removeProperty('overflow');
+    } catch (_) {}
+    const vid = document.querySelector('video');
+    try { if (vid && vid.paused) vid.play().catch(() => {}); } catch (_) {}
+    if (Date.now() - _popupLogThrottle > 5000) {
+      _popupLogThrottle = Date.now();
+      _sbLog('warn', 'Anti-adblock popup dismissed — playback resumed');
+    }
+  }
+
+  function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); dismissAdblockPopup(); }
 
   const _tickInterval = setInterval(tick, 750);
   tick();
 
-  // Fast path: click skip button the moment it appears in the DOM.
-  // YouTube's player mutates constantly, so debounce to ~1 click/sec — otherwise
-  // a single ad triggers dozens of redundant clicks (and log spam) per second,
-  // which can disrupt playback (especially on YouTube Music).
   let _lastSkipClick = 0;
   const _skipObserver = new MutationObserver(() => {
     if (Date.now() - _lastSkipClick < 1000) return;
@@ -209,10 +193,10 @@
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
     if (skip) { skip.click(); _lastSkipClick = Date.now(); _sbLog('info', 'Ad: skip button clicked'); }
+    dismissAdblockPopup();
   });
   _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
 
-  // Stat — count each ad encounter once
   let _wasAd = false;
   const _statInterval = setInterval(() => {
     const ad = isAdPlaying();
@@ -222,8 +206,6 @@
     _wasAd = ad;
   }, 1000);
 
-  // Cleanup — disconnect observers and clear intervals when YouTube SPA navigates
-  // away or the feature toggle is turned off (prevents memory/CPU accumulation).
   function _cleanup() {
     clearInterval(_tickInterval);
     clearInterval(_statInterval);
@@ -243,17 +225,33 @@
       _restoreAudio();
       _stopped = true;
     }
+    try { localStorage.setItem('__sbYtOff', '1'); } catch (_) {}
     window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
   }
+
   window.addEventListener('beforeunload', _cleanup, { once: true });
+
+  let _liveYtOff = false, _livePaused = false, _liveWl = false;
   chrome.storage.onChanged.addListener((changes) => {
-    const wl = changes.whitelist?.newValue;
-    const isWhitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
-    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
-    if (changes.settings?.newValue?.youtube === false || isWhitelisted || paused) {
-      _disableNow();
+    let relevant = false;
+    if (changes.settings)    { _liveYtOff = !changes.settings.newValue?.youtube; relevant = true; }
+    if (changes.globalPause) {
+      const gp = changes.globalPause.newValue;
+      _livePaused = !!(gp && gp.until > Date.now());
+      relevant = true;
     }
+    if (changes.whitelist) {
+      const nwl = changes.whitelist.newValue;
+      _liveWl = Array.isArray(nwl) && nwl.some(d => _host === d || _host.endsWith('.' + d));
+      relevant = true;
+    }
+    if (!relevant) return;
+    const nowDisabled = _liveYtOff || _livePaused || _liveWl;
+    try { localStorage.setItem('__sbYtOff', nowDisabled ? '1' : '0'); } catch (_) {}
+    if (!nowDisabled) return;
+    _disableNow();
   });
+
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') _disableNow();
     if (message?.type === 'WHITELIST_CHANGED') {

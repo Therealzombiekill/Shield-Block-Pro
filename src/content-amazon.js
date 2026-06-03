@@ -137,21 +137,17 @@ function _removeAmazonCss() {
 
   function clean() {
     let batch = 0;
-    try {
-      document.querySelectorAll(AD_SEL).forEach(el => { el.remove(); batch++; });
-    } catch (_) {
-      for (const sel of AD_SELECTORS) {
-        try { document.querySelectorAll(sel).forEach(el => { el.remove(); batch++; }); } catch (_) {}
-      }
-    }
-    // Text-based: search result cards with explicit sponsored labels
+    // 1. Card-level removal FIRST. These detect a sponsored *card* by a label
+    //    element inside it — and the broad AD_SEL sweep below also matches that
+    //    same label (.puis-sponsored-label-text). Running the sweep first would
+    //    delete the label and leave the sponsored product card behind.
     document.querySelectorAll('[data-component-type="s-search-result"]').forEach(card => {
       if (card.querySelector('.puis-sponsored-label-text, .s-sponsored-label-info-icon')) {
         card.remove();
         batch++;
       }
     });
-    // Text-based scan: find "Sponsored" labels Amazon injects
+    // Text-based scan: "Sponsored" labels Amazon injects across locales
     document.querySelectorAll('.s-label-popover-default, .a-color-secondary').forEach(el => {
       const _t = el.textContent.trim();
       if (AMZN_SPONSORED.has(_t)) {
@@ -162,6 +158,14 @@ function _removeAmazonCss() {
         }
       }
     });
+    // 2. Broad selector sweep for standalone ad slots / banners / labels.
+    try {
+      document.querySelectorAll(AD_SEL).forEach(el => { el.remove(); batch++; });
+    } catch (_) {
+      for (const sel of AD_SELECTORS) {
+        try { document.querySelectorAll(sel).forEach(el => { el.remove(); batch++; }); } catch (_) {}
+      }
+    }
 
     if (batch > 0) {
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'amazon' }).catch(()=>{});

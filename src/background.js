@@ -4,6 +4,7 @@
 
 import './browser-compat.js';
 import { parseFilterList } from './filter-parser.js';
+import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
 const MAX_DYNAMIC_RULES = 5000;
 const MAX_FILTER_RULES = 4300; // reserve dynamic-rule headroom for pause, whitelist, matrix, and privacy rules
@@ -1112,31 +1113,6 @@ const SB_ALLOW_TTL_MS = 10 * 60 * 1000;
 // (github.com/u/repo, drive.google.com/file/…) extracting the bare hostname
 // blocks the entire legitimate domain — a false positive. Never block these
 // shared-hosting platforms or top-reputation apexes (matched incl. subdomains).
-const SB_DOMAIN_ALLOWLIST = new Set([
-  // Shared hosting where the malicious part is the PATH, not the domain
-  'github.com','githubassets.com','githubusercontent.com','raw.githubusercontent.com','gist.github.com','github.io',
-  'drive.google.com','docs.google.com','drive.usercontent.google.com','storage.googleapis.com',
-  'dropbox.com','dropboxusercontent.com','mega.nz','mediafire.com',
-  'cdn.discordapp.com','media.discordapp.net','t.me',
-  // Top-reputation apexes (an apex entry in a feed is a false positive)
-  'google.com','gstatic.com','googleusercontent.com','youtube.com','youtu.be',
-  'analytics.google.com','tagmanager.google.com',
-  'microsoft.com','live.com','office.com','sharepoint.com','apple.com','icloud.com',
-  'amazon.com','cloudflare.com','facebook.com','instagram.com','x.com','twitter.com',
-  'linkedin.com','reddit.com','wikipedia.org','mozilla.org','anthropic.com','claude.ai',
-]);
-
-function isSafeBrowsingAllowlisted(host) {
-  if (!host) return false;
-  host = host.replace(/^www\./, '');
-  if (SB_DOMAIN_ALLOWLIST.has(host)) return true;
-  const parts = host.split('.');
-  for (let i = 1; i < parts.length - 1; i++) {
-    if (SB_DOMAIN_ALLOWLIST.has(parts.slice(i).join('.'))) return true;
-  }
-  return false;
-}
-
 // Malware feeds list URLs on shared platforms (github.com/foo) — never keep apex hosts.
 function sanitizeSbDomains(domains) {
   const out = [];
@@ -2465,6 +2441,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
         } catch (e) { warn('Storage', e.message); }
 
+        // 11. Safe-browsing false-positive guard (GitHub, Drive, GA dashboard)
+        const fpHosts = ['github.com', 'drive.google.com', 'analytics.google.com'];
+        const fpBlocked = fpHosts.filter(h => _safeBrowsingDomains.has(h));
+        if (fpBlocked.length) fail('Trusted sites', `SB block list contains: ${fpBlocked.join(', ')} — reload extension`);
+        else pass('Trusted sites', 'GitHub, Drive, and GA not in malware domain cache');
+
+        // 12. Sync failure streak
+        try {
+          const { syncFailures = 0 } = await chrome.storage.local.get('syncFailures');
+          if (syncFailures === 0) pass('List sync errors', 'No recent list failures');
+          else if (syncFailures < 4) warn('List sync errors', `${syncFailures} list(s) failed last sync — check Log tab`);
+          else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
+        } catch (e) { warn('List sync errors', e.message); }
+
+        // 13. Extension version
+        pass('Version', chrome.runtime.getManifest().version);
+
         const summary = checks.every(c => c.status === 'pass') ? 'healthy'
                       : checks.some(c => c.status === 'fail')  ? 'degraded'
                       : 'warning';
@@ -3229,11 +3222,12 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== '2.10.1') {
+    if (sbRulesVersion !== '2.11.0') {
       const all = await chrome.storage.local.get(null);
       const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
       if (stale.length) await chrome.storage.local.remove(stale);
-      await chrome.storage.local.set({ sbRulesVersion: '2.10.1' });
+      await chrome.storage.local.set({ sbRulesVersion: '2.11.0' });
+      logEvent('startup', 'info', 'Upgraded to v2.11.0 — cleared stale filter cache for resync');
     }
   } catch (_) {}
 

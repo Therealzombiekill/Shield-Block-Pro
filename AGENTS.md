@@ -8,6 +8,18 @@ ShieldBlock Pro is a Manifest V3 Chrome/Firefox browser extension. There is **no
 
 See `CLAUDE.md` for architecture, storage layout, DNR rule ID ranges, and manual testing workflow.
 
+## Trusted sites (v2.11.0+)
+
+**Single source:** `src/trusted-sites.js` — protected filter domains, Google API initiator exclusions, safe-browsing allowlist, and privacy URL-clean skip hosts.
+
+| Consumer | Uses |
+|----------|------|
+| `src/filter-parser.js` | `isDomainProtected`, `SHARED_GOOGLE_API_EXCLUDED_INITIATORS` |
+| `src/background.js` | `isSafeBrowsingAllowlisted` (+ `sanitizeSbDomains`) |
+| `src/content-privacy.js` | `shouldSkipPrivacyUrlClean` → `SB_PRIVACY_CONFIG.skipUrlClean` |
+
+When adding GitHub / Google Workspace / GA dashboard protection, update **trusted-sites.js** first, then mirror `excludedInitiatorDomains` on static `apis.google.com` / `boq.google.com` rules in `rules/hosts.json` if needed.
+
 ## Cursor Cloud specific instructions
 
 ### What runs locally
@@ -15,70 +27,72 @@ See `CLAUDE.md` for architecture, storage layout, DNR rule ID ranges, and manual
 | Component | Required? | Notes |
 |-----------|-----------|-------|
 | Google Chrome ≥ 116 (or Firefox ≥ 128) | **Yes** | Primary dev path is Chrome |
-| Node.js | Optional | Only for ad-hoc validation scripts; not part of the extension runtime |
-| Local dev server / Docker / database | **No** | Extension state lives in `chrome.storage.local` and IndexedDB inside the browser |
+| Node.js | Optional | Ad-hoc validation only |
+| Local dev server / Docker / database | **No** | State in `chrome.storage.local` + IndexedDB |
 
-Nothing is started from the terminal. The only runtime is the browser extension service worker (`src/background.js`), which starts when the extension is loaded.
+Nothing is started from the terminal. Runtime is the extension service worker (`src/background.js`).
 
 ### Loading the extension for development
 
-1. Open Chrome → `chrome://extensions`
-2. Enable **Developer mode** (top right)
-3. Click **Load unpacked** → select the repository root (`/workspace`)
-4. After editing `src/*.js`, `popup.*`, or `manifest.json`, click **Reload** on the extension card
+1. Chrome → `chrome://extensions` → Developer mode → **Load unpacked** → `/workspace`
+2. After edits, **Reload** the extension card
 
-Useful DevTools entry points:
-
-- **Service worker console:** `chrome://extensions` → "Inspect views: service worker"
-- **Popup DevTools:** right-click the extension toolbar icon → "Inspect Popup"
+DevTools: service worker console on the extension card; popup via right-click toolbar icon → Inspect Popup.
 
 ### Lint / test / build
 
 | Task | Command / workflow |
 |------|-------------------|
-| Lint | Not configured (no ESLint/Prettier in repo) |
-| Automated tests | None — manual browser testing only |
-| Build | None — edit source and reload the extension |
+| Lint | Not configured |
+| Automated tests | None — manual browser testing |
+| Build | None |
 | Structure validation | `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` |
-| JS syntax check | `node --check src/background.js` (ES modules; run per file) |
+| JS syntax check | `node --check src/background.js` |
 
 ### Hello-world verification
 
-After loading unpacked:
+1. Extension enabled on `chrome://extensions` (v2.11.0+).
+2. Open popup → **Support** → **Extension Health** → **Run check**.
+3. Expect **Trusted sites**, **Version**, and filter checks to pass.
 
-1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.10.3).
-2. Open the extension popup from the toolbar.
-3. Go to the **Support** tab → **Extension Health** → click **Run check**.
-4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.
+### Regression checklist (before merging YouTube / DNR / privacy changes)
 
-Filter sync uses remote CDNs (EasyList, uBlock, AdGuard, etc.) and requires network access. Bundled static DNR rules in `rules/*.json` work offline.
+| Site / feature | How to verify |
+|----------------|---------------|
+| YouTube playback | Video plays; no error **282054944**; log tag `2.11.0-stable` |
+| YouTube ads | DOM skip/mute works; **no** `InnerTube fetch: stripped` in logs |
+| GitHub | Sign-in, repo browse, assets load |
+| Google Drive / Docs | Open files, edit |
+| GA dashboard | `analytics.google.com` loads reports (third-party trackers still blocked elsewhere) |
+| Safe browsing | Health: GitHub/Drive/GA not in malware cache |
 
-### YouTube ad blocking (v2.10.5 — do not oscillate strategies)
+### YouTube — play-first (v2.11.1+)
 
-**One stable design** (do not re-add `fetch`/`XHR` Response rewriting in `inject-youtube.js` — it caused repeated black-screen regressions):
+**Let the player start, then block ads.** Do **not** re-add `fetch`/`XHR` `Response` rewriting (black screen + 282054944).
 
-| Layer | File | What it does |
-|-------|------|----------------|
-| First load only | `inject-youtube.js` | In-place prune of `ytInitialPlayerResponse` ad fields (no `new Response()`) |
-| All playback | `content-youtube.js` | Skip button, seek short ads, mute long ads, remove feed overlays, dismiss anti-adblock modal |
+| Phase | Behavior |
+|-------|----------|
+| Until `playing` | No overlay removal, no skip/mute, no `ytInitial` prune |
+| After playback + ~2s grace | `SB_YT_PLAYBACK_READY` → DOM ad handling + optional `ytInitial` prune on later SPA sets |
+| Browse / no video | After 12s, feed-only overlay cleanup (no in-player touches) |
 
-SPA navigations use pristine `/player` fetch responses; DOM layer handles in-player ads.
+Log tag: `2.11.1-playfirst`. Never remove all `tp-yt-iron-overlay-backdrop` nodes.
 
-- **After YouTube changes:** reload extension + hard-refresh YouTube tabs.
-- **Log tag:** `2.10.5-stable` in Support → Log.
-- **Never** remove all `tp-yt-iron-overlay-backdrop` nodes (blanks the player).
-- **Do not** merge alternate “full InnerTube fetch hook” branches without playback testing — that path keeps getting reverted for black screens.
-
-### Chrome on cloud VMs (GUI testing)
+### Chrome on cloud VMs
 
 ```bash
 google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps &
 ```
 
-Then load unpacked from `/workspace`. MV3 service worker may show **Inactive** when idle — normal.
-
 ### Reload gotchas
 
-- **Background (`src/background.js`):** service worker restarts on extension reload; check the service worker console for startup errors.
-- **Content scripts:** require a **page reload** (not just extension reload) to pick up changes on already-open tabs.
-- **Popup changes:** close and reopen the popup after reload.
+- **Background:** reload extension; check service worker console.
+- **Content scripts:** reload the **page** tab.
+- **Popup:** close and reopen after reload.
+
+### VM update script (dependency refresh only)
+
+```text
+node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
+node --check src/background.js
+```

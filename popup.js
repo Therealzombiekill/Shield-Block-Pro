@@ -29,6 +29,7 @@ async function refreshStatsPanel() {
 }
 document.querySelectorAll('.nb').forEach(btn => {
   btn.addEventListener('click', () => {
+    moveNavGlider(btn);
     document.querySelectorAll('.nb').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
@@ -87,6 +88,45 @@ const fmt = n => {
   return String(n);
 };
 
+const _reducedMotion = () =>
+  typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function animateCount(el, target, duration = 650) {
+  if (!el) return;
+  target = target || 0;
+  if (_reducedMotion()) {
+    el.textContent = fmt(target);
+    el.dataset.count = String(target);
+    return;
+  }
+  const start = parseInt(el.dataset.count || '0', 10);
+  if (start === target) {
+    el.textContent = fmt(target);
+    return;
+  }
+  const t0 = performance.now();
+  const tick = now => {
+    const p = Math.min(1, (now - t0) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(Math.round(start + (target - start) * eased));
+    if (p < 1) requestAnimationFrame(tick);
+    else {
+      el.dataset.count = String(target);
+      el.textContent = fmt(target);
+    }
+  };
+  requestAnimationFrame(tick);
+}
+
+function moveNavGlider(btn) {
+  const glider = $('nav-glider');
+  if (!glider || !btn) return;
+  requestAnimationFrame(() => {
+    glider.style.width = `${btn.offsetWidth}px`;
+    glider.style.transform = `translateX(${btn.offsetLeft}px)`;
+  });
+}
+
 // ── Stats ─────────────────────────────────────────────────────────────
 let _lastTotal = 0;
 
@@ -102,7 +142,7 @@ async function refreshStats() {
 
     const total = stats.total || 0;
     const el = $('stat-total');
-    el.textContent = fmt(total);
+    animateCount(el, total, el.dataset.count ? 500 : 750);
 
     // Flash accent color when count increases
     if (total > _lastTotal && _lastTotal > 0) {
@@ -340,6 +380,10 @@ function updateStatusPill(domain, whitelist) {
   el.textContent = '';
   const _d = document.createElement('span'); _d.className = 'dot'; el.appendChild(_d);
   el.appendChild(document.createTextNode(wl ? 'PAUSED' : 'ACTIVE'));
+  el.classList.remove('pill-pop');
+  void el.offsetWidth;
+  el.classList.add('pill-pop');
+  setTimeout(() => el.classList.remove('pill-pop'), 450);
 }
 
 function renderWhitelistItems(whitelist, currentDomain) {
@@ -424,7 +468,14 @@ async function boot() {
   _intervals.forEach(clearInterval);
   _intervals.length = 0;
   await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules()]);
+  moveNavGlider(document.querySelector('.nb.active'));
   $('app').classList.add('ready');
+  document.body.classList.add('sb-ready');
+  const loader = $('sb-loader');
+  if (loader) {
+    loader.classList.add('hide');
+    setTimeout(() => loader.remove(), 450);
+  }
   _intervals.push(setInterval(refreshStats, 3000));
   _intervals.push(setInterval(refreshFilterStatus, 8000));
 
@@ -562,26 +613,24 @@ $('run-health-check')?.addEventListener('click', async () => {
 
     checks.textContent = '';
     const frag = document.createDocumentFragment();
-    for (const c of result.checks) {
+    result.checks.forEach((c, i) => {
       const row  = document.createElement('div');
-      row.style.cssText = 'display:flex;gap:5px;padding:1px 0';
+      row.className = 'health-row';
+      row.style.animationDelay = `${i * 0.045}s`;
       const icon = document.createElement('span');
+      icon.className = 'health-icon';
       icon.style.color = colors[c.status];
-      icon.style.flexShrink = '0';
       icon.textContent = icons[c.status];
       const name = document.createElement('span');
-      name.style.color = 'var(--text)';
-      name.style.minWidth = '110px';
+      name.className = 'health-name';
       name.textContent = c.name;
       const detail = document.createElement('span');
-      detail.style.color = 'var(--muted)';
-      detail.style.overflow = 'hidden';
-      detail.style.textOverflow = 'ellipsis';
+      detail.className = 'health-detail';
       detail.style.whiteSpace = 'nowrap';
       detail.textContent = c.detail;
       row.appendChild(icon); row.appendChild(name); row.appendChild(detail);
       frag.appendChild(row);
-    }
+    });
     checks.appendChild(frag);
   } catch (e) {
     summary.style.color = 'var(--red,#f87171)';

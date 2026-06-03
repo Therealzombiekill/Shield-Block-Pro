@@ -53,6 +53,16 @@ After loading unpacked:
 
 Filter sync uses remote CDNs (EasyList, uBlock, AdGuard, etc.) and requires network access. Bundled static DNR rules in `rules/*.json` work offline.
 
+### Chrome on cloud VMs (GUI testing)
+
+Use a dedicated profile so extension state does not mix with the default browser profile:
+
+```bash
+google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps &
+```
+
+Then load unpacked from `/workspace` via `chrome://extensions` (Developer mode → **Load unpacked**). On MV3, the service worker link may show **Inactive** when idle; it wakes on messages, navigation, or alarms.
+
 ### Reload gotchas
 
 - **Background (`src/background.js`):** service worker restarts on extension reload; check the service worker console for startup errors.

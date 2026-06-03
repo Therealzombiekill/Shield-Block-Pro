@@ -5,7 +5,9 @@
 import './browser-compat.js';
 import { parseFilterList } from './filter-parser.js';
 import {
+  AMAZON_INITIATOR_EXCLUSIONS,
   AMAZON_STABILITY_DOMAINS,
+  isAmazonShoppingHost,
   isSafeBrowsingAllowlisted,
 } from './trusted-sites.js';
 
@@ -359,6 +361,8 @@ async function reapplyFeatureRules() {
 const REFERRER_RULE_ID   = 47000;
 const HTTPS_UPGRADE_ID   = 47001; // upgradeScheme — http → https for main/sub frames
 const DNT_GPC_RULE_ID    = 47002; // set DNT: 1 and Sec-GPC: 1 on all outbound requests
+const AMAZON_ALLOW_INIT_ID = 47003; // allow subresources when shopping on Amazon
+const AMAZON_ALLOW_MAIN_ID = 47004; // allow main-frame navigations to Amazon storefronts
 
 // ── Settings cache ─────────────────────────────────────────────────────────
 // getSettings() is called on every webNavigation.onBeforeNavigate event plus
@@ -963,6 +967,7 @@ async function applyRemoveParamRules() {
         condition: {
           urlFilter: '|http',
           resourceTypes: ['main_frame', 'sub_frame'],
+          excludedInitiatorDomains: AMAZON_INITIATOR_EXCLUSIONS,
         },
       });
       if (idCursor > REMOVEPARAM_BASE + 999) break;
@@ -971,6 +976,7 @@ async function applyRemoveParamRules() {
     // Domain-scoped rules (e.g. remove 'ref' only on amazon.com)
     for (const group of domainGroups) {
       if (!group.params?.length) continue;
+      if (group.initDomains?.some(d => isAmazonShoppingHost(d.replace(/^www\./, '')))) continue;
       for (const params of chunkParams(group.params)) {
         const condition = {
           urlFilter: '|http',
@@ -1511,6 +1517,39 @@ async function pruneYoutubeFromWhitelist() {
   return true;
 }
 
+/** Always-on DNR allow for Amazon shopping (independent of user whitelist edits). */
+async function applyAmazonShoppingAllowRules() {
+  try {
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const removeRuleIds = existing
+      .filter(r => r.id === AMAZON_ALLOW_INIT_ID || r.id === AMAZON_ALLOW_MAIN_ID)
+      .map(r => r.id);
+    const addRules = [
+      {
+        id: AMAZON_ALLOW_INIT_ID,
+        priority: 9999,
+        action: { type: 'allow' },
+        condition: {
+          initiatorDomains: AMAZON_INITIATOR_EXCLUSIONS,
+          resourceTypes: DNR_RESOURCE_TYPES.filter(t => t !== 'main_frame'),
+        },
+      },
+      {
+        id: AMAZON_ALLOW_MAIN_ID,
+        priority: 9999,
+        action: { type: 'allow' },
+        condition: {
+          requestDomains: AMAZON_INITIATOR_EXCLUSIONS,
+          resourceTypes: ['main_frame', 'sub_frame'],
+        },
+      },
+    ];
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
+  } catch (e) {
+    logEvent('system', 'warn', `Amazon allow rules failed: ${e?.message ?? e}`);
+  }
+}
+
 async function ensurePlatformStabilityMode() {
   const { settings = {}, whitelist = [] } = await chrome.storage.local.get(['settings', 'whitelist']);
   const mergedSettings = {
@@ -1528,11 +1567,12 @@ async function ensurePlatformStabilityMode() {
     ...(wlChanged ? { whitelist: wl } : {}),
   });
   invalidateSettingsCache();
+  await applyAmazonShoppingAllowRules();
   if (wlChanged) {
     await applyWhitelistRules();
     await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
   }
-  logEvent('system', 'info', 'Platform stability: Amazon allowlisted; YT/streaming use network lists only');
+  logEvent('system', 'info', 'Maximum stability: Amazon fully protected; no Amazon extension scripts');
 }
 
 async function syncFilterLists(force = false) {
@@ -2108,6 +2148,7 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
     applyHttpsUpgradeRule(merged.httpsUpgrade !== false),
     applyPrivacyHeadersRule(merged.privacyHeaders !== false),
     applyWhitelistRules(),
+    applyAmazonShoppingAllowRules(),
     restoreGlobalPauseRule(),
     applyRemoveParamRules(), // self-gates on the tracking toggle
   ]);
@@ -3295,6 +3336,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
     applyWhitelistRules(),
+    applyAmazonShoppingAllowRules(),
     restoreGlobalPauseRule(),
   ]);
   await restoreGlobalPauseIfActive();
@@ -3355,10 +3397,10 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 
   try {
     const { sbStabilityVersion, sbRulesVersion } = await chrome.storage.local.get(['sbStabilityVersion', 'sbRulesVersion']);
-    if (sbStabilityVersion !== '2.14.0') {
+    if (sbStabilityVersion !== '2.15.0') {
       await ensurePlatformStabilityMode();
       await pruneYoutubeFromWhitelist();
-      await chrome.storage.local.set({ sbStabilityVersion: '2.14.0' });
+      await chrome.storage.local.set({ sbStabilityVersion: '2.15.0' });
     }
     if (sbRulesVersion !== '2.14.0') {
       const all = await chrome.storage.local.get(null);
@@ -3427,6 +3469,7 @@ chrome.runtime.onStartup.addListener(async () => {
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
     applyWhitelistRules(),
+    applyAmazonShoppingAllowRules(),
     restoreGlobalPauseRule(),
   ]);
   await restoreGlobalPauseIfActive();
@@ -3453,10 +3496,10 @@ chrome.runtime.onStartup.addListener(async () => {
   await repairFilterHealthForCheck();
   try {
     const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
-    if (sbStabilityVersion !== '2.14.0') {
+    if (sbStabilityVersion !== '2.15.0') {
       await ensurePlatformStabilityMode();
       await pruneYoutubeFromWhitelist();
-      await chrome.storage.local.set({ sbStabilityVersion: '2.14.0' });
+      await chrome.storage.local.set({ sbStabilityVersion: '2.15.0' });
     }
   } catch (_) {}
 

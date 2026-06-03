@@ -53,6 +53,12 @@ body::before{
 }
 
 /* ── Header ─────────────────────────────────────────────────────────── */
+.stability-banner{
+  flex-shrink:0;padding:7px 12px;font-size:10px;line-height:1.45;
+  background:linear-gradient(90deg,#ecfdf5,#eff6ff);border-bottom:1px solid #a7f3d0;
+  color:#065f46;font-family:var(--mono);
+}
+.stability-banner span{font-weight:700}
 .hdr{
   padding:11px 14px 10px;
   display:flex;align-items:center;justify-content:space-between;
@@ -642,6 +648,9 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     </div>
     <div id="hdr-status" class="pill pill-on"><span class="dot"></span>ACTIVE</div>
   </div>
+  <div id="stability-banner" class="stability-banner">
+    <span>Stability</span> — Amazon: no extension scripts, always allowlisted. Reload extension after updating to v2.15.
+  </div>
 
   <!-- NAV -->
   <div class="nav">
@@ -788,7 +797,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-az">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0a500"><path d="M.045 18c.072-.116.187-.124.348-.022 3.636 2.11 7.594 3.17 11.87 3.17 2.852 0 5.668-.534 8.447-1.595.315-.14.39-.1.494.124.102.167.066.334-.12.496-2.7 1.861-5.937 2.797-9.713 2.797-2.997 0-5.805-.668-8.426-2.003z"/></svg>
           </div>
-          <div class="ttxt"><strong>Amazon</strong><span>Off in v2.13 — allowlisted for normal shopping</span></div>
+          <div class="ttxt"><strong>Amazon</strong><span>Max stability — whitelisted + no scripts (v2.15)</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-az" data-s="amazon" disabled title="Amazon blocking removed for stability"><div class="sw-t"><div class="sw-k"></div></div></div>
       </div>
@@ -1060,7 +1069,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
       <div class="sup-card sup-card-sm">
         <div class="sup-info">
-          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.14.0<br>
+          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.15.0<br>
           <a href="https://shieldblock.pro/" target="_blank" rel="noopener"
              style="color:var(--accent2);text-decoration:none;font-size:10px">Privacy Policy ↗</a>
         </div>
@@ -1172,7 +1181,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <div class="ftr">
     <div class="ftr-l">
       <span class="ftr-badge">FREE</span>
-      <span class="ver">ShieldBlock v2.14.0</span>
+      <span class="ver">ShieldBlock v2.15.0</span>
     </div>
     <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
        class="ghost" style="text-decoration:none">tip ❤</a>

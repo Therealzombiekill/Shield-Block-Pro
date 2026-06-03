@@ -43,7 +43,16 @@
     'mail.google.com', 'calendar.google.com', 'meet.google.com', 'classroom.google.com',
     'chat.google.com', 'keep.google.com', 'photos.google.com',
     'drive.usercontent.google.com',
+    'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.ca', 'amazon.com.au',
+    'amazon.co.jp', 'amazon.in', 'amazon.fr', 'amazon.es', 'amazon.it',
+    'amazon.com.mx', 'amazon.com.br', 'amazon.nl', 'amazon.pl', 'amazon.se', 'amazon.sg',
   ]);
+  globalThis.__sbIsAmazonShoppingHost = function (host) {
+    if (!host) return false;
+    host = host.replace(/^www\./, '').toLowerCase();
+    if (host.includes('amazon.')) return true;
+    return globalThis.__sbHostMatchesSet(host, _privacySkipHosts);
+  };
   globalThis.__sbHostMatchesSet = function (host, domainSet) {
     if (!host) return false;
     host = host.replace(/^www\./, '').toLowerCase();

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.14.0",
+  "version": "2.15.0",
   "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
@@ -33,7 +33,23 @@
         "*://youtube.com/*",
         "*://youtu.be/*",
         "*://music.youtube.com/*",
-        "*://tv.youtube.com/*"
+        "*://tv.youtube.com/*",
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*"
       ],
       "js": [
         "src/inject-privacy.js"
@@ -45,6 +61,24 @@
       "matches": [
         "<all_urls>"
       ],
+      "exclude_matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*"
+      ],
       "js": [
         "src/browser-compat.js",
         "src/content-privacy.js"
@@ -54,6 +88,24 @@
     {
       "matches": [
         "<all_urls>"
+      ],
+      "exclude_matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*"
       ],
       "js": [
         "src/browser-compat.js",
@@ -118,7 +170,23 @@
         "*://youtube.com/*",
         "*://youtu.be/*",
         "*://music.youtube.com/*",
-        "*://tv.youtube.com/*"
+        "*://tv.youtube.com/*",
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*"
       ],
       "js": [
         "src/scriptlets.js"
@@ -132,6 +200,24 @@
         "http://*/*",
         "https://*/*"
       ],
+      "exclude_matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*"
+      ],
       "js": [
         "src/browser-compat.js",
         "src/content-procedural.js"
@@ -142,6 +228,24 @@
     {
       "matches": [
         "*://*/*"
+      ],
+      "exclude_matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*"
       ],
       "js": [
         "src/browser-compat.js",

@@ -127,5 +127,42 @@ export function isSafeBrowsingAllowlisted(host) {
 }
 
 export function shouldSkipPrivacyUrlClean(host) {
-  return hostMatchesSet(host, PRIVACY_URL_CLEAN_SKIP_HOSTS);
+  return hostMatchesSet(host, PRIVACY_URL_CLEAN_SKIP_HOSTS) || isAmazonShoppingHost(host);
 }
+
+/** Any Amazon storefront host (regional TLDs and subdomains like smile.amazon.com). */
+export function isAmazonShoppingHost(host) {
+  if (!host) return false;
+  host = host.replace(/^www\./, '').toLowerCase();
+  if (host.includes('amazon.')) return true;
+  return hostMatchesSet(host, new Set(
+    AMAZON_STABILITY_DOMAINS.map(d => d.replace(/^www\./, '')),
+  ));
+}
+
+/** Apex domains for DNR excludedInitiatorDomains on static Amazon ad rules. */
+export const AMAZON_INITIATOR_EXCLUSIONS = [
+  'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.ca', 'amazon.com.au',
+  'amazon.co.jp', 'amazon.in', 'amazon.fr', 'amazon.es', 'amazon.it',
+  'amazon.com.mx', 'amazon.com.br', 'amazon.nl', 'amazon.pl', 'amazon.se', 'amazon.sg',
+];
+
+/** Manifest exclude_matches — keep in sync with content-general exclusions. */
+export const AMAZON_EXCLUDE_MATCHES = [
+  '*://*.amazon.com/*',
+  '*://*.amazon.co.uk/*',
+  '*://*.amazon.de/*',
+  '*://*.amazon.ca/*',
+  '*://*.amazon.com.au/*',
+  '*://*.amazon.co.jp/*',
+  '*://*.amazon.in/*',
+  '*://*.amazon.fr/*',
+  '*://*.amazon.es/*',
+  '*://*.amazon.it/*',
+  '*://*.amazon.com.mx/*',
+  '*://*.amazon.com.br/*',
+  '*://*.amazon.nl/*',
+  '*://*.amazon.pl/*',
+  '*://*.amazon.se/*',
+  '*://*.amazon.sg/*',
+];

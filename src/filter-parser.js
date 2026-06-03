@@ -42,7 +42,27 @@ const PROTECTED_DOMAINS = new Set([
   'ajax.googleapis.com', 'fonts.googleapis.com', 'fonts.gstatic.com',
   // Common broken if blocked
   'jquery.com', 'bootstrapcdn.com', 'jsdelivr.net', 'unpkg.com',
+  // GitHub — sign-in, assets, API
+  'github.com', 'githubassets.com', 'githubusercontent.com', 'ghcr.io',
+  'raw.githubusercontent.com', 'gist.github.com', 'github.io',
+  // Google Workspace / sign-in (apis.google.com, boq.google.com load from these)
+  'google.com', 'drive.google.com', 'docs.google.com', 'sheets.google.com',
+  'slides.google.com', 'mail.google.com', 'accounts.google.com',
+  'calendar.google.com', 'meet.google.com', 'classroom.google.com',
+  'drive.usercontent.google.com',
+  'youtubei.googleapis.com',
 ]);
+
+// When a filter blocks a shared Google endpoint, never apply from these initiators.
+const SHARED_GOOGLE_API_EXCLUDED_INITIATORS = [
+  'youtube.com', 'youtu.be', 'youtube-nocookie.com', 'music.youtube.com', 'tv.youtube.com',
+  'github.com', 'www.github.com', 'api.github.com', 'gist.github.com',
+  'githubassets.com', 'githubusercontent.com',
+  'google.com', 'www.google.com',
+  'drive.google.com', 'docs.google.com', 'sheets.google.com', 'slides.google.com',
+  'mail.google.com', 'accounts.google.com', 'calendar.google.com', 'meet.google.com',
+  'classroom.google.com', 'chat.google.com', 'keep.google.com', 'photos.google.com',
+];
 
 function isDomainProtected(filter) {
   const bare = filter.replace(/^\|\|/, '').split(/[/?^]/)[0].toLowerCase();
@@ -129,7 +149,7 @@ function parseLine(line, idCounter) {
   const excludedResourceTypes = new Set();
   let domainType = null;
   const initiatorDomains = [];
-  const excludedInitiatorDomains = ['youtube.com', 'youtu.be', 'youtube-nocookie.com'];
+  const excludedInitiatorDomains = [...SHARED_GOOGLE_API_EXCLUDED_INITIATORS];
 
   const optIdx = filter.lastIndexOf('$');
   if (optIdx !== -1) {

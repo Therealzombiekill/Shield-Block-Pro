@@ -1114,7 +1114,7 @@ const SB_ALLOW_TTL_MS = 10 * 60 * 1000;
 // shared-hosting platforms or top-reputation apexes (matched incl. subdomains).
 const SB_DOMAIN_ALLOWLIST = new Set([
   // Shared hosting where the malicious part is the PATH, not the domain
-  'github.com','githubusercontent.com','raw.githubusercontent.com','gist.github.com','github.io',
+  'github.com','githubassets.com','githubusercontent.com','raw.githubusercontent.com','gist.github.com','github.io',
   'drive.google.com','docs.google.com','drive.usercontent.google.com','storage.googleapis.com',
   'dropbox.com','dropboxusercontent.com','mega.nz','mediafire.com',
   'cdn.discordapp.com','media.discordapp.net','t.me',

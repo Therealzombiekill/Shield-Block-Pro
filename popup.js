@@ -231,8 +231,8 @@ async function refreshPageLog() {
     const frag = document.createDocumentFragment();
     for (const [domain, count] of sorted) {
       const row = document.createElement('div');
-      row.className = 'page-log-row';
-      row.innerHTML = `<span class="page-log-host">${escapeHtml(domain)}</span><span class="page-log-n">${count}×</span>`;
+      row.style.cssText = 'display:flex;justify-content:space-between;padding:1px 0;color:var(--muted)';
+      row.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escapeHtml(domain)}</span><span style="color:var(--red);margin-left:8px;flex-shrink:0">${count}×</span>`;
       frag.appendChild(row);
     }
     list.appendChild(frag);
@@ -265,13 +265,15 @@ async function refreshTopDomains() {
     for (const { domain, count } of domains.slice(0, 10)) {
       const pct = Math.round((count / max) * 100);
       const row = document.createElement('div');
-      row.className = 'top-dom-row';
+      row.style.cssText = 'margin-bottom:3px';
       row.innerHTML = `
-        <div class="top-dom-meta">
-          <span class="top-dom-name">${escapeHtml(domain)}</span>
-          <span class="top-dom-count">${count}</span>
+        <div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:1px">
+          <span style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escapeHtml(domain)}</span>
+          <span style="color:var(--muted);margin-left:6px;flex-shrink:0">${count}</span>
         </div>
-        <div class="top-dom-track"><div class="top-dom-bar" style="width:${pct}%"></div></div>`;
+        <div style="height:2px;background:var(--border);border-radius:1px">
+          <div style="height:2px;width:${pct}%;background:var(--accent);border-radius:1px;transition:width .3s"></div>
+        </div>`;
       frag.appendChild(row);
     }
     list.appendChild(frag);
@@ -1217,19 +1219,21 @@ async function drawSparkline() {
   const max    = Math.max(...counts, 1);
   const step   = W / (counts.length - 1 || 1);
 
-  ctx.fillStyle = '#e8ecfa';
+  // Background
+  ctx.fillStyle = 'rgba(30,30,46,0.4)';
   ctx.fillRect(0, 0, W, H);
 
   if (counts.every(c => c === 0)) {
-    ctx.fillStyle = '#888cad';
+    ctx.fillStyle = '#3a3a54';
     ctx.font = '10px monospace';
     ctx.fillText('no data yet', W/2 - 30, H/2 + 4);
     return;
   }
 
+  // Fill gradient
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, 'rgba(91,74,232,0.28)');
-  grad.addColorStop(1, 'rgba(91,74,232,0.03)');
+  grad.addColorStop(0, 'rgba(124,106,255,0.35)');
+  grad.addColorStop(1, 'rgba(124,106,255,0.02)');
 
   ctx.beginPath();
   counts.forEach((c, i) => {

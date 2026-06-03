@@ -42,7 +42,7 @@ Single source: `src/trusted-sites.js`. Content scripts use `browser-compat.js` (
 - Chrome ≥ 116, load unpacked from `/workspace`
 - Validate: `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` and `node --check src/background.js`
 - Hello-world: Support → Run check (v2.13.0+); verify Amazon loads after reload
-- Popup styles: `popup.css` only (no large inline `<style>` in `popup.html`)
+- Popup styles: inline `<style>` in `popup.html` (no separate `popup.css`)
 
 ## Do not regress
 

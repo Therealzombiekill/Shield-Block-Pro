@@ -169,12 +169,16 @@ async function refreshStats() {
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 
-    const syncedAt = stored?.filterSyncedAt;
+    let syncedAt = stored?.filterSyncedAt;
     if ($('stat-last-sync')) {
-      if (!syncedAt) {
+      if (!syncedAt || !Number.isFinite(Number(syncedAt))) {
+        const status = await msg('GET_FILTER_STATUS');
+        if (status?.lastSync) syncedAt = status.lastSync;
+      }
+      if (!syncedAt || !Number.isFinite(Number(syncedAt))) {
         $('stat-last-sync').textContent = 'never';
       } else {
-        const age = Date.now() - syncedAt;
+        const age = Date.now() - Number(syncedAt);
         const mins = Math.floor(age / 60000);
         const hrs  = Math.floor(age / 3600000);
         const days = Math.floor(age / 86400000);
@@ -348,17 +352,41 @@ $('sync-btn')?.addEventListener('click', async () => {
 });
 
 // ── Toggles ───────────────────────────────────────────────────────────
-document.querySelectorAll('[data-s]').forEach(input => {
-  input.addEventListener('change', async e => {
-    await msg('SET_SETTINGS', { settings: { [e.target.dataset.s]: e.target.checked } });
+const STABILITY_LOCKED = { youtube: false, amazon: false };
+
+function wireSettingToggles() {
+  document.querySelectorAll('.sw input[type="checkbox"][data-s]').forEach(input => {
+    if (input._sbToggleWired) return;
+    input._sbToggleWired = true;
+    input.addEventListener('change', async () => {
+      if (input.disabled) return;
+      const key = input.dataset.s;
+      if (!key) return;
+      const want = input.checked;
+      const result = await msg('SET_SETTINGS', { settings: { [key]: want } });
+      if (!result?.ok) {
+        input.checked = !want;
+        return;
+      }
+      await loadSettings();
+      if (key === 'general') refreshFilterStatus();
+    });
   });
-});
+}
 
 async function loadSettings() {
   const s = await msg('GET_SETTINGS');
   if (!s) return;
   document.querySelectorAll('[data-s]').forEach(input => {
-    if (input.dataset.s in s) input.checked = s[input.dataset.s];
+    const key = input.dataset.s;
+    if (key in STABILITY_LOCKED) {
+      input.checked = STABILITY_LOCKED[key];
+      input.disabled = true;
+      input.closest('.tr')?.classList.add('tr-locked');
+      return;
+    }
+    if (key in s) input.checked = !!s[key];
+    input.closest('.tr')?.classList.remove('tr-locked');
   });
 }
 
@@ -473,6 +501,8 @@ const _intervals = [];
 async function boot() {
   _intervals.forEach(clearInterval);
   _intervals.length = 0;
+  wireSettingToggles();
+  try { await msg('GET_HEALTH_STATUS'); } catch (_) {}
   await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules()]);
   moveNavGlider(document.querySelector('.nb.active'));
   $('app').classList.add('ready');

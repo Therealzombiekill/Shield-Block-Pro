@@ -2467,7 +2467,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg.settings.safeBrowsing === true && _safeBrowsingDomains.size === 0) fetchSafeBrowsingLists().catch(() => {});
         // Auto-push updated settings to chrome.storage.sync (fire-and-forget)
         pushToCloud().catch(() => {});
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, settings: merged });
         break;
       }
 

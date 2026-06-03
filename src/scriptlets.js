@@ -588,11 +588,20 @@
   IMPL['acis'] = IMPL['abort-current-inline-script'];
 
   // ── Public API ────────────────────────────────────────────────────────────────
-  // Called by background.js via chrome.scripting.executeScript after domain lookup
+  // Called by background.js via chrome.scripting.executeScript after domain lookup.
+  // Many scriptlets wrap native globals (fetch/setTimeout/…) or install a
+  // MutationObserver. Re-invoking this for the same document (e.g. repeated
+  // injection on navigation) would chain those wrappers and leak observers, so we
+  // de-dupe per document by (name+args): distinct rules still apply, but an
+  // identical rule is only ever applied once per document lifetime.
+  const _sbApplied = new Set();
   globalThis.__sbRunScriptlets = function (scriptlets) {
     if (!Array.isArray(scriptlets)) return;
     for (const { name, args } of scriptlets) {
       try {
+        const sig = name + ' ' + JSON.stringify(args || []);
+        if (_sbApplied.has(sig)) continue;
+        _sbApplied.add(sig);
         const fn = IMPL[name];
         if (typeof fn === 'function') fn(args || []);
       } catch (_) {}

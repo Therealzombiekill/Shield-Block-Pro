@@ -13,6 +13,12 @@
 (function () {
   'use strict';
 
+  // Idempotency guard — a second injection (SPA re-inject, extension reload, or
+  // manual scripting.executeScript) must not chain-wrap fetch/XHR or re-define
+  // the ytInitialPlayerResponse accessor. Bail out if we already hooked.
+  if (window._sbYouTubeHooked) return;
+  window._sbYouTubeHooked = true;
+
   // ── Disable flag ──────────────────────────────────────────────────────────────
   // MAIN world can't call chrome APIs. content-youtube.js reads settings and
   // posts SB_YOUTUBE_DISABLE / SB_YOUTUBE_ENABLE here.
@@ -65,7 +71,14 @@
   // ── 1. ytInitialPlayerResponse — first page load ─────────────────────────────
   // YouTube inlines this global in a <script> tag before the player boots.
   // Wrapping it in a setter lets us strip the ad payload from that first load.
-  let _ytInitial;
+  // Capture any value assigned before our setter installs (normally undefined
+  // at document_start, but possible if another script set it first).
+  let _ytInitial = window.ytInitialPlayerResponse;
+  if (_ytInitial && !_disabled) {
+    try {
+      if (stripAds(_ytInitial)) _sbLog('info', 'InnerTube ytInitial: stripped pre-existing ad placements');
+    } catch (_) {}
+  }
   Object.defineProperty(window, 'ytInitialPlayerResponse', {
     get() { return _ytInitial; },
     set(v) {
@@ -92,10 +105,16 @@
           _sbLog('info', 'InnerTube fetch: stripped ad placements', {
             path: url.split('?')[0].split('/').slice(-3).join('/'),
           });
+          // Drop content-encoding/length: the body is now plaintext JSON, so the
+          // original (compressed) length/encoding would mis-describe it and can
+          // trigger decode errors in the consumer.
+          const _h = new Headers(res.headers);
+          _h.delete('content-encoding');
+          _h.delete('content-length');
           return new Response(body, {
             status: res.status,
             statusText: res.statusText,
-            headers: res.headers,
+            headers: _h,
           });
         }
       }
@@ -141,15 +160,6 @@
   try {
     XMLHttpRequest.prototype.open.toString = () => _origXhrOpen.toString();
     XMLHttpRequest.prototype.send.toString = () => _origXhrSend.toString();
-  } catch (_) {}
-
-  // If ytInitialPlayerResponse was set before our setter installed, strip once.
-  try {
-    const desc = Object.getOwnPropertyDescriptor(window, 'ytInitialPlayerResponse');
-    if (desc?.value && !_disabled) {
-      stripAds(desc.value);
-      _sbLog('info', 'InnerTube ytInitial: stripped pre-existing ad placements');
-    }
   } catch (_) {}
 
 })();

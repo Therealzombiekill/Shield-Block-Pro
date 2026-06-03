@@ -183,12 +183,14 @@ const FILTER_LISTS = [
   for (let i = 0; i < ranges.length; i++) {
     for (let j = i + 1; j < ranges.length; j++) {
       if (ranges[i][0] <= ranges[j][1] && ranges[j][0] <= ranges[i][1]) {
-        logEvent('system', 'error', `Rule ID range overlap: ${ranges[i][2]} overlaps ${ranges[j][2]}`);
+        // console (not logEvent): this IIFE runs at module-eval before the log
+        // buffer consts are initialised, so logEvent here would throw a TDZ error.
+        console.error(`[ShieldBlock] Rule ID range overlap: ${ranges[i][2]} overlaps ${ranges[j][2]}`);
       }
     }
   }
   const total = FILTER_LISTS.reduce((s, l) => s + l.max, 0);
-  if (total > MAX_DYNAMIC_RULES) logEvent('system', 'error', `Total dynamic rules ${total} exceeds browser limit ${MAX_DYNAMIC_RULES} — some rules will be silently dropped`);
+  if (total > MAX_DYNAMIC_RULES) console.error(`[ShieldBlock] Total dynamic rules ${total} exceeds browser limit ${MAX_DYNAMIC_RULES} — some rules will be silently dropped`);
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
@@ -422,13 +424,14 @@ function _flushStats() {
   _pendingTimeSaved = 0;
   if (Object.keys(pending).length === 0 && savedThisFlush === 0) return;
 
-  // Record daily total for 7-day chart (fire-and-forget, non-critical)
+  // Daily total for the 7-day chart — serialised on the same queue (below) so
+  // two flushes in quick succession can't both read-modify-write dailyStats.
   const pendingTotal = Object.values(pending).reduce((a,b)=>a+b,0);
-  if (pendingTotal > 0) recordDailyStats(pendingTotal);
 
   // Serialise writes — chain onto the queue so concurrent flushes never race
   _flushQueue = _flushQueue.then(async () => {
     try {
+      if (pendingTotal > 0) await recordDailyStats(pendingTotal);
       const { stats, lifetime, timeSaved: prevSaved } =
         await chrome.storage.local.get(['stats','lifetime','timeSaved']);
       const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
@@ -453,9 +456,8 @@ function _flushStats() {
   });
 }
 
-let _statQueue = Promise.resolve();
-
 const _tabCosmeticState = new Map(); // tabId -> { baseCss, css }
+const _cosmeticChain    = new Map(); // tabId -> Promise (serialises injectCosmetics per tab)
 
 const _pageStats  = new Map();
 const _requestLog = [];       // network blocks (last 150) — in-memory only
@@ -801,7 +803,10 @@ async function countNetworkBlocks(tabId, url) {
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
 
-    _statQueue = _statQueue.then(async () => {
+    // Chain onto the SAME queue _flushStats uses — these two writers both
+    // read-modify-write stats/lifetime, so they must share one serial queue or
+    // a concurrent flush would overwrite this increment (lost block counts).
+    _flushQueue = _flushQueue.then(async () => {
       try {
         const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
         const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
@@ -1496,14 +1501,20 @@ async function syncFilterLists(force = false) {
       return true;
     });
 
-    // Hard-cap at MAX_DYNAMIC_RULES — the DNR API rejects any batch that would push
-    // the total over 5000, so excess rules must be dropped before we start adding.
-    if (deduped.length > MAX_DYNAMIC_RULES) deduped = deduped.slice(0, MAX_DYNAMIC_RULES);
     deduped = filterStaticConflicts(deduped);
 
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
     const removeIds = existing.filter(r => isFilterListRuleId(r.id)).map(r => r.id);
     const existingSnapshot = existing.filter(r => isFilterListRuleId(r.id)).map(r => ({ ...r }));
+
+    // Hard-cap filter rules at the budget REMAINING after resident feature rules.
+    // Feature rules (removeparam/matrix/privacy/user/pause) share the same 5000-rule
+    // dynamic pool but aren't in removeIds, so they stay through the swap. Capping at
+    // a flat 5000 would let filter+feature exceed Chrome's hard limit and the addRules
+    // batches would be rejected (MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES).
+    const residentNonFilter = existing.length - removeIds.length;
+    const filterBudget = Math.max(0, MAX_DYNAMIC_RULES - residentNonFilter);
+    if (deduped.length > filterBudget) deduped = deduped.slice(0, filterBudget);
 
     if (deduped.length > 0 || removeIds.length > 0) {
       const firstBatch = deduped.slice(0, 500);
@@ -1749,7 +1760,19 @@ async function pushToCloud() {
 
 // ── Cosmetic Injection ─────────────────────────────────────────────────────
 
-async function injectCosmetics(tabId, tabUrl) {
+// Per-tab serialisation wrapper: two onCommitted events for the same tab must not
+// run injectCosmetics concurrently, or they race removeCSS/insertCSS against a
+// shared _tabCosmeticState baseline and leak duplicate cosmetic CSS that a later
+// whitelist/disable can't remove. Chain each call after the previous one per tab.
+function injectCosmetics(tabId, tabUrl) {
+  const prev = _cosmeticChain.get(tabId) ?? Promise.resolve();
+  const next = prev.then(() => _injectCosmeticsImpl(tabId, tabUrl)).catch(() => {});
+  _cosmeticChain.set(tabId, next);
+  next.finally(() => { if (_cosmeticChain.get(tabId) === next) _cosmeticChain.delete(tabId); });
+  return next;
+}
+
+async function _injectCosmeticsImpl(tabId, tabUrl) {
   if (!tabUrl || !/^https?:\/\//.test(tabUrl)) return;
   // Merge both storage reads into one so all variables are available before use
   const { cosmeticSelectors, domainCosmetics = {}, scriptletRules = {},
@@ -2694,7 +2717,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // ── Tab events ─────────────────────────────────────────────────────────────
 
-chrome.tabs.onRemoved.addListener((tabId) => { _tabCosmeticState.delete(tabId); });
+chrome.tabs.onRemoved.addListener((tabId) => { _tabCosmeticState.delete(tabId); _cosmeticChain.delete(tabId); });
 
 chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
   if (frameId === 0) injectCosmetics(tabId, url);

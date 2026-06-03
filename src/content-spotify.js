@@ -144,7 +144,12 @@
   let wasMuted = false;
 
   function tick() {
-    if (globalThis.__sbGlobalPause) return;
+    if (globalThis.__sbGlobalPause) {
+      // Pause turned on mid-ad: restore audio/overlay before idling, else the
+      // audio stays muted until reload (tick early-returns past the restore branch).
+      if (adActive) { muteAudio(wasMuted); hideOverlay(); adActive = false; }
+      return;
+    }
     const hasAd = isAdPlaying();
     removeSpotifyAdUI();
 

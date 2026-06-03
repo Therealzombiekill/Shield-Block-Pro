@@ -64,7 +64,16 @@
   let _adStartTime = 0;
 
   function tick() {
-    if (globalThis.__sbGlobalPause) return;
+    if (globalThis.__sbGlobalPause) {
+      // Pause turned on mid-ad: restore audio before idling, else the video
+      // stays muted until reload (tick early-returns past the restore branch).
+      if (adActive) {
+        const video = document.querySelector('video');
+        if (video) video.muted = wasMuted;
+        adActive = false;
+      }
+      return;
+    }
     const hasAd = isAdPlaying();
     removeAdUI();
 

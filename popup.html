@@ -35,6 +35,11 @@ body{
 .brand-name{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em}
 .brand-name em{color:var(--accent2);font-style:normal}
 .brand-tag{font-size:11px;color:var(--muted);margin-top:2px}
+.stability-line{
+  font-family:var(--mono);font-size:9px;color:var(--green);letter-spacing:.04em;
+  margin-top:6px;padding:4px 8px;background:rgba(46,232,168,.08);
+  border:1px solid rgba(46,232,168,.22);border-radius:6px;display:inline-block;
+}
 
 .stats{
   background:var(--card);border:1px solid var(--border);border-radius:16px;
@@ -112,6 +117,7 @@ body{
     <div class="brand-text">
       <div class="brand-name">SHIELD<em>BLOCK</em></div>
       <div class="brand-tag">Ad &amp; tracker protection</div>
+      <div id="stability-line" class="stability-line">Amazon stability mode · protection active</div>
     </div>
   </header>
 
@@ -146,7 +152,7 @@ body{
 
   <footer class="foot">
     <a id="privacy-link" href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>
-    <span class="ver">v2.16.1</span>
+    <span class="ver">v2.16.2</span>
   </footer>
 
 </div>

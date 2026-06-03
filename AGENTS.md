@@ -42,7 +42,8 @@ Single source: `src/trusted-sites.js`. Content scripts use `browser-compat.js` (
 - Chrome ≥ 116, load unpacked from `/workspace`
 - Validate: `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` and `node --check src/background.js`
 - Hello-world: Support → Run check (v2.13.0+); verify Amazon loads after reload
-- Popup: minimal UI in `popup.html` + `popup.js` — session/lifetime stats, PayPal tip, privacy link only
+- Popup: minimal UI — session/lifetime/time saved (live via `GET_POPUP_STATS`), PayPal, privacy
+- Stability: `runStabilityMaintenanceIfNeeded()` on install/startup (`STABILITY_VERSION` in `background.js`)
 
 ## Do not regress
 

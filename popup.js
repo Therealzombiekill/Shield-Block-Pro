@@ -1,9 +1,13 @@
-// ShieldBlock Pro — minimal popup (live stats while open)
+// ShieldBlock Pro — minimal popup (live stats, stability-safe polling)
 
 const $ = id => document.getElementById(id);
 
-const REFRESH_MS = 1000;
+const REFRESH_MS = 1500;
+const REFRESH_SLOW_MS = 4000;
 let _refreshTimer = null;
+let _storageBound = false;
+let _failStreak = 0;
+let _storageDebounce = null;
 
 async function msg(type, extra = {}) {
   try {
@@ -47,32 +51,50 @@ function formatTimeSaved(seconds) {
 
 async function refreshStats() {
   const live = await msg('GET_POPUP_STATS');
-  if (!live) return;
-
-  const session = live.session ?? 0;
-  const life = live.lifetime ?? 0;
-  const saved = live.timeSavedSeconds ?? 0;
+  if (!live) {
+    _failStreak++;
+    return;
+  }
+  _failStreak = 0;
 
   const sessionEl = $('session-count');
-  if (sessionEl) sessionEl.textContent = fmt(session);
+  if (sessionEl) sessionEl.textContent = fmt(live.session ?? 0);
 
   const lifeEl = $('lifetime-count');
-  if (lifeEl) lifeEl.textContent = fmt(life);
+  if (lifeEl) lifeEl.textContent = fmt(live.lifetime ?? 0);
 
   const savedEl = $('time-saved');
-  if (savedEl) savedEl.textContent = formatTimeSaved(saved);
+  if (savedEl) savedEl.textContent = formatTimeSaved(live.timeSavedSeconds ?? 0);
+
+  const stability = $('stability-line');
+  if (stability && live.amazonProtected) {
+    stability.textContent = 'Amazon stability mode · protection active';
+  }
+}
+
+function scheduleStorageRefresh() {
+  if (_storageDebounce) clearTimeout(_storageDebounce);
+  _storageDebounce = setTimeout(() => {
+    _storageDebounce = null;
+    refreshStats();
+  }, 80);
 }
 
 function startLiveRefresh() {
   refreshStats();
   if (_refreshTimer) clearInterval(_refreshTimer);
-  _refreshTimer = setInterval(refreshStats, REFRESH_MS);
+  const interval = _failStreak >= 3 ? REFRESH_SLOW_MS : REFRESH_MS;
+  _refreshTimer = setInterval(refreshStats, interval);
 }
 
 function stopLiveRefresh() {
   if (_refreshTimer) {
     clearInterval(_refreshTimer);
     _refreshTimer = null;
+  }
+  if (_storageDebounce) {
+    clearTimeout(_storageDebounce);
+    _storageDebounce = null;
   }
 }
 
@@ -84,13 +106,15 @@ function init() {
 
   startLiveRefresh();
 
-  // Instant bump when background flushes stats to storage
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    if (changes.stats || changes.lifetime || changes.timeSaved) {
-      refreshStats();
-    }
-  });
+  if (!_storageBound) {
+    _storageBound = true;
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      if (changes.stats || changes.lifetime || changes.timeSaved) {
+        scheduleStorageRefresh();
+      }
+    });
+  }
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') startLiveRefresh();

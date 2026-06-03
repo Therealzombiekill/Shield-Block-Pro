@@ -363,6 +363,8 @@ const HTTPS_UPGRADE_ID   = 47001; // upgradeScheme — http → https for main/s
 const DNT_GPC_RULE_ID    = 47002; // set DNT: 1 and Sec-GPC: 1 on all outbound requests
 const AMAZON_ALLOW_INIT_ID = 47003; // allow subresources when shopping on Amazon
 const AMAZON_ALLOW_MAIN_ID = 47004; // allow main-frame navigations to Amazon storefronts
+/** Bumped when stability maintenance (Amazon allowlist, DNR allow rules) must re-run. */
+const STABILITY_VERSION = '2.16.2';
 const STATS_EXEMPT_RULE_IDS = new Set([
   REFERRER_RULE_ID, HTTPS_UPGRADE_ID, DNT_GPC_RULE_ID,
   AMAZON_ALLOW_INIT_ID, AMAZON_ALLOW_MAIN_ID, PAUSE_ALL_RULE_ID,
@@ -1609,6 +1611,26 @@ async function ensurePlatformStabilityMode() {
   logEvent('system', 'info', 'Maximum stability: Amazon fully protected; no Amazon extension scripts');
 }
 
+async function runStabilityMaintenanceIfNeeded() {
+  try {
+    const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
+    if (sbStabilityVersion === STABILITY_VERSION) return;
+    await ensurePlatformStabilityMode();
+    await pruneYoutubeFromWhitelist();
+    await applyAmazonShoppingAllowRules();
+    await refreshAllowRuleIds();
+    await chrome.storage.local.set({ sbStabilityVersion: STABILITY_VERSION });
+    logEvent('system', 'info', `Stability maintenance applied (${STABILITY_VERSION})`);
+  } catch (e) {
+    logEvent('system', 'warn', `Stability maintenance failed: ${e?.message ?? e}`);
+  }
+}
+
+function safeStatInt(n) {
+  const v = Number(n);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+}
+
 async function syncFilterLists(force = false) {
   if (_syncLock) return;
   _syncLock = true;
@@ -2515,21 +2537,36 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       // Popup live view — includes not-yet-flushed pending counts/time
       case 'GET_POPUP_STATS': {
-        const { stats, lifetime, timeSaved } = await chrome.storage.local.get([
-          'stats', 'lifetime', 'timeSaved',
-        ]);
-        const pendingBlocks = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
-        const session = (stats?.total ?? 0) + pendingBlocks;
-        const life = (lifetime?.total ?? 0) + pendingBlocks;
-        sendResponse({
-          session,
-          lifetime: life,
-          timeSavedSeconds: (timeSaved ?? 0) + _pendingTimeSaved,
-        });
+        try {
+          const { stats, lifetime, timeSaved } = await chrome.storage.local.get([
+            'stats', 'lifetime', 'timeSaved',
+          ]);
+          const pendingBlocks = Object.values(_pendingStats).reduce(
+            (a, b) => a + safeStatInt(b), 0,
+          );
+          sendResponse({
+            session: safeStatInt(stats?.total) + pendingBlocks,
+            lifetime: safeStatInt(lifetime?.total) + pendingBlocks,
+            timeSavedSeconds: safeStatInt(timeSaved) + safeStatInt(_pendingTimeSaved),
+            amazonProtected: true,
+          });
+        } catch (_) {
+          sendResponse({ session: 0, lifetime: 0, timeSavedSeconds: 0, amazonProtected: true });
+        }
         break;
       }
       case 'RESET_STATS':
-        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
+        _pendingStats = {};
+        _pendingTimeSaved = 0;
+        if (_pendingFlush) {
+          clearTimeout(_pendingFlush);
+          _pendingFlush = null;
+        }
+        await chrome.storage.local.set({
+          stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 },
+          lifetime: { total: 0 },
+          timeSaved: 0,
+        });
         try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
         sendResponse({ ok: true });
         break;
@@ -3447,12 +3484,8 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   }
 
   try {
-    const { sbStabilityVersion, sbRulesVersion } = await chrome.storage.local.get(['sbStabilityVersion', 'sbRulesVersion']);
-    if (sbStabilityVersion !== '2.15.0') {
-      await ensurePlatformStabilityMode();
-      await pruneYoutubeFromWhitelist();
-      await chrome.storage.local.set({ sbStabilityVersion: '2.15.0' });
-    }
+    await runStabilityMaintenanceIfNeeded();
+    const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
     if (sbRulesVersion !== '2.14.0') {
       const all = await chrome.storage.local.get(null);
       const stale = Object.keys(all).filter(k =>
@@ -3547,12 +3580,7 @@ chrome.runtime.onStartup.addListener(async () => {
 
   await repairFilterHealthForCheck();
   try {
-    const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
-    if (sbStabilityVersion !== '2.15.0') {
-      await ensurePlatformStabilityMode();
-      await pruneYoutubeFromWhitelist();
-      await chrome.storage.local.set({ sbStabilityVersion: '2.15.0' });
-    }
+    await runStabilityMaintenanceIfNeeded();
   } catch (_) {}
 
   setTimeout(() => {

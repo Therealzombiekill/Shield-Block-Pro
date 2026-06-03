@@ -352,7 +352,10 @@ $('sync-btn')?.addEventListener('click', async () => {
 });
 
 // ── Toggles ───────────────────────────────────────────────────────────
-const STABILITY_LOCKED = { youtube: false, amazon: false };
+const STABILITY_LOCKED = {
+  youtube: false, amazon: false,
+  twitch: false, spotify: false, hulu: false, kick: false,
+};
 
 function wireSettingToggles() {
   document.querySelectorAll('.sw input[type="checkbox"][data-s]').forEach(input => {
@@ -503,6 +506,13 @@ async function boot() {
   _intervals.length = 0;
   wireSettingToggles();
   try { await msg('GET_HEALTH_STATUS'); } catch (_) {}
+  try {
+    const info = await msg('GET_FILTER_INFO');
+    const desc = $('rules-desc');
+    if (desc && info?.builtInCount) {
+      desc.textContent = `${info.builtInCount} built-in lists (EasyList · uBO · AdGuard · regional)`;
+    }
+  } catch (_) {}
   await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules()]);
   moveNavGlider(document.querySelector('.nb.active'));
   $('app').classList.add('ready');

@@ -798,7 +798,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-net">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1 17.9c-4-.5-7-3.9-7-7.9 0-.6.1-1.2.2-1.8L9 15v1c0 1.1.9 2 2 2v1.9zm6.9-2.5c-.3-.8-1-1.4-1.9-1.4h-1v-3c0-.6-.4-1-1-1H8V8h2c.6 0 1-.5 1-1V5h2c1.1 0 2-.9 2-2v-.4c2.9 1.2 5 4.1 5 7.4 0 2.1-.8 4-2.1 5.4z"/></svg>
           </div>
-          <div class="ttxt"><strong>Network Block</strong><span id="rules-desc">EasyList + 22 filter lists</span></div>
+          <div class="ttxt"><strong>Network Block</strong><span id="rules-desc">39 built-in lists (EasyList · uBO · AdGuard)</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-wb" data-s="general" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </div>
@@ -859,49 +859,49 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ti ti-yt">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
           </div>
-          <div class="ttxt"><strong>YouTube</strong><span>Off in v2.12 — allowlisted for stable playback</span></div>
+          <div class="ttxt"><strong>YouTube</strong><span>Filter lists only — no player scripts (safer)</span></div>
         </div>
-        <div class="sw"><input type="checkbox" id="t-yt" data-s="youtube" disabled title="YouTube blocking removed for stability"><div class="sw-t"><div class="sw-k"></div></div></div>
+        <div class="sw"><input type="checkbox" id="t-yt" data-s="youtube" disabled title="Use Network Block for YouTube ads"><div class="sw-t"><div class="sw-k"></div></div></div>
       </div>
 
-      <div class="tr" data-toggle-for="t-tw">
+      <div class="tr tr-locked" data-toggle-for="t-tw">
         <div class="tr-info">
           <div class="ti ti-tw">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#9147ff"><path d="M11.6 4.7h1.7v5.1h-1.7zm4.7 0H18v5.1h-1.7zM6 0L1.7 4.3v15.4h5.1V24l4.3-4.3h3.4l8.2-8.2V0H6zm14.6 11.1l-3.4 3.5H13.8l-3 3v-3H6.9V1.7h13.7v9.4z"/></svg>
           </div>
-          <div class="ttxt"><strong>Twitch</strong><span>Stream ad mute + swap</span></div>
+          <div class="ttxt"><strong>Twitch</strong><span>Off — use filter lists (scripts removed)</span></div>
         </div>
-        <div class="sw"><input type="checkbox" id="t-tw" data-s="twitch" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+        <div class="sw"><input type="checkbox" id="t-tw" data-s="twitch" disabled><div class="sw-t"><div class="sw-k"></div></div></div>
       </div>
 
-      <div class="tr" data-toggle-for="t-sp">
+      <div class="tr tr-locked" data-toggle-for="t-sp">
         <div class="tr-info">
           <div class="ti ti-sp">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#1db954"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 14.36c-.2.32-.62.43-.94.24-2.57-1.57-5.8-1.93-9.61-1.06-.37.09-.73-.14-.82-.51-.09-.37.14-.73.51-.82 4.17-.96 7.74-.55 10.63 1.22.33.2.44.62.23.93zm1.24-2.76c-.25.41-.77.53-1.18.29-2.94-1.81-7.43-2.33-10.91-1.28-.46.14-.94-.12-1.08-.57-.13-.46.12-.95.57-1.08 3.98-1.2 8.93-.62 12.32 1.46.41.25.53.77.28 1.18zm.1-2.88c-3.53-2.1-9.33-2.29-12.7-1.27-.54.16-1.1-.14-1.27-.68-.16-.54.14-1.1.68-1.27 3.87-1.17 10.3-.95 14.36 1.47.49.29.65.92.36 1.41-.29.49-.92.65-1.43.34z"/></svg>
           </div>
-          <div class="ttxt"><strong>Spotify</strong><span>Ad mute + skip</span></div>
+          <div class="ttxt"><strong>Spotify</strong><span>Off — use filter lists</span></div>
         </div>
-        <div class="sw"><input type="checkbox" id="t-sp" data-s="spotify" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+        <div class="sw"><input type="checkbox" id="t-sp" data-s="spotify" disabled><div class="sw-t"><div class="sw-k"></div></div></div>
       </div>
 
-      <div class="tr" data-toggle-for="t-hl">
+      <div class="tr tr-locked" data-toggle-for="t-hl">
         <div class="tr-info">
           <div class="ti ti-hl">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#1ca8ff"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zM9 12l6-3.5v7z"/></svg>
           </div>
-          <div class="ttxt"><strong>Hulu</strong><span>Ad mute during breaks</span></div>
+          <div class="ttxt"><strong>Hulu</strong><span>Off — use filter lists</span></div>
         </div>
-        <div class="sw"><input type="checkbox" id="t-hl" data-s="hulu" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+        <div class="sw"><input type="checkbox" id="t-hl" data-s="hulu" disabled><div class="sw-t"><div class="sw-k"></div></div></div>
       </div>
 
-      <div class="tr" data-toggle-for="t-kk">
+      <div class="tr tr-locked" data-toggle-for="t-kk">
         <div class="tr-info">
           <div class="ti ti-kk">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="#53fc4e"><path d="M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm4 5v10l9-5-9-5z"/></svg>
           </div>
-          <div class="ttxt"><strong>Kick</strong><span>Ad mute during breaks</span></div>
+          <div class="ttxt"><strong>Kick</strong><span>Off — use filter lists</span></div>
         </div>
-        <div class="sw"><input type="checkbox" id="t-kk" data-s="kick" checked><div class="sw-t"><div class="sw-k"></div></div></div>
+        <div class="sw"><input type="checkbox" id="t-kk" data-s="kick" disabled><div class="sw-t"><div class="sw-k"></div></div></div>
       </div>
 
       <div class="sec-hd">Privacy & Advanced</div>
@@ -1060,7 +1060,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
       <div class="sup-card sup-card-sm">
         <div class="sup-info">
-          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.13.1<br>
+          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.14.0<br>
           <a href="https://shieldblock.pro/" target="_blank" rel="noopener"
              style="color:var(--accent2);text-decoration:none;font-size:10px">Privacy Policy ↗</a>
         </div>
@@ -1172,7 +1172,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <div class="ftr">
     <div class="ftr-l">
       <span class="ftr-badge">FREE</span>
-      <span class="ver">ShieldBlock v2.13.1</span>
+      <span class="ver">ShieldBlock v2.14.0</span>
     </div>
     <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
        class="ghost" style="text-decoration:none">tip ❤</a>

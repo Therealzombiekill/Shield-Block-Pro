@@ -121,73 +121,51 @@ function adGuardUrl(filterId) {
 }
 
 // ── Filter list registry ──────────────────────────────────────────────────────
-// Rules are pulled from each list up to `max` entries.
-// ID ranges MUST NOT overlap — each list's [start, start+max-1] must be disjoint.
-// Chrome hard-caps updateDynamicRules at 5,000 total; sync truncates lists to the reserved filter budget.
-//
-//   List                │ start  │ max  │ end (exclusive)
-//   ────────────────────┼────────┼──────┼────────────────
-//   EasyList            │ 10000  │ 1600 │ 11600
-//   EasyPrivacy         │ 12000  │  700 │ 12700
-//   Peter Lowe          │ 13000  │  200 │ 13200
-//   AdGuard Tracking    │ 13500  │  350 │ 13850   ← new, replaces AdGuard Annoyances
-//   uBlock Annoyances   │ 14000  │  150 │ 14150
-//   uBlock Filters      │ 14500  │  550 │ 15050   ← new: uBO main list
-//   Fanboy Social       │ 15500  │  120 │ 15620   ← new: social widget blocking
-//   AdGuard Base        │ 16000  │  300 │ 16300
-//   uBlock Badware      │ 16500  │  150 │ 16650
-//   Liste FR            │ 17000  │   80 │ 17080
-//   EasyList Germany    │ 17200  │   80 │ 17280
-//   RU AdList           │ 17400  │   80 │ 17480
-//   AdGuard Annoyances  │ 17600  │  300 │ 17900   ← kept but after the new ones
-//   ────────────────────┼────────┼──────┼────────────────
-//   Total               │        │~4950 │          (> 4300 filter budget)
+// Rules are pulled from each list up to `max` entries (sum of max ≈ MAX_FILTER_RULES).
+// ID ranges MUST NOT overlap. Sync walks lists in order until the 4,300-rule budget is full.
 
 const FILTER_LISTS = [
-  // Core ad blocking
-  { name: 'EasyList',              url: 'https://easylist.to/easylist/easylist.txt',                                                                                   key: 'easylist',      max: 1100, start: 10000 },
-  { name: 'EasyPrivacy',           url: 'https://easylist.to/easylist/easyprivacy.txt',                                                                                key: 'easyprivacy',   max:  540, start: 12000 },
-  { name: 'Peter Lowe',            url: 'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext',                         key: 'peterlow',      max:  200, start: 13000 },
-  // Tracking & privacy
-  { name: 'AdGuard Tracking',      url: adGuardUrl(3),                                                                                                                  key: 'adguard_track', max:  350, start: 13500 },
-  { name: 'uBlock Annoyances',     url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt',                               key: 'ublock_ann',    max:  150, start: 14000 },
-  // uBlock Origin main filter list — high-quality, minimal overlap with EasyList
-  { name: 'uBlock Filters',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',                                           key: 'ublock_main',   max:  300, start: 14500 },
-  // Social widget & share-button tracking
-  { name: 'Fanboy Social',         url: 'https://easylist.to/easylist/fanboy-social.txt',                                                                              key: 'fanboy_social', max:  120, start: 15500 },
-  // Broader ad network coverage
-  { name: 'AdGuard Base',          url: adGuardUrl(2),                                                                                                                  key: 'adguard_base',  max:  300, start: 16000 },
-  { name: 'uBlock Badware',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt',                                           key: 'ublock_bad',    max:  150, start: 16500 },
-  // Regional lists
-  { name: 'Liste FR',              url: 'https://easylist-downloads.adblockplus.org/liste_fr.txt',                                                                     key: 'listefr',       max:   80, start: 17000 },
-  { name: 'EasyList Germany',      url: 'https://easylist.to/easylistgermany/easylistgermany.txt',                                                                     key: 'easylistde',    max:   80, start: 17200 },
-  { name: 'RU AdList',             url: 'https://easylist-downloads.adblockplus.org/advblock.txt',                                                                     key: 'ruadlist',      max:   80, start: 17400 },
-  // Annoyances (newsletter popups, notification prompts, cookie notices)
-  { name: 'AdGuard Annoyances',    url: adGuardUrl(14),                                                                                                                 key: 'adguard_ann',   max:  300, start: 17600 },
-  // Scriptlet-heavy lists — these provide ##+js() rules that defuse anti-adblock scripts
-  { name: 'uBlock Origin Filters 2', url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters-2024.txt',                                     key: 'ublock_2024',   max:  200, start: 17900 },
-  { name: 'uBlock Annoyances Full',  url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances.txt',                                       key: 'ublock_ann2',   max:  150, start: 18200 },
-  // Anti-adblock bypass rules
-  { name: 'Anti-Adblock Killer',    url: 'https://raw.githubusercontent.com/reek/anti-adblock-killer/master/anti-adblock-killer-filters.txt',                           key: 'anti_adblock',  max:  100, start: 18400 },
-  // Regional lists
-  { name: 'EasyList Polish',          url: 'https://easylist-downloads.adblockplus.org/easylistpolish.txt',                                                                    key: 'easylist_pl',   max:   80, start: 19000 },
-  { name: 'uBlock Unbreak',            url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt',                                              key: 'ublock_unbr',   max:   80, start: 19200 },
-  { name: 'EasyList Korean',          url: 'https://raw.githubusercontent.com/yous/YousList/master/youslist.txt',                                                              key: 'easylist_kr',   max:   80, start: 19400 },
-  { name: 'AdGuard Turkish',           url: adGuardUrl(9),                                                                                                                  key: 'adguard_tr',    max:   80, start: 19600 },
-  { name: 'ChinaList',               url: 'https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjxlist.txt',                                                            key: 'chinalist',     max:   80, start: 19800 },
-  // Anti-cryptomining
-  { name: 'NoCoin',                   url: 'https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt',                                               key: 'nocoin',        max:   80, start: 19900 },
-  // ── Regional language lists ──────────────────────────────────────────────
-  { name: 'EasyList Spanish',       url: 'https://easylist-downloads.adblockplus.org/easylistspanish.txt',           key: 'easylist_es',  max:  30, start: 22000 },
-  { name: 'EasyList Italian',       url: 'https://easylist-downloads.adblockplus.org/easylistitaly.txt',             key: 'easylist_it',  max:  30, start: 22030 },
-  { name: 'EasyList Dutch',         url: 'https://easylist-downloads.adblockplus.org/easylistdutch.txt',             key: 'easylist_nl',  max:  30, start: 22060 },
-  { name: 'AdGuard Japanese',       url: adGuardUrl(7),                                                                                                                  key: 'adguard_ja',   max:  30, start: 22090 },
-  { name: 'Liste AR Arabic',        url: 'https://easylist-downloads.adblockplus.org/Liste_AR.txt',                  key: 'liste_ar',     max:  25, start: 22120 },
-  { name: 'Czech and Slovak',       url: 'https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt', key: 'easylist_cs',  max:  25, start: 22145 },
-  { name: 'ABP Indonesian',         url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                   key: 'abp_id',       max:  25, start: 22170 },
-  { name: 'Hebrew List',            url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt', key: 'hebrew_il',    max:  25, start: 22195 },
-  { name: 'ABPVN Vietnamese',       url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',    key: 'abp_vn',       max:  25, start: 22220 },
-  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20alternate%20versions/NordicFiltersABP-Inclusion.txt', key: 'nordic', max: 25, start: 22245 },
+  // ── Core (EasyList + uBlock + AdGuard) ───────────────────────────────────
+  { name: 'EasyList',                 url: 'https://easylist.to/easylist/easylist.txt',                                                                 key: 'easylist',       max:  930, start: 10000 },
+  { name: 'EasyPrivacy',              url: 'https://easylist.to/easylist/easyprivacy.txt',                                                              key: 'easyprivacy',    max:  480, start: 10950 },
+  { name: 'Peter Lowe',               url: 'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext',          key: 'peterlow',       max:  170, start: 11430 },
+  { name: 'AdGuard Tracking',         url: adGuardUrl(3),                                                                                               key: 'adguard_track',  max:  320, start: 11600 },
+  { name: 'AdGuard Social',           url: adGuardUrl(4),                                                                                               key: 'adguard_social', max:   60, start: 11920 },
+  { name: 'uBlock Cookie Notices',    url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt',                key: 'ublock_cookies', max:  120, start: 11980 },
+  { name: 'uBlock Filters',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',                         key: 'ublock_main',    max:  400, start: 12100 },
+  { name: 'Fanboy Annoyances',        url: 'https://easylist.to/easylist/fanboy-annoyance.txt',                                                         key: 'fanboy_ann',     max:   70, start: 12500 },
+  { name: 'Fanboy Cookie Monster',    url: 'https://secure.fanboy.co.nz/fanboy-cookiemonster.txt',                                                      key: 'fanboy_cookies', max:   90, start: 12570 },
+  { name: 'Fanboy Social',            url: 'https://easylist.to/easylist/fanboy-social.txt',                                                            key: 'fanboy_social',  max:   80, start: 12660 },
+  { name: 'AdGuard Base',             url: adGuardUrl(2),                                                                                               key: 'adguard_base',   max:  280, start: 12740 },
+  { name: 'uBlock Badware',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt',                         key: 'ublock_bad',     max:   90, start: 13020 },
+  { name: 'uBlock Unbreak',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt',                         key: 'ublock_unbr',    max:   80, start: 13110 },
+  { name: 'AdGuard Annoyances',       url: adGuardUrl(14),                                                                                              key: 'adguard_ann',    max:  200, start: 13190 },
+  { name: 'uBlock Filters 2024',      url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters-2024.txt',                    key: 'ublock_2024',    max:  110, start: 13390 },
+  { name: 'uBlock Annoyances',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances.txt',                      key: 'ublock_ann',     max:   70, start: 13500 },
+  { name: 'Anti-Adblock Killer',      url: 'https://raw.githubusercontent.com/reek/anti-adblock-killer/master/anti-adblock-killer-filters.txt',         key: 'anti_adblock',   max:   60, start: 13570 },
+  { name: 'NoCoin',                   url: 'https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt',                           key: 'nocoin',         max:   50, start: 13630 },
+  { name: 'uBlock Resource Abuse',    url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/resource-abuse.txt',                  key: 'ublock_res',     max:   50, start: 13680 },
+  { name: 'uBlock Privacy',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt',                         key: 'ublock_priv',    max:   70, start: 13730 },
+  { name: 'Adblock Warning Removal',  url: 'https://easylist-downloads.adblockplus.org/adblock_warning_removal_list.txt',                               key: 'warn_removal',   max:   40, start: 13800 },
+  // ── Regional (smaller slices — sync budget shared with core) ─────────────
+  { name: 'Liste FR',                 url: 'https://easylist-downloads.adblockplus.org/liste_fr.txt',                                                   key: 'listefr',        max:   40, start: 13840 },
+  { name: 'EasyList Germany',         url: 'https://easylist.to/easylistgermany/easylistgermany.txt',                                                    key: 'easylistde',     max:   40, start: 13880 },
+  { name: 'RU AdList',                url: 'https://easylist-downloads.adblockplus.org/advblock.txt',                                                   key: 'ruadlist',       max:   40, start: 13920 },
+  { name: 'EasyList Polish',          url: 'https://easylist-downloads.adblockplus.org/easylistpolish.txt',                                               key: 'easylist_pl',    max:   35, start: 13960 },
+  { name: 'ChinaList',                url: 'https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjxlist.txt',                                       key: 'chinalist',      max:   35, start: 13995 },
+  { name: 'EasyList Korean',          url: 'https://raw.githubusercontent.com/yous/YousList/master/youslist.txt',                                       key: 'easylist_kr',    max:   35, start: 14030 },
+  { name: 'AdGuard Turkish',          url: adGuardUrl(9),                                                                                               key: 'adguard_tr',     max:   35, start: 14065 },
+  { name: 'EasyList Spanish',         url: 'https://easylist-downloads.adblockplus.org/easylistspanish.txt',                                              key: 'easylist_es',    max:   20, start: 14100 },
+  { name: 'EasyList Italian',         url: 'https://easylist-downloads.adblockplus.org/easylistitaly.txt',                                                key: 'easylist_it',    max:   20, start: 14120 },
+  { name: 'EasyList Dutch',           url: 'https://easylist-downloads.adblockplus.org/easylistdutch.txt',                                                key: 'easylist_nl',    max:   20, start: 14140 },
+  { name: 'AdGuard Japanese',         url: adGuardUrl(7),                                                                                               key: 'adguard_ja',     max:   20, start: 14160 },
+  { name: 'Liste AR Arabic',          url: 'https://easylist-downloads.adblockplus.org/Liste_AR.txt',                                                     key: 'liste_ar',       max:   20, start: 14180 },
+  { name: 'Czech and Slovak',         url: 'https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt',                        key: 'easylist_cs',    max:   20, start: 14200 },
+  { name: 'ABP Indonesian',           url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                                                      key: 'abp_id',         max:   20, start: 14220 },
+  { name: 'Hebrew List',              url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt',                       key: 'hebrew_il',      max:   20, start: 14240 },
+  { name: 'ABPVN Vietnamese',         url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',                                   key: 'abp_vn',         max:   20, start: 14260 },
+  { name: 'Nordic List',              url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20alternate%20versions/NordicFiltersABP-Inclusion.txt', key: 'nordic', max: 20, start: 14280 },
+  { name: 'ABP Japanese',             url: 'https://raw.githubusercontent.com/k2jp/abp-japanese-filters/master/abpjf.txt',                                  key: 'abp_ja',         max:   20, start: 14300 },
 ];
 
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
@@ -213,14 +191,13 @@ const YOUTUBE_STABILITY_DOMAINS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  twitch: true, amazon: false, general: true,
+  twitch: false, amazon: false, general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
-  spotify: true,
-  hulu: true,
-  kick: true,
-  youtube: false, // no YouTube blocking in v2.12+ (stability)
-  // amazon: false — no Amazon DOM/DNR breakage in v2.13+ (stability)
+  spotify: false,
+  hulu: false,
+  kick: false,
+  youtube: false, // network lists only — no player/inject scripts (v2.14+)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
   paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
@@ -1518,12 +1495,32 @@ async function ensureFilterHealthMetadata() {
   return repairFilterHealthForCheck();
 }
 
+/** Remove auto-whitelist entries so filter lists can block ads on YouTube again (network-only). */
+async function pruneYoutubeFromWhitelist() {
+  const { whitelist = [] } = await chrome.storage.local.get('whitelist');
+  const drop = new Set(YOUTUBE_STABILITY_DOMAINS.map(d => d.replace(/^www\./, '')));
+  const wl = whitelist.filter(d => {
+    const bare = d.replace(/^www\./, '');
+    return !drop.has(d) && !drop.has(bare) && ![...drop].some(x => bare === x || bare.endsWith('.' + x));
+  });
+  if (wl.length === whitelist.length) return false;
+  await chrome.storage.local.set({ whitelist: wl });
+  await applyWhitelistRules();
+  await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
+  logEvent('system', 'info', 'Removed YouTube domains from whitelist — network blocking enabled');
+  return true;
+}
+
 async function ensurePlatformStabilityMode() {
   const { settings = {}, whitelist = [] } = await chrome.storage.local.get(['settings', 'whitelist']);
-  const mergedSettings = { ...DEFAULT_SETTINGS, ...settings, youtube: false, amazon: false };
+  const mergedSettings = {
+    ...DEFAULT_SETTINGS, ...settings,
+    youtube: false, amazon: false,
+    twitch: false, spotify: false, hulu: false, kick: false,
+  };
   const wl = [...whitelist];
   let wlChanged = false;
-  for (const d of [...YOUTUBE_STABILITY_DOMAINS, ...AMAZON_STABILITY_DOMAINS]) {
+  for (const d of AMAZON_STABILITY_DOMAINS) {
     if (!wl.includes(d)) { wl.push(d); wlChanged = true; }
   }
   await chrome.storage.local.set({
@@ -1535,7 +1532,7 @@ async function ensurePlatformStabilityMode() {
     await applyWhitelistRules();
     await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
   }
-  logEvent('system', 'info', 'Platform stability: YouTube + Amazon allowlisted, platform scripts off');
+  logEvent('system', 'info', 'Platform stability: Amazon allowlisted; YT/streaming use network lists only');
 }
 
 async function syncFilterLists(force = false) {
@@ -2460,7 +2457,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'SET_SETTINGS': {
         if (!msg.settings || typeof msg.settings !== 'object') { sendResponse({ ok: false }); break; }
-        const merged = { ...(await getSettings()), ...msg.settings, youtube: false, amazon: false };
+        const merged = {
+          ...(await getSettings()), ...msg.settings,
+          youtube: false, amazon: false,
+          twitch: false, spotify: false, hulu: false, kick: false,
+        };
         await chrome.storage.local.set({ settings: merged });
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
         await applySettingsSideEffects(merged, { syncFilters: 'general' in msg.settings && merged.general });
@@ -2655,6 +2656,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
 
+      case 'GET_FILTER_INFO': {
+        sendResponse({
+          builtInCount: FILTER_LISTS.length,
+          builtInNames: FILTER_LISTS.map(l => l.name),
+          maxBudget: MAX_FILTER_RULES,
+        });
+        break;
+      }
       case 'GET_FILTER_STATUS': {
         const d = await chrome.storage.local.get(['filterSyncedAt','filterRuleCount','syncFailures','syncDuration','syncListStatus','staticRuleCount']);
         const dynamic = await chrome.declarativeNetRequest.getDynamicRules();
@@ -3345,10 +3354,20 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   }
 
   try {
-    const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
-    if (sbStabilityVersion !== '2.13.0') {
+    const { sbStabilityVersion, sbRulesVersion } = await chrome.storage.local.get(['sbStabilityVersion', 'sbRulesVersion']);
+    if (sbStabilityVersion !== '2.14.0') {
       await ensurePlatformStabilityMode();
-      await chrome.storage.local.set({ sbStabilityVersion: '2.13.0' });
+      await pruneYoutubeFromWhitelist();
+      await chrome.storage.local.set({ sbStabilityVersion: '2.14.0' });
+    }
+    if (sbRulesVersion !== '2.14.0') {
+      const all = await chrome.storage.local.get(null);
+      const stale = Object.keys(all).filter(k =>
+        k.startsWith('fr_') || k.startsWith('fm_') || k.startsWith('fc_') ||
+        k.startsWith('fd_') || k.startsWith('fs_') || k.startsWith('frp_') || k.startsWith('fe_'));
+      if (stale.length) await chrome.storage.local.remove(stale);
+      await rebuildAggregatedFilterCaches();
+      await chrome.storage.local.set({ sbRulesVersion: '2.14.0' });
     }
   } catch (_) {}
 
@@ -3418,22 +3437,26 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== '2.11.3') {
+    if (sbRulesVersion !== '2.14.0') {
       const all = await chrome.storage.local.get(null);
-      const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
+      const stale = Object.keys(all).filter(k =>
+        k.startsWith('fr_') || k.startsWith('fm_') || k.startsWith('fc_') ||
+        k.startsWith('fd_') || k.startsWith('fs_') || k.startsWith('frp_') || k.startsWith('fe_'));
       if (stale.length) await chrome.storage.local.remove(stale);
       await rebuildAggregatedFilterCaches();
-      await chrome.storage.local.set({ sbRulesVersion: '2.11.3' });
-      logEvent('startup', 'info', 'Upgraded to v2.11.3 — filter health metadata repair');
+      await chrome.storage.local.set({ sbRulesVersion: '2.14.0' });
+      logEvent('startup', 'info', 'Upgraded to v2.14.0 — expanded built-in filter lists');
+      setTimeout(() => syncFilterLists(true).catch(() => {}), 2000);
     }
   } catch (_) {}
 
   await repairFilterHealthForCheck();
   try {
     const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
-    if (sbStabilityVersion !== '2.13.0') {
+    if (sbStabilityVersion !== '2.14.0') {
       await ensurePlatformStabilityMode();
-      await chrome.storage.local.set({ sbStabilityVersion: '2.13.0' });
+      await pruneYoutubeFromWhitelist();
+      await chrome.storage.local.set({ sbStabilityVersion: '2.14.0' });
     }
   } catch (_) {}
 

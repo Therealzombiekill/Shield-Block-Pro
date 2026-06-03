@@ -8,7 +8,17 @@ ShieldBlock Pro is a Manifest V3 Chrome/Firefox browser extension. **No build st
 
 See `CLAUDE.md` for architecture and DNR ID ranges.
 
-## v2.12+ / v2.13+ — platform stability (YouTube, Amazon)
+## v2.14.0 — filter lists & platform stability
+
+**39 built-in lists** (~4,300 DNR budget): EasyList, EasyPrivacy, uBO (main, unbreak, privacy, badware, cookies, annoyances), AdGuard (base, tracking, social, annoyances), Fanboy (annoyances, cookies, social), Peter Lowe, NoCoin, anti-adblock, regional languages.
+
+**YouTube:** Network/filter-list blocking only — no `inject-youtube` / `content-youtube`. YouTube is **not** auto-whitelisted (v2.14 removes old whitelist entries). `googlevideo.com` etc. stay protected in `trusted-sites.js`.
+
+**Amazon:** Still allowlisted; no `content-amazon.js`.
+
+**Twitch / Spotify / Hulu / Kick:** Platform scripts **removed** from manifest — use filter lists only.
+
+## v2.12+ / v2.13+ — platform stability (legacy notes)
 
 **YouTube ad blocking is removed.** Do not re-add `inject-youtube.js` or `content-youtube.js` to `manifest.json` without explicit user request and playback testing.
 

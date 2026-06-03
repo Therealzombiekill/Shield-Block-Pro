@@ -57,18 +57,23 @@
   // ── 1. ytInitialPlayerResponse — first page load ─────────────────────────────
   // YouTube inlines this global in a <script> tag before the player boots.
   // Wrapping it in a setter lets us strip the ad payload from that first load.
-  let _ytInitial;
-  Object.defineProperty(window, 'ytInitialPlayerResponse', {
-    get() { return _ytInitial; },
-    set(v) {
-      if (!_disabled) {
-        const stripped = stripAds(v);
-        if (stripped) _sbLog('info', 'InnerTube ytInitial: stripped ad placements');
-      }
-      _ytInitial = v;
-    },
-    configurable: true,
-  });
+  // CRITICAL: stripping is best-effort and fully isolated — _ytInitial MUST be
+  // assigned even if stripAds throws, or the getter returns undefined and the
+  // player renders a black screen. defineProperty itself is also guarded so a
+  // timing/redefinition failure never leaves the page without its data.
+  try {
+    let _ytInitial;
+    Object.defineProperty(window, 'ytInitialPlayerResponse', {
+      get() { return _ytInitial; },
+      set(v) {
+        try {
+          if (!_disabled && stripAds(v)) _sbLog('info', 'InnerTube ytInitial: stripped ad placements');
+        } catch (_) { /* never let ad-stripping break playback */ }
+        _ytInitial = v;
+      },
+      configurable: true,
+    });
+  } catch (_) { /* property already locked by the page — leave it as-is */ }
 
   // ── 2. fetch hook — SPA navigations re-request /player via InnerTube API ─────
   const _origFetch = window.fetch;

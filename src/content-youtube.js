@@ -8,6 +8,11 @@
  */
 
 (async () => {
+  // Build marker — surfaces in exported logs so we can confirm exactly which
+  // packaged build is running and which YouTube strategy is active. The manifest
+  // version alone was ambiguous (old and patched builds both read 2.10.x).
+  const SB_YT_BUILD = '2.10.2-ytsafe (dom-only)';
+
   // ── Log helper ────────────────────────────────────────────────────────────────
   function _sbLog(level, message, data) {
     chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'youtube', level, message, data: data ?? {} }).catch(() => {});
@@ -42,7 +47,7 @@
   // Signal MAIN world to ensure interception is active (handles re-enable after toggle)
   window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
 
-  _sbLog('info', `Init — ${_host}`, { ytMusic: _host.includes('music.') });
+  _sbLog('info', `Init — ${_host} [${SB_YT_BUILD}]`, { ytMusic: _host.includes('music.'), build: SB_YT_BUILD });
 
   // ── Relay log messages from inject-youtube.js (MAIN world) ───────────────────
   // inject-youtube.js cannot call chrome APIs; it postMessages here and we relay.

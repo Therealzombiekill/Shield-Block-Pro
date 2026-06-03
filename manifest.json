@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.11.1",
+  "version": "2.11.2",
   "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",

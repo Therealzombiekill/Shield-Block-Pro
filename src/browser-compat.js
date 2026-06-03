@@ -33,4 +33,28 @@
       if (msg?.type === 'GLOBAL_RESUME') globalThis.__sbGlobalPause = false;
     });
   }
+
+  // Content scripts cannot use ES import — mirror trusted-sites.js PRIVACY_URL_CLEAN_SKIP_HOSTS
+  const _privacySkipHosts = new Set([
+    'analytics.google.com', 'tagmanager.google.com',
+    'github.com', 'gist.github.com', 'github.io',
+    'google.com', 'accounts.google.com',
+    'drive.google.com', 'docs.google.com', 'sheets.google.com', 'slides.google.com',
+    'mail.google.com', 'calendar.google.com', 'meet.google.com', 'classroom.google.com',
+    'chat.google.com', 'keep.google.com', 'photos.google.com',
+    'drive.usercontent.google.com',
+  ]);
+  globalThis.__sbHostMatchesSet = function (host, domainSet) {
+    if (!host) return false;
+    host = host.replace(/^www\./, '').toLowerCase();
+    if (domainSet.has(host)) return true;
+    const parts = host.split('.');
+    for (let i = 1; i < parts.length; i++) {
+      if (domainSet.has(parts.slice(i).join('.'))) return true;
+    }
+    return false;
+  };
+  globalThis.__sbShouldSkipPrivacyUrlClean = function (host) {
+    return globalThis.__sbHostMatchesSet(host, _privacySkipHosts);
+  };
 })();

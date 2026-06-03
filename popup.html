@@ -438,8 +438,9 @@ textarea:focus{border-color:var(--accent)!important}
 .health-row .health-detail{color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis}
 
 /* ── Log rows ────────────────────────────────────────────────────── */
-.log-row{animation:sbLogIn .25s var(--ease-out) backwards}
-@keyframes sbLogIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+.log-row{opacity:1}
+.sb-animate .log-row{animation:sbLogIn .2s var(--ease-out) both}
+@keyframes sbLogIn{from{opacity:.5}to{opacity:1}}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{
@@ -1036,7 +1037,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
       <div class="sup-card sup-card-sm">
         <div class="sup-info">
-          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.11.4<br>
+          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.11.5<br>
           <a href="https://shieldblock.pro/" target="_blank" rel="noopener"
              style="color:var(--accent2);text-decoration:none;font-size:10px">Privacy Policy ↗</a>
         </div>
@@ -1143,7 +1144,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <div class="ftr">
     <div class="ftr-l">
       <span class="ftr-badge">FREE</span>
-      <span class="ver">ShieldBlock v2.11.4</span>
+      <span class="ver">ShieldBlock v2.11.5</span>
     </div>
     <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
        class="ghost" style="text-decoration:none">tip ❤</a>

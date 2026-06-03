@@ -2,7 +2,8 @@
  * ShieldBlock Pro — Trusted sites (single source of truth)
  *
  * Used by filter-parser (protected domains, Google API initiator exclusions),
- * background (safe-browsing allowlist), and content-privacy (skip URL rewriting).
+ * background (safe-browsing allowlist). Content scripts use browser-compat.js
+ * (__sbShouldSkipPrivacyUrlClean) — keep PRIVACY_URL_CLEAN_SKIP_HOSTS in sync there.
  * Static rules in rules/*.json should mirror SHARED_GOOGLE_API_EXCLUDED_INITIATORS
  * for apis.google.com / boq.google.com entries.
  */

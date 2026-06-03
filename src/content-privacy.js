@@ -5,8 +5,6 @@
  * effective privacy/tracking state to inject-privacy.js in the MAIN world.
  */
 
-import { shouldSkipPrivacyUrlClean } from './trusted-sites.js';
-
 (async () => {
   if (!location.href.startsWith('http://') && !location.href.startsWith('https://')) return;
 
@@ -25,7 +23,9 @@ import { shouldSkipPrivacyUrlClean } from './trusted-sites.js';
       type: 'SB_PRIVACY_CONFIG',
       privacy: settings?.privacy !== false && !disabled,
       tracking: settings?.tracking !== false && !disabled,
-      skipUrlClean: shouldSkipPrivacyUrlClean(host),
+      skipUrlClean: typeof globalThis.__sbShouldSkipPrivacyUrlClean === 'function'
+        ? globalThis.__sbShouldSkipPrivacyUrlClean(host)
+        : false,
     }, '*');
   }
 

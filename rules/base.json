@@ -975,6 +975,7 @@
     },
     "condition": {
       "urlFilter": "||analytics.google.com^",
+      "domainType": "thirdParty",
       "resourceTypes": [
         "image",
         "media",

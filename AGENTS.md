@@ -46,19 +46,27 @@ Useful DevTools entry points:
 
 After loading unpacked:
 
-1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.10.2).
+1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.10.3).
 2. Open the extension popup from the toolbar.
 3. Go to the **Support** tab → **Extension Health** → click **Run check**.
 4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.
 
 Filter sync uses remote CDNs (EasyList, uBlock, AdGuard, etc.) and requires network access. Bundled static DNR rules in `rules/*.json` work offline.
 
-### YouTube ad blocking (v2.10.2+)
+### YouTube ad blocking (v2.10.3 — do not oscillate strategies)
 
-- **Strategy:** InnerTube API strip in `src/inject-youtube.js` (MAIN world) plus DOM skip/mute in `src/content-youtube.js`.
-- **After updating YouTube-related files:** reload the extension **and** hard-refresh every open YouTube tab.
-- **Verify in logs:** Support → Log tab should show init with build tag `2.10.2-innertube` (not `dom-only`).
-- **Toggle off/on:** turning YouTube blocking back on in the popup still requires a **tab reload** to restart the DOM loop; MAIN-world hooks update via `localStorage.__sbYtOff` on the next navigation.
+**One stable design** (do not re-add `fetch`/`XHR` Response rewriting in `inject-youtube.js` — it caused repeated black-screen regressions):
+
+| Layer | File | What it does |
+|-------|------|----------------|
+| First load only | `inject-youtube.js` | In-place prune of `ytInitialPlayerResponse` ad fields (no `new Response()`) |
+| All playback | `content-youtube.js` | Skip button, seek short ads, mute long ads, remove feed overlays, dismiss anti-adblock modal |
+
+SPA navigations use pristine `/player` fetch responses; DOM layer handles in-player ads.
+
+- **After YouTube changes:** reload extension + hard-refresh YouTube tabs.
+- **Log tag:** `2.10.3-stable` in Support → Log.
+- **Do not** merge alternate “full InnerTube fetch hook” branches without playback testing — that path keeps getting reverted for black screens.
 
 ### Chrome on cloud VMs (GUI testing)
 

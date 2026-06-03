@@ -8,7 +8,8 @@
  */
 
 (async () => {
-  const SB_YT_BUILD = '2.10.2-innertube';
+  // Playback-safe: InnerTube fetch is NOT hooked (see inject-youtube.js). DOM handles player ads.
+  const SB_YT_BUILD = '2.10.3-stable';
 
   // ── Log helper ────────────────────────────────────────────────────────────────
   function _sbLog(level, message, data) {

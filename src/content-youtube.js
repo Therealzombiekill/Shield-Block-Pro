@@ -9,7 +9,7 @@
 
 (async () => {
   // Playback-safe: InnerTube fetch is NOT hooked (see inject-youtube.js). DOM handles player ads.
-  const SB_YT_BUILD = '2.10.6-stable';
+  const SB_YT_BUILD = '2.11.0-stable';
   const YT_PLAYER_ERR = '282054944';
 
   // ── Log helper ────────────────────────────────────────────────────────────────

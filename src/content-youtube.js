@@ -9,7 +9,7 @@
 
 (async () => {
   // Playback-safe: InnerTube fetch is NOT hooked (see inject-youtube.js). DOM handles player ads.
-  const SB_YT_BUILD = '2.10.3-stable';
+  const SB_YT_BUILD = '2.10.5-stable';
 
   // ── Log helper ────────────────────────────────────────────────────────────────
   function _sbLog(level, message, data) {
@@ -169,7 +169,7 @@
     if (!enforcement) return;
     const dialog = enforcement.closest('tp-yt-paper-dialog');
     try { (dialog || enforcement).remove(); } catch (_) {}
-    document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(el => { try { el.remove(); } catch (_) {} });
+    // Do NOT remove every iron-overlay-backdrop on the page — that blanks the video player.
     try {
       document.documentElement.style.removeProperty('overflow');
       if (document.body) document.body.style.removeProperty('overflow');

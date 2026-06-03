@@ -53,7 +53,7 @@ After loading unpacked:
 
 Filter sync uses remote CDNs (EasyList, uBlock, AdGuard, etc.) and requires network access. Bundled static DNR rules in `rules/*.json` work offline.
 
-### YouTube ad blocking (v2.10.3 — do not oscillate strategies)
+### YouTube ad blocking (v2.10.5 — do not oscillate strategies)
 
 **One stable design** (do not re-add `fetch`/`XHR` Response rewriting in `inject-youtube.js` — it caused repeated black-screen regressions):
 
@@ -65,7 +65,8 @@ Filter sync uses remote CDNs (EasyList, uBlock, AdGuard, etc.) and requires netw
 SPA navigations use pristine `/player` fetch responses; DOM layer handles in-player ads.
 
 - **After YouTube changes:** reload extension + hard-refresh YouTube tabs.
-- **Log tag:** `2.10.3-stable` in Support → Log.
+- **Log tag:** `2.10.5-stable` in Support → Log.
+- **Never** remove all `tp-yt-iron-overlay-backdrop` nodes (blanks the player).
 - **Do not** merge alternate “full InnerTube fetch hook” branches without playback testing — that path keeps getting reverted for black screens.
 
 ### Chrome on cloud VMs (GUI testing)

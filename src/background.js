@@ -183,7 +183,7 @@ const FILTER_LISTS = [
   { name: 'ABP Indonesian',         url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                   key: 'abp_id',       max:  25, start: 22170 },
   { name: 'Hebrew List',            url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt', key: 'hebrew_il',    max:  25, start: 22195 },
   { name: 'ABPVN Vietnamese',       url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',    key: 'abp_vn',       max:  25, start: 22220 },
-  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NordicFiltersABP-Inclusion.txt',                key: 'nordic', max: 25, start: 22245 },
+  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20alternate%20versions/NordicFiltersABP-Inclusion.txt', key: 'nordic', max: 25, start: 22245 },
 ];
 
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
@@ -1136,10 +1136,25 @@ function isSafeBrowsingAllowlisted(host) {
   return false;
 }
 
+// Malware feeds list URLs on shared platforms (github.com/foo) — never keep apex hosts.
+function sanitizeSbDomains(domains) {
+  const out = [];
+  for (const d of domains) {
+    const h = String(d).replace(/^www\./, '');
+    if (h && !isSafeBrowsingAllowlisted(h)) out.push(h);
+  }
+  return out;
+}
+
 async function loadSafeBrowsingCache() {
   try {
     const { sbDomains = [], sbLastFetch = 0 } = await chrome.storage.local.get(['sbDomains', 'sbLastFetch']);
-    _safeBrowsingDomains = new Set(sbDomains);
+    const cleaned = sanitizeSbDomains(sbDomains);
+    _safeBrowsingDomains = new Set(cleaned);
+    if (cleaned.length !== sbDomains.length) {
+      await chrome.storage.local.set({ sbDomains: cleaned });
+      logEvent('safe-browsing', 'info', `Purged ${sbDomains.length - cleaned.length} allowlisted false positives from cache`);
+    }
     logEvent('safe-browsing', 'info', `Loaded ${_safeBrowsingDomains.size} domains from cache`);
     // Refresh if stale
     if (Date.now() - sbLastFetch > SB_REFRESH_INTERVAL_MS) await fetchSafeBrowsingLists();
@@ -1200,9 +1215,10 @@ async function fetchSafeBrowsingLists() {
   }
 
   if (merged.size > 0) {
-    _safeBrowsingDomains = merged;
-    await chrome.storage.local.set({ sbDomains: [...merged], sbLastFetch: Date.now() });
-    logEvent('safe-browsing', 'info', `Updated: ${merged.size} malicious domains`);
+    const cleaned = sanitizeSbDomains(merged);
+    _safeBrowsingDomains = new Set(cleaned);
+    await chrome.storage.local.set({ sbDomains: cleaned, sbLastFetch: Date.now() });
+    logEvent('safe-browsing', 'info', `Updated: ${cleaned.length} malicious domains`);
   }
   } finally { _stopKeepAlive(); }
 }
@@ -1213,10 +1229,13 @@ function checkSafeBrowsing(url) {
     const hostname = new URL(url).hostname.replace(/^www\./, '');
     if (isSafeBrowsingAllowlisted(hostname)) return false; // never block trusted platforms
     if (_safeBrowsingDomains.has(hostname)) return true;
-    // Check parent domains (e.g. sub.evil.com → evil.com)
+    // Parent-domain match — but never block if the matched apex is allowlisted
+    // (feeds must not list github.com, but sanitize + this guard are belt-and-suspenders).
     const parts = hostname.split('.');
     for (let i = 1; i < parts.length - 1; i++) {
-      if (_safeBrowsingDomains.has(parts.slice(i).join('.'))) return true;
+      const parent = parts.slice(i).join('.');
+      if (isSafeBrowsingAllowlisted(parent)) return false;
+      if (_safeBrowsingDomains.has(parent)) return true;
     }
   } catch (_) {}
   return false;

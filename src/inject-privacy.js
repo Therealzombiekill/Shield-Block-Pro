@@ -369,6 +369,8 @@
     if (!_trackingEnabled) return null;
     try {
       const url = new URL(urlStr);
+      const h = url.hostname.replace(/^www\./, '');
+      if (h === 'analytics.google.com' || h === 'tagmanager.google.com') return null;
       let changed = false;
 
       // Query string params

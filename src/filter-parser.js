@@ -51,6 +51,8 @@ const PROTECTED_DOMAINS = new Set([
   'calendar.google.com', 'meet.google.com', 'classroom.google.com',
   'drive.usercontent.google.com',
   'youtubei.googleapis.com',
+  // Google Analytics / Tag Manager dashboards (first-party app, not third-party trackers)
+  'analytics.google.com', 'tagmanager.google.com',
 ]);
 
 // When a filter blocks a shared Google endpoint, never apply from these initiators.
@@ -62,6 +64,7 @@ const SHARED_GOOGLE_API_EXCLUDED_INITIATORS = [
   'drive.google.com', 'docs.google.com', 'sheets.google.com', 'slides.google.com',
   'mail.google.com', 'accounts.google.com', 'calendar.google.com', 'meet.google.com',
   'classroom.google.com', 'chat.google.com', 'keep.google.com', 'photos.google.com',
+  'analytics.google.com', 'tagmanager.google.com',
 ];
 
 function isDomainProtected(filter) {

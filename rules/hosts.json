@@ -2874,6 +2874,7 @@
       ],
       "excludedInitiatorDomains": [
         "accounts.google.com",
+        "analytics.google.com",
         "api.github.com",
         "calendar.google.com",
         "chat.google.com",
@@ -2892,6 +2893,7 @@
         "photos.google.com",
         "sheets.google.com",
         "slides.google.com",
+        "tagmanager.google.com",
         "tv.youtube.com",
         "www.github.com",
         "www.google.com",
@@ -13307,6 +13309,7 @@
       ],
       "excludedInitiatorDomains": [
         "accounts.google.com",
+        "analytics.google.com",
         "api.github.com",
         "calendar.google.com",
         "chat.google.com",
@@ -13325,6 +13328,7 @@
         "photos.google.com",
         "sheets.google.com",
         "slides.google.com",
+        "tagmanager.google.com",
         "tv.youtube.com",
         "www.github.com",
         "www.google.com",

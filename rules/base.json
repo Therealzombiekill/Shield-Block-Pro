@@ -1017,6 +1017,13 @@
         "script",
         "sub_frame",
         "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "analytics.google.com",
+        "tagmanager.google.com",
+        "accounts.google.com",
+        "google.com",
+        "www.google.com"
       ]
     }
   },
@@ -3027,6 +3034,13 @@
         "xmlhttprequest",
         "ping",
         "image"
+      ],
+      "excludedInitiatorDomains": [
+        "analytics.google.com",
+        "tagmanager.google.com",
+        "accounts.google.com",
+        "google.com",
+        "www.google.com"
       ]
     }
   },
@@ -3602,6 +3616,13 @@
         "script",
         "sub_frame",
         "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "analytics.google.com",
+        "tagmanager.google.com",
+        "accounts.google.com",
+        "google.com",
+        "www.google.com"
       ]
     }
   },
@@ -3726,6 +3747,13 @@
         "script",
         "sub_frame",
         "xmlhttprequest"
+      ],
+      "excludedInitiatorDomains": [
+        "analytics.google.com",
+        "tagmanager.google.com",
+        "accounts.google.com",
+        "google.com",
+        "www.google.com"
       ]
     }
   },

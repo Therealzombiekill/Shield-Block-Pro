@@ -1120,6 +1120,7 @@ const SB_DOMAIN_ALLOWLIST = new Set([
   'cdn.discordapp.com','media.discordapp.net','t.me',
   // Top-reputation apexes (an apex entry in a feed is a false positive)
   'google.com','gstatic.com','googleusercontent.com','youtube.com','youtu.be',
+  'analytics.google.com','tagmanager.google.com',
   'microsoft.com','live.com','office.com','sharepoint.com','apple.com','icloud.com',
   'amazon.com','cloudflare.com','facebook.com','instagram.com','x.com','twitter.com',
   'linkedin.com','reddit.com','wikipedia.org','mozilla.org','anthropic.com','claude.ai',

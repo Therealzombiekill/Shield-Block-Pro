@@ -112,23 +112,12 @@ function adGuardUrl(filterId) {
 // ID ranges MUST NOT overlap — each list's [start, start+max-1] must be disjoint.
 // Chrome hard-caps updateDynamicRules at 5,000 total; sum of all `max` values ≤ 5,000.
 //
-//   List                │ start  │ max  │ end (exclusive)
-//   ────────────────────┼────────┼──────┼────────────────
-//   EasyList            │ 10000  │ 1600 │ 11600
-//   EasyPrivacy         │ 12000  │  700 │ 12700
-//   Peter Lowe          │ 13000  │  200 │ 13200
-//   AdGuard Tracking    │ 13500  │  350 │ 13850   ← new, replaces AdGuard Annoyances
-//   uBlock Annoyances   │ 14000  │  150 │ 14150
-//   uBlock Filters      │ 14500  │  550 │ 15050   ← new: uBO main list
-//   Fanboy Social       │ 15500  │  120 │ 15620   ← new: social widget blocking
-//   AdGuard Base        │ 16000  │  300 │ 16300
-//   uBlock Badware      │ 16500  │  150 │ 16650
-//   Liste FR            │ 17000  │   80 │ 17080
-//   EasyList Germany    │ 17200  │   80 │ 17280
-//   RU AdList           │ 17400  │   80 │ 17480
-//   AdGuard Annoyances  │ 17600  │  300 │ 17900   ← kept but after the new ones
-//   ────────────────────┼────────┼──────┼────────────────
-//   Total               │        │~4950 │          (≤ 5000 ✓)
+// The array below is the authoritative source — do not duplicate it in a comment
+// table (that drifts out of date). _checkRanges() asserts at startup that (a) no two
+// [start, start+max) ranges overlap and (b) the sum of all `max` values stays within
+// MAX_DYNAMIC_RULES. The sum is currently ≈4950 across all lists, spanning IDs
+// 10000–20249 (within the 10000–29999 dynamic filter-list range; removeparam/matrix/
+// privacy/pause rules live above 30000 and share the same 5,000 runtime cap).
 
 const FILTER_LISTS = [
   // Core ad blocking
@@ -1486,14 +1475,20 @@ async function syncFilterLists(force = false) {
       return true;
     });
 
-    // Hard-cap at MAX_DYNAMIC_RULES — the DNR API rejects any batch that would push
-    // the total over 5000, so excess rules must be dropped before we start adding.
-    if (deduped.length > MAX_DYNAMIC_RULES) deduped = deduped.slice(0, MAX_DYNAMIC_RULES);
-    deduped = filterStaticConflicts(deduped);
-
+    // Fetch current dynamic rules up front so we can reserve budget for the ones we
+    // are NOT replacing here. This sync only swaps filter-list rules; removeparam,
+    // matrix, privacy, pause and custom-list rules are retained and still count toward
+    // the 5,000 cap.
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
     const removeIds = existing.filter(r => isFilterListRuleId(r.id)).map(r => r.id);
     const existingSnapshot = existing.filter(r => isFilterListRuleId(r.id)).map(r => ({ ...r }));
+
+    // Hard-cap so (retained non-filter rules + new filter rules) stays within the
+    // limit. Capping at the full 5000 — ignoring the retained rules — would let the
+    // total exceed the cap and make the later add batches silently fail.
+    const filterBudget = Math.max(0, MAX_DYNAMIC_RULES - (existing.length - removeIds.length));
+    if (deduped.length > filterBudget) deduped = deduped.slice(0, filterBudget);
+    deduped = filterStaticConflicts(deduped);
 
     if (deduped.length > 0 || removeIds.length > 0) {
       const firstBatch = deduped.slice(0, 500);

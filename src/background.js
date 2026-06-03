@@ -344,15 +344,16 @@ async function purgeFilterListDynamicRules() {
 
 async function reapplyFeatureRules() {
   const s = await getSettings();
-  await Promise.all([
-    applyRemoveParamRules(),
-    applyMatrixRules(),
-    applyReferrerRule(s.referrerStrip !== false),
-    applyHttpsUpgradeRule(s.httpsUpgrade !== false),
-    applyPrivacyHeadersRule(s.privacyHeaders !== false),
-    applyUserFilterRules(),
-    applyWhitelistRules(),
-  ]);
+  // Serialize DNR writers — parallel updates race on the shared dynamic rule pool.
+  await applyWhitelistRules();
+  await applyUserFilterRules();
+  await applyRemoveParamRules();
+  await applyMatrixRules();
+  await applyReferrerRule(s.referrerStrip !== false);
+  await applyHttpsUpgradeRule(s.httpsUpgrade !== false);
+  await applyPrivacyHeadersRule(s.privacyHeaders !== false);
+  await applyAmazonShoppingAllowRules();
+  await refreshAllowRuleIds();
   await restoreGlobalPauseIfActive();
 }
 
@@ -364,7 +365,17 @@ const DNT_GPC_RULE_ID    = 47002; // set DNT: 1 and Sec-GPC: 1 on all outbound r
 const AMAZON_ALLOW_INIT_ID = 47003; // allow subresources when shopping on Amazon
 const AMAZON_ALLOW_MAIN_ID = 47004; // allow main-frame navigations to Amazon storefronts
 /** Bumped when stability maintenance (Amazon allowlist, DNR allow rules) must re-run. */
-const STABILITY_VERSION = '2.16.2';
+const STABILITY_VERSION = '2.17.0';
+
+/** Cloud sync is opt-in only — auto sync/restore can look like enterprise control on managed profiles. */
+async function isCloudSyncEnabled() {
+  try {
+    const { sbCloudSyncEnabled } = await chrome.storage.local.get('sbCloudSyncEnabled');
+    return sbCloudSyncEnabled === true;
+  } catch (_) {
+    return false;
+  }
+}
 const STATS_EXEMPT_RULE_IDS = new Set([
   REFERRER_RULE_ID, HTTPS_UPGRADE_ID, DNT_GPC_RULE_ID,
   AMAZON_ALLOW_INIT_ID, AMAZON_ALLOW_MAIN_ID, PAUSE_ALL_RULE_ID,
@@ -632,6 +643,7 @@ async function _retryFailedLists() {
     try { await chrome.alarms.create('retrySync', { delayInMinutes: 2 }); } catch (_) {}
     return;
   }
+  _syncLock = true;
   const toRetry = _retryQueue.splice(0);
   _startKeepAlive('_retryFailedLists');
   logEvent('filter-sync', 'info', `Retrying ${toRetry.length} failed list(s)`, { lists: toRetry.map(l => l.list.name) });
@@ -682,7 +694,7 @@ async function _retryFailedLists() {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set(existing.map(r => r.id));
       const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
-      const budget = 5000 - existing.length;
+      const budget = Math.max(0, MAX_DYNAMIC_RULES - existing.length);
       if (budget > 0 && uniqueNew.length > 0) {
         await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
         logEvent('filter-sync', 'info', `Retry: added ${Math.min(uniqueNew.length, budget)} rules`);
@@ -736,7 +748,10 @@ async function _retryFailedLists() {
       await applyRemoveParamRules();
     } catch (e) { logEvent('filter-sync', 'warn', `Retry removeparam merge failed: ${e.message}`); }
   }
-  } finally { _stopKeepAlive(); }
+  } finally {
+    _syncLock = false;
+    _stopKeepAlive();
+  }
 }
 
 // ── Network connectivity gate ─────────────────────────────────────────────
@@ -795,11 +810,7 @@ function logBlockedRequest(url, tabId, ruleId) {
 }
 
 // Real-time log via declarativeNetRequestFeedback (dev mode + production with permission)
-try {
-  chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
-    logBlockedRequest(info.request.url, info.request.tabId, info.rule?.ruleId);
-  });
-} catch (_) {}
+// Domain stats come from countNetworkBlocks on navigation — debug listener duplicates counts.
 
 async function countNetworkBlocks(tabId, url) {
   if (_navCounted.has(tabId) || _navCounting.has(tabId)) return;
@@ -918,9 +929,11 @@ let _syncListStatus = {}; // { [key]: { status:'ok'|'error'|'cached'|'304', rule
 // can't cause it to leak. The interval itself also keeps the SW alive since
 // the callback re-registers the timer.
 let _keepAliveTimer = null;
+let _keepAliveRefs = 0;
 
 function _startKeepAlive(label) {
-  if (_keepAliveTimer) return; // already running (nested call guard)
+  _keepAliveRefs++;
+  if (_keepAliveTimer) return;
   _keepAliveTimer = setInterval(() => {
     chrome.storage.local.get('__ka').catch(() => {}); // reset idle timer
   }, 20000); // 20s < Chrome's 30s idle threshold
@@ -928,7 +941,8 @@ function _startKeepAlive(label) {
 }
 
 function _stopKeepAlive() {
-  if (!_keepAliveTimer) return;
+  if (_keepAliveRefs > 0) _keepAliveRefs--;
+  if (_keepAliveRefs > 0 || !_keepAliveTimer) return;
   clearInterval(_keepAliveTimer);
   _keepAliveTimer = null;
 }
@@ -2230,6 +2244,9 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
 // down to metadata only (url/name/key/enabled) since cached rule data belongs
 // in local storage, not sync.
 async function pushToCloud() {
+  if (!(await isCloudSyncEnabled())) {
+    return { ok: false, error: 'Cloud sync is off (local-only mode)' };
+  }
   try {
     const data = await chrome.storage.local.get(
       ['settings', 'whitelist', 'userFilterText', 'customFilterLists']
@@ -2594,8 +2611,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
         await applySettingsSideEffects(merged, { syncFilters: 'general' in msg.settings && merged.general });
         if (msg.settings.safeBrowsing === true && _safeBrowsingDomains.size === 0) fetchSafeBrowsingLists().catch(() => {});
-        // Auto-push updated settings to chrome.storage.sync (fire-and-forget)
-        pushToCloud().catch(() => {});
         sendResponse({ ok: true, settings: merged });
         break;
       }
@@ -2921,8 +2936,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(pushResult);
         break;
       }
+      case 'ENABLE_CLOUD_SYNC': {
+        await chrome.storage.local.set({ sbCloudSyncEnabled: true });
+        const pushResult = await pushToCloud();
+        sendResponse({ ok: true, pushed: pushResult?.ok ?? false });
+        break;
+      }
+      case 'DISABLE_CLOUD_SYNC': {
+        await chrome.storage.local.set({ sbCloudSyncEnabled: false });
+        try {
+          await chrome.storage.sync.remove(['settings', 'whitelist', 'userFilterText', 'customFilterLists']);
+        } catch (_) {}
+        sendResponse({ ok: true });
+        break;
+      }
       case 'RESTORE_FROM_CLOUD': {
         try {
+          if (!(await isCloudSyncEnabled())) {
+            sendResponse({ ok: false, error: 'Cloud sync is off — enable it first if you want restore' });
+            break;
+          }
           const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
           if (!Object.keys(synced).length) { sendResponse({ ok: false, error: 'Nothing saved in cloud' }); break; }
           if (synced.settings && typeof synced.settings === 'object') {
@@ -2953,8 +2986,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await chrome.storage.local.set({ whitelist: wl });
         await applyWhitelistRules();
         await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
-        // Auto-push whitelist changes to cloud (fire-and-forget)
-        pushToCloud().catch(() => {});
         sendResponse({ ok: true });
         break;
       }
@@ -3371,7 +3402,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await chrome.storage.local.set({ whitelist: wl });
     await applyWhitelistRules();
     await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
-    pushToCloud().catch(() => {}); // keep cloud in sync (fire-and-forget)
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
@@ -3431,30 +3461,9 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 
   // Show welcome page on fresh install
   if (reason === 'install') {
-    // Check cloud sync for existing settings from another device BEFORE showing welcome
-    // so the user's preferences are already applied when the welcome page opens.
-    try {
-      const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
-      if (Object.keys(synced).length > 0) {
-        // Validate types before writing (mirrors RESTORE_FROM_CLOUD checks)
-        if (synced.settings && typeof synced.settings === 'object') {
-          const validated = {};
-          for (const [k, v] of Object.entries(synced.settings)) {
-            if (k in DEFAULT_SETTINGS && typeof v === typeof DEFAULT_SETTINGS[k]) validated[k] = v;
-          }
-          synced.settings = validated;
-        }
-        if ('whitelist' in synced && !Array.isArray(synced.whitelist)) delete synced.whitelist;
-        if ('userFilterText' in synced && typeof synced.userFilterText !== 'string') delete synced.userFilterText;
-        if ('customFilterLists' in synced && !Array.isArray(synced.customFilterLists)) delete synced.customFilterLists;
-        await chrome.storage.local.set(synced);
-        invalidateSettingsCache();
-        if (typeof synced.userFilterText === 'string') await parseAndStoreUserFilterText(synced.userFilterText);
-        logEvent('system', 'info', `Restored ${Object.keys(synced).join(', ')} from cloud sync`);
-      }
-    } catch (e) {
-      logEvent('system', 'warn', `Cloud restore on install failed: ${e.message}`);
-    }
+    // Local-only by default — do not auto-pull chrome.storage.sync on install (managed
+    // Chrome profiles can inject synced policy-like settings and confuse users).
+    await chrome.storage.local.set({ sbCloudSyncEnabled: false });
     chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html'), active: true });
   }
 
@@ -3481,6 +3490,11 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   } else if (reason === 'update' && existingSettings) {
     const merged = { ...DEFAULT_SETTINGS, ...existingSettings };
     await chrome.storage.local.set({ settings: merged });
+  }
+
+  const { sbCloudSyncEnabled } = await chrome.storage.local.get('sbCloudSyncEnabled');
+  if (sbCloudSyncEnabled === undefined) {
+    await chrome.storage.local.set({ sbCloudSyncEnabled: false });
   }
 
   try {
@@ -3518,7 +3532,6 @@ chrome.commands.onCommand.addListener(async (command) => {
     await chrome.storage.local.set({ whitelist: wl });
     await applyWhitelistRules();
     await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
-    pushToCloud().catch(() => {}); // sync whitelist change to cloud (fire-and-forget)
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
     if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId: tab.id });

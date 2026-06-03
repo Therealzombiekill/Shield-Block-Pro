@@ -44,6 +44,7 @@ Single source: `src/trusted-sites.js`. Content scripts use `browser-compat.js` (
 - Hello-world: Support → Run check (v2.13.0+); verify Amazon loads after reload
 - Popup: minimal UI — session/lifetime/time saved (live via `GET_POPUP_STATS`), PayPal, privacy
 - Stability: `runStabilityMaintenanceIfNeeded()` on install/startup (`STABILITY_VERSION` in `background.js`)
+- **Not enterprise-managed:** no `management` permission; cloud sync is **opt-in** (`sbCloudSyncEnabled`). “Managed extensions” in Chrome = browser policy or duplicate install — see `chrome://policy`
 
 ## Do not regress
 

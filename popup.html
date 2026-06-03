@@ -40,6 +40,9 @@ body{
   margin-top:6px;padding:4px 8px;background:rgba(46,232,168,.08);
   border:1px solid rgba(46,232,168,.22);border-radius:6px;display:inline-block;
 }
+.install-hint{
+  font-size:9px;color:var(--muted);line-height:1.4;margin-top:6px;max-width:220px;
+}
 
 .stats{
   background:var(--card);border:1px solid var(--border);border-radius:16px;
@@ -117,7 +120,8 @@ body{
     <div class="brand-text">
       <div class="brand-name">SHIELD<em>BLOCK</em></div>
       <div class="brand-tag">Ad &amp; tracker protection</div>
-      <div id="stability-line" class="stability-line">Amazon stability mode · protection active</div>
+      <div id="stability-line" class="stability-line">Amazon stability · local install</div>
+      <div id="install-hint" class="install-hint">Not enterprise-managed. If Chrome shows “Managed extensions”, check chrome://policy or remove duplicate installs.</div>
     </div>
   </header>
 
@@ -152,7 +156,7 @@ body{
 
   <footer class="foot">
     <a id="privacy-link" href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>
-    <span class="ver">v2.16.2</span>
+    <span class="ver">v2.17.0</span>
   </footer>
 
 </div>

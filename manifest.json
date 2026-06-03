@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.16.2",
+  "version": "2.17.0",
   "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
@@ -49,7 +49,14 @@
         "*://*.amazon.nl/*",
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/inject-privacy.js"
@@ -77,7 +84,14 @@
         "*://*.amazon.nl/*",
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",
@@ -105,7 +119,14 @@
         "*://*.amazon.nl/*",
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",
@@ -136,7 +157,14 @@
         "*://*.amazon.nl/*",
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",
@@ -186,7 +214,14 @@
         "*://*.amazon.nl/*",
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/scriptlets.js"
@@ -216,7 +251,14 @@
         "*://*.amazon.nl/*",
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",
@@ -245,7 +287,14 @@
         "*://*.amazon.nl/*",
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",

@@ -58,6 +58,13 @@ export const AMAZON_STABILITY_DOMAINS = [
   'amazon.pl', 'www.amazon.pl',
   'amazon.se', 'www.amazon.se',
   'amazon.sg', 'www.amazon.sg',
+  'amazon.ae', 'www.amazon.ae',
+  'amazon.com.tr', 'www.amazon.com.tr',
+  'amazon.sa', 'www.amazon.sa',
+  'amazon.eg', 'www.amazon.eg',
+  'amazon.com.be', 'www.amazon.com.be',
+  'amazon.cl', 'www.amazon.cl',
+  'amazon.com.co', 'www.amazon.com.co',
 ];
 
 /** Never block shared Google endpoints when the page is one of these initiators. */
@@ -145,6 +152,7 @@ export const AMAZON_INITIATOR_EXCLUSIONS = [
   'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.ca', 'amazon.com.au',
   'amazon.co.jp', 'amazon.in', 'amazon.fr', 'amazon.es', 'amazon.it',
   'amazon.com.mx', 'amazon.com.br', 'amazon.nl', 'amazon.pl', 'amazon.se', 'amazon.sg',
+  'amazon.ae', 'amazon.com.tr', 'amazon.sa', 'amazon.eg', 'amazon.com.be', 'amazon.cl', 'amazon.com.co',
 ];
 
 /** Manifest exclude_matches — keep in sync with content-general exclusions. */
@@ -165,4 +173,11 @@ export const AMAZON_EXCLUDE_MATCHES = [
   '*://*.amazon.pl/*',
   '*://*.amazon.se/*',
   '*://*.amazon.sg/*',
+  '*://*.amazon.ae/*',
+  '*://*.amazon.com.tr/*',
+  '*://*.amazon.sa/*',
+  '*://*.amazon.eg/*',
+  '*://*.amazon.com.be/*',
+  '*://*.amazon.cl/*',
+  '*://*.amazon.com.co/*',
 ];

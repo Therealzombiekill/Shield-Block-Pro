@@ -176,18 +176,50 @@
     } catch (_) {}
   }
 
+  // ── Anti-adblock enforcement popup ─────────────────────────────────────────────
+  // When YouTube detects blocking it shows a modal ("Ad blockers are not allowed
+  // on YouTube") and pauses the video. The InnerTube stripping in
+  // inject-youtube.js prevents this in most cases; this is the fallback that
+  // dismisses the modal and resumes playback if it slips through.
+  let _popupLogThrottle = 0;
+  function dismissAdblockPopup() {
+    const enforcement = document.querySelector(
+      'ytd-enforcement-message-view-model, .ytd-enforcement-message-view-model'
+    );
+    if (!enforcement) return;
+    // Remove only the specific dialog containing the enforcement message —
+    // NOT the shared ytd-popup-container (which also hosts legit menus).
+    const dialog = enforcement.closest('tp-yt-paper-dialog');
+    try { (dialog || enforcement).remove(); } catch (_) {}
+    // Drop the modal backdrop and unlock page scrolling.
+    document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(el => { try { el.remove(); } catch (_) {} });
+    try {
+      document.documentElement.style.removeProperty('overflow');
+      if (document.body) document.body.style.removeProperty('overflow');
+    } catch (_) {}
+    // The popup pauses the video — resume it.
+    const vid = document.querySelector('video');
+    try { if (vid && vid.paused) vid.play().catch(() => {}); } catch (_) {}
+    if (Date.now() - _popupLogThrottle > 5000) {
+      _popupLogThrottle = Date.now();
+      _sbLog('warn', 'Anti-adblock popup dismissed — playback resumed');
+    }
+  }
+
   // ── Main loop ─────────────────────────────────────────────────────────────────
-  function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); }
+  function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); dismissAdblockPopup(); }
 
   const _tickInterval = setInterval(tick, 750);
   tick();
 
-  // Fast path: click skip button the moment it appears in the DOM
+  // Fast path: click skip button / dismiss enforcement popup the moment either
+  // appears in the DOM, without waiting for the next tick.
   const _skipObserver = new MutationObserver(() => {
     const skip = document.querySelector(
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
     if (skip) { skip.click(); _sbLog('info', 'Ad: MutationObserver skip button clicked'); }
+    dismissAdblockPopup();
   });
   _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
 

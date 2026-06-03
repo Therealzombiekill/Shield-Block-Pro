@@ -42,7 +42,10 @@ body::before{
 #app,#sb-loader{position:relative;z-index:1}
 
 /* ── App wrapper ────────────────────────────────────────────────────── */
-#app{display:none;flex-direction:column;min-height:480px}
+#app{
+  display:none;flex-direction:column;min-height:480px;max-height:600px;
+  opacity:1;transform:none;
+}
 #app.ready{display:flex}
 
 /* ── Header ─────────────────────────────────────────────────────────── */
@@ -122,16 +125,17 @@ body::before{
 .nb.active{color:var(--accent)}
 
 /* ── Panels ──────────────────────────────────────────────────────────── */
-.panel{
-  display:none;flex:1;overflow-y:auto;max-height:400px;
-  opacity:0;transform:translateY(6px);
-}
+.panel{display:none;flex:1 1 auto;min-height:0;overflow:hidden}
 .panel.active{
-  display:block;
-  animation:sbPanelIn var(--dur-med) var(--ease-out) forwards;
+  display:flex;flex-direction:column;flex:1 1 auto;min-height:0;
+  overflow-x:hidden;overflow-y:auto;max-height:420px;
+  opacity:1;transform:none;
+}
+.panel.active.panel-anim{
+  animation:sbPanelIn .22s var(--ease-out);
 }
 @keyframes sbPanelIn{
-  from{opacity:0;transform:translateY(10px)}
+  from{opacity:.6;transform:translateY(6px)}
   to{opacity:1;transform:none}
 }
 
@@ -160,18 +164,19 @@ body::before{
 @keyframes sbCountPop{
   0%{transform:scale(1)}35%{transform:scale(1.06)}100%{transform:scale(1)}
 }
-body.sb-ready .sc{animation:sbCardIn .5s var(--ease-out) backwards}
-body.sb-ready .sc:nth-child(1){animation-delay:.04s}
-body.sb-ready .sc:nth-child(2){animation-delay:.07s}
-body.sb-ready .sc:nth-child(3){animation-delay:.10s}
-body.sb-ready .sc:nth-child(4){animation-delay:.13s}
-body.sb-ready .sc:nth-child(5){animation-delay:.16s}
-body.sb-ready .sc:nth-child(6){animation-delay:.19s}
-body.sb-ready .sc:nth-child(7){animation-delay:.22s}
-body.sb-ready .sc:nth-child(8){animation-delay:.25s}
-body.sb-ready .sc:nth-child(9){animation-delay:.28s}
+body.sb-ready .sc{opacity:1;transform:none}
+body.sb-ready.sb-animate .sc{animation:sbCardIn .4s var(--ease-out) both}
+body.sb-ready.sb-animate .sc:nth-child(1){animation-delay:.03s}
+body.sb-ready.sb-animate .sc:nth-child(2){animation-delay:.05s}
+body.sb-ready.sb-animate .sc:nth-child(3){animation-delay:.07s}
+body.sb-ready.sb-animate .sc:nth-child(4){animation-delay:.09s}
+body.sb-ready.sb-animate .sc:nth-child(5){animation-delay:.11s}
+body.sb-ready.sb-animate .sc:nth-child(6){animation-delay:.13s}
+body.sb-ready.sb-animate .sc:nth-child(7){animation-delay:.15s}
+body.sb-ready.sb-animate .sc:nth-child(8){animation-delay:.17s}
+body.sb-ready.sb-animate .sc:nth-child(9){animation-delay:.19s}
 @keyframes sbCardIn{
-  from{opacity:0;transform:translateY(8px) scale(.97)}
+  from{opacity:.5;transform:translateY(6px)}
   to{opacity:1;transform:none}
 }
 .hero-label{font-size:11px;color:var(--muted);line-height:1.5}
@@ -383,9 +388,7 @@ letter-spacing:.05em;margin-right:4px;flex-shrink:0}
 textarea:focus{border-color:var(--accent)!important}
 .pause-active { color: var(--yellow) !important; border-color: var(--yellow) !important; }
 
-/* ── Popup fade-in ───────────────────────────────────────────────── */
-@keyframes sbFadeIn{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
-#app.ready{animation:sbFadeIn var(--dur-slow) var(--ease-out)}
+/* App shell stays visible — avoid opacity-0 fade that can stick in extension popups */
 
 /* ── Boot loader ─────────────────────────────────────────────────── */
 .sb-loader{
@@ -421,10 +424,13 @@ textarea:focus{border-color:var(--accent)!important}
 /* ── Health rows ─────────────────────────────────────────────────── */
 .health-row{
   display:flex;gap:6px;padding:4px 0;align-items:flex-start;
-  opacity:0;transform:translateX(-6px);
-  animation:sbHealthIn .35s var(--ease-out) forwards;
+  opacity:1;
+}
+.sb-animate .health-row{
+  animation:sbHealthIn .3s var(--ease-out) both;
 }
 @keyframes sbHealthIn{
+  from{opacity:.4;transform:translateX(-4px)}
   to{opacity:1;transform:none}
 }
 .health-row .health-icon{flex-shrink:0;width:14px;font-weight:700}
@@ -1030,7 +1036,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
       <div class="sup-card sup-card-sm">
         <div class="sup-info">
-          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.11.3<br>
+          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.11.4<br>
           <a href="https://shieldblock.pro/" target="_blank" rel="noopener"
              style="color:var(--accent2);text-decoration:none;font-size:10px">Privacy Policy ↗</a>
         </div>
@@ -1137,7 +1143,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <div class="ftr">
     <div class="ftr-l">
       <span class="ftr-badge">FREE</span>
-      <span class="ver">ShieldBlock v2.11.3</span>
+      <span class="ver">ShieldBlock v2.11.4</span>
     </div>
     <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
        class="ghost" style="text-decoration:none">tip ❤</a>

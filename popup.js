@@ -31,9 +31,15 @@ document.querySelectorAll('.nb').forEach(btn => {
   btn.addEventListener('click', () => {
     moveNavGlider(btn);
     document.querySelectorAll('.nb').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => {
+      p.classList.remove('active', 'panel-anim');
+    });
     btn.classList.add('active');
-    $('panel-' + btn.dataset.panel)?.classList.add('active');
+    const panel = $('panel-' + btn.dataset.panel);
+    if (panel) {
+      panel.classList.add('active');
+      requestAnimationFrame(() => panel.classList.add('panel-anim'));
+    }
 
     clearInterval(_logInterval);
     clearInterval(_pauseCheckInterval);
@@ -471,6 +477,9 @@ async function boot() {
   moveNavGlider(document.querySelector('.nb.active'));
   $('app').classList.add('ready');
   document.body.classList.add('sb-ready');
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.body.classList.add('sb-animate');
+  }
   const loader = $('sb-loader');
   if (loader) {
     loader.classList.add('hide');
@@ -616,7 +625,9 @@ $('run-health-check')?.addEventListener('click', async () => {
     result.checks.forEach((c, i) => {
       const row  = document.createElement('div');
       row.className = 'health-row';
-      row.style.animationDelay = `${i * 0.045}s`;
+      if (document.body.classList.contains('sb-animate')) {
+        row.style.animationDelay = `${i * 0.04}s`;
+      }
       const icon = document.createElement('span');
       icon.className = 'health-icon';
       icon.style.color = colors[c.status];

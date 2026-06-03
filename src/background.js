@@ -363,6 +363,31 @@ const HTTPS_UPGRADE_ID   = 47001; // upgradeScheme — http → https for main/s
 const DNT_GPC_RULE_ID    = 47002; // set DNT: 1 and Sec-GPC: 1 on all outbound requests
 const AMAZON_ALLOW_INIT_ID = 47003; // allow subresources when shopping on Amazon
 const AMAZON_ALLOW_MAIN_ID = 47004; // allow main-frame navigations to Amazon storefronts
+const STATS_EXEMPT_RULE_IDS = new Set([
+  REFERRER_RULE_ID, HTTPS_UPGRADE_ID, DNT_GPC_RULE_ID,
+  AMAZON_ALLOW_INIT_ID, AMAZON_ALLOW_MAIN_ID, PAUSE_ALL_RULE_ID,
+]);
+let _allowRuleIds = new Set(STATS_EXEMPT_RULE_IDS);
+
+async function refreshAllowRuleIds() {
+  try {
+    const next = new Set(STATS_EXEMPT_RULE_IDS);
+    const rules = await chrome.declarativeNetRequest.getDynamicRules();
+    for (const r of rules) {
+      if (r.action?.type === 'allow') next.add(r.id);
+    }
+    _allowRuleIds = next;
+  } catch (_) {}
+}
+
+function shouldCountBlockedRequest(url, ruleId) {
+  if (ruleId != null && _allowRuleIds.has(ruleId)) return false;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (isAmazonShoppingHost(host)) return false;
+  } catch (_) {}
+  return true;
+}
 
 // ── Settings cache ─────────────────────────────────────────────────────────
 // getSettings() is called on every webNavigation.onBeforeNavigate event plus
@@ -751,8 +776,9 @@ function incrementStat(type, tabId) {
   }
 }
 
-function logBlockedRequest(url, tabId) {
+function logBlockedRequest(url, tabId, ruleId) {
   try {
+    if (!shouldCountBlockedRequest(url, ruleId)) return;
     const hostname = new URL(url).hostname;
     _requestLog.push({ url: hostname, ts: Date.now(), tabId });
     if (_requestLog.length > LOG_MAX) _requestLog.shift();
@@ -769,12 +795,18 @@ function logBlockedRequest(url, tabId) {
 // Real-time log via declarativeNetRequestFeedback (dev mode + production with permission)
 try {
   chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
-    logBlockedRequest(info.request.url, info.request.tabId);
+    logBlockedRequest(info.request.url, info.request.tabId, info.rule?.ruleId);
   });
 } catch (_) {}
 
 async function countNetworkBlocks(tabId, url) {
   if (_navCounted.has(tabId) || _navCounting.has(tabId)) return;
+  let pageHost = '';
+  try { pageHost = new URL(url).hostname.replace(/^www\./, ''); } catch (_) {}
+  if (isAmazonShoppingHost(pageHost)) {
+    _navCounted.add(tabId);
+    return;
+  }
   // getMatchedRules is not implemented in Firefox — skip gracefully
   if (!chrome.declarativeNetRequest.getMatchedRules) {
     _navCounted.add(tabId);
@@ -784,11 +816,13 @@ async function countNetworkBlocks(tabId, url) {
   try {
     const minTs = _navStart.get(tabId) ?? (Date.now() - 30000);
     const matched = await chrome.declarativeNetRequest.getMatchedRules({ tabId, minTimeStamp: minTs });
-    const count = matched?.rulesMatchedInfo?.length ?? 0;
+    const blockMatches = (matched?.rulesMatchedInfo ?? []).filter(m =>
+      shouldCountBlockedRequest(m.request?.url || url, m.rule?.ruleId),
+    );
+    const count = blockMatches.length;
     _navCounted.add(tabId); // only mark as counted after successful API call
-    // Log each matched rule for the request log panel
-    matched?.rulesMatchedInfo?.forEach(m => {
-      try { logBlockedRequest(m.request?.url || url, tabId); } catch(_) {}
+    blockMatches.forEach(m => {
+      try { logBlockedRequest(m.request?.url || url, tabId, m.rule?.ruleId); } catch (_) {}
     });
     if (count === 0) return;
 
@@ -796,7 +830,6 @@ async function countNetworkBlocks(tabId, url) {
     ps.total   = (ps.total   | 0) + count;
     ps.network = (ps.network | 0) + count;
     const cat = url?.includes('twitch.tv')  ? 'twitch'
-              : url?.includes('amazon.')     ? 'amazon'
               : 'general';
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
@@ -1545,6 +1578,7 @@ async function applyAmazonShoppingAllowRules() {
       },
     ];
     await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
+    await refreshAllowRuleIds();
   } catch (e) {
     logEvent('system', 'warn', `Amazon allow rules failed: ${e?.message ?? e}`);
   }
@@ -2094,6 +2128,7 @@ async function applyWhitelistRules() {
     if (removeRuleIds.length || addRules.length) {
       await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
     }
+    await refreshAllowRuleIds();
   } catch (e) {
     logEvent('settings', 'warn', `Whitelist DNR apply failed: ${e.message}`);
   }
@@ -3339,6 +3374,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     applyAmazonShoppingAllowRules(),
     restoreGlobalPauseRule(),
   ]);
+  await refreshAllowRuleIds();
   await restoreGlobalPauseIfActive();
 
   // Show welcome page on fresh install
@@ -3472,6 +3508,7 @@ chrome.runtime.onStartup.addListener(async () => {
     applyAmazonShoppingAllowRules(),
     restoreGlobalPauseRule(),
   ]);
+  await refreshAllowRuleIds();
   await restoreGlobalPauseIfActive();
 
   const existing = await chrome.alarms.get('filterSync');

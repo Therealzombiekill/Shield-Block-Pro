@@ -1107,6 +1107,35 @@ let _safeBrowsingDomains = new Set(); // in-memory for fast synchronous lookup
 const SB_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const SB_ALLOW_TTL_MS = 10 * 60 * 1000;
 
+// urlhaus/openphish list malicious *URLs*. We can only block at domain
+// granularity, so when malware is hosted on a *path* of a shared platform
+// (github.com/u/repo, drive.google.com/file/…) extracting the bare hostname
+// blocks the entire legitimate domain — a false positive. Never block these
+// shared-hosting platforms or top-reputation apexes (matched incl. subdomains).
+const SB_DOMAIN_ALLOWLIST = new Set([
+  // Shared hosting where the malicious part is the PATH, not the domain
+  'github.com','githubusercontent.com','raw.githubusercontent.com','gist.github.com','github.io',
+  'drive.google.com','docs.google.com','drive.usercontent.google.com','storage.googleapis.com',
+  'dropbox.com','dropboxusercontent.com','mega.nz','mediafire.com',
+  'cdn.discordapp.com','media.discordapp.net','t.me',
+  // Top-reputation apexes (an apex entry in a feed is a false positive)
+  'google.com','gstatic.com','googleusercontent.com','youtube.com','youtu.be',
+  'microsoft.com','live.com','office.com','sharepoint.com','apple.com','icloud.com',
+  'amazon.com','cloudflare.com','facebook.com','instagram.com','x.com','twitter.com',
+  'linkedin.com','reddit.com','wikipedia.org','mozilla.org','anthropic.com','claude.ai',
+]);
+
+function isSafeBrowsingAllowlisted(host) {
+  if (!host) return false;
+  host = host.replace(/^www\./, '');
+  if (SB_DOMAIN_ALLOWLIST.has(host)) return true;
+  const parts = host.split('.');
+  for (let i = 1; i < parts.length - 1; i++) {
+    if (SB_DOMAIN_ALLOWLIST.has(parts.slice(i).join('.'))) return true;
+  }
+  return false;
+}
+
 async function loadSafeBrowsingCache() {
   try {
     const { sbDomains = [], sbLastFetch = 0 } = await chrome.storage.local.get(['sbDomains', 'sbLastFetch']);
@@ -1130,7 +1159,10 @@ async function fetchSafeBrowsingLists() {
         for (const line of text.split('\n')) {
           const t = line.trim();
           if (!t || t.startsWith('#')) continue;
-          try { domains.add(new URL(t).hostname.replace(/^www\./, '')); } catch (_) {}
+          try {
+            const h = new URL(t).hostname.replace(/^www\./, '');
+            if (!isSafeBrowsingAllowlisted(h)) domains.add(h);
+          } catch (_) {}
         }
         return domains;
       },
@@ -1142,7 +1174,10 @@ async function fetchSafeBrowsingLists() {
         for (const line of text.split('\n')) {
           const t = line.trim();
           if (!t || t.startsWith('#')) continue;
-          try { domains.add(new URL(t).hostname.replace(/^www\./, '')); } catch (_) {}
+          try {
+            const h = new URL(t).hostname.replace(/^www\./, '');
+            if (!isSafeBrowsingAllowlisted(h)) domains.add(h);
+          } catch (_) {}
         }
         return domains;
       },
@@ -1176,6 +1211,7 @@ function checkSafeBrowsing(url) {
   if (!_safeBrowsingDomains.size) return false;
   try {
     const hostname = new URL(url).hostname.replace(/^www\./, '');
+    if (isSafeBrowsingAllowlisted(hostname)) return false; // never block trusted platforms
     if (_safeBrowsingDomains.has(hostname)) return true;
     // Check parent domains (e.g. sub.evil.com → evil.com)
     const parts = hostname.split('.');
@@ -1187,19 +1223,23 @@ function checkSafeBrowsing(url) {
 }
 
 
+// Allow/block is keyed by HOSTNAME, not the exact URL: the blocked page
+// navigates to a normalized URL (and the user then clicks around the site),
+// so an exact-URL match would re-block immediately after "Proceed anyway".
 async function isSafeBrowsingAllowed(url) {
   try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
     const { safeBrowsingAllow = {} } = await chrome.storage.local.get('safeBrowsingAllow');
     const now = Date.now();
     let changed = false;
-    for (const [allowedUrl, expiry] of Object.entries(safeBrowsingAllow)) {
+    for (const [allowedHost, expiry] of Object.entries(safeBrowsingAllow)) {
       if (!expiry || expiry <= now) {
-        delete safeBrowsingAllow[allowedUrl];
+        delete safeBrowsingAllow[allowedHost];
         changed = true;
       }
     }
     if (changed) await chrome.storage.local.set({ safeBrowsingAllow });
-    return (safeBrowsingAllow[url] ?? 0) > now;
+    return (safeBrowsingAllow[host] ?? 0) > now;
   } catch (_) {
     return false;
   }
@@ -1208,8 +1248,9 @@ async function isSafeBrowsingAllowed(url) {
 async function allowSafeBrowsingUrl(url) {
   if (!url || !/^https?:\/\//.test(url)) return false;
   try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
     const { safeBrowsingAllow = {} } = await chrome.storage.local.get('safeBrowsingAllow');
-    safeBrowsingAllow[url] = Date.now() + SB_ALLOW_TTL_MS;
+    safeBrowsingAllow[host] = Date.now() + SB_ALLOW_TTL_MS;
     await chrome.storage.local.set({ safeBrowsingAllow });
     return true;
   } catch (_) {

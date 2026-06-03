@@ -113,7 +113,9 @@
     '.ytp-ce-element',                      // end-cards
     '.ytp-suggested-action',                // "Visit advertiser" CTA
     '.ytp-ad-image-overlay',
-    '.ytp-ad-player-overlay-layout',        // modern in-player ad overlay UI
+    // NOTE: do NOT remove .ytp-ad-player-overlay-layout here — it is structural
+    // in-player markup, and el.remove()'ing it blanks the whole video (black
+    // screen). Ads are handled by mute/skip + the InnerTube strip instead.
     // Page-level ad placements
     '#masthead-ad',
     '#player-ads',

@@ -661,6 +661,11 @@
   }
 
   function startAntiAdblockObserver() {
+    // YouTube has its own handler (content-youtube.js). Generic anti-adblock DOM
+    // removal here fights YouTube's enforcement layer and triggers player error
+    // 282054944 ("Something went wrong") for many ad-blocker users.
+    if (/youtube\.com$|youtu\.be$/i.test(location.hostname.replace(/^www\./, '')) ||
+        location.hostname.includes('youtube.com')) return;
     if (!document.body) { setTimeout(startAntiAdblockObserver, 200); return; }
     setTimeout(bypassAntiAdblock, 800);
     setTimeout(bypassAntiAdblock, 2500);

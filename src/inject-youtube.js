@@ -18,7 +18,11 @@
   'use strict';
 
   let _disabled = false;
-  try { if (localStorage.getItem('__sbYtOff') === '1') _disabled = true; } catch (_) {}
+  try {
+    if (localStorage.getItem('__sbYtOff') === '1') _disabled = true;
+    // Tab session recovery after YouTube error 282054944 — do not prune InnerTube.
+    if (sessionStorage.getItem('__sbYtRecovery') === '1') _disabled = true;
+  } catch (_) {}
 
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;

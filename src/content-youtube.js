@@ -9,7 +9,8 @@
 
 (async () => {
   // Playback-safe: InnerTube fetch is NOT hooked (see inject-youtube.js). DOM handles player ads.
-  const SB_YT_BUILD = '2.10.5-stable';
+  const SB_YT_BUILD = '2.10.6-stable';
+  const YT_PLAYER_ERR = '282054944';
 
   // ── Log helper ────────────────────────────────────────────────────────────────
   function _sbLog(level, message, data) {
@@ -33,8 +34,17 @@
   const _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
 
   if (settings) {
-    try { localStorage.setItem('__sbYtOff', _shouldDisable ? '1' : '0'); } catch (_) {}
+    try {
+      localStorage.setItem('__sbYtOff', _shouldDisable ? '1' : '0');
+      if (!_shouldDisable) sessionStorage.removeItem('__sbYtRecovery');
+    } catch (_) {}
   }
+  try {
+    if (sessionStorage.getItem('__sbYtRecovery') === '1' && !_shouldDisable) {
+      _sbLog('warn', `Prior ${YT_PLAYER_ERR} on this tab — staying in playback-safe mode until refresh`);
+      _shouldDisable = true;
+    }
+  } catch (_) {}
 
   window.postMessage({ type: _shouldDisable ? 'SB_YOUTUBE_DISABLE' : 'SB_YOUTUBE_ENABLE' }, '*');
   if (_shouldDisable) return;
@@ -100,9 +110,8 @@
     '.ytp-ad-overlay-container', '.ytp-ad-overlay-slot',
     '.ytp-suggested-action',
     '.ytp-ad-image-overlay',
-    // Do NOT remove .ytp-ad-player-overlay-layout — structural player markup.
+    // Do NOT remove .ytp-ad-player-overlay-layout or #player-ads — player shell.
     '#masthead-ad',
-    '#player-ads',
     'ytd-display-ad-renderer',
     'ytd-banner-promo-renderer',
     'ytd-statement-banner-renderer',
@@ -162,7 +171,44 @@
   }
 
   let _popupLogThrottle = 0;
+  let _playbackRecovery = false;
+  let _recoveryLogged = false;
+
+  function hasPlayerError282() {
+    try {
+      if (document.body?.innerText?.includes(YT_PLAYER_ERR)) return true;
+      const errEl = document.querySelector(
+        'ytd-player-error-message-renderer, .ytp-error, #player-error, [class*="error-message"]'
+      );
+      return errEl && (errEl.textContent || '').includes(YT_PLAYER_ERR);
+    } catch (_) { return false; }
+  }
+
+  function enterPlaybackRecovery() {
+    if (_playbackRecovery) return;
+    _playbackRecovery = true;
+    try { sessionStorage.setItem('__sbYtRecovery', '1'); } catch (_) {}
+    try { localStorage.setItem('__sbYtOff', '1'); } catch (_) {}
+    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    _restoreAudio();
+    if (!_recoveryLogged) {
+      _recoveryLogged = true;
+      _sbLog('error',
+        `YouTube error ${YT_PLAYER_ERR} — paused ad blocking on this tab for playback. ` +
+        'Hard-refresh the page (do not clear cookies). Toggle YouTube off/on in popup to retry.',
+        { code: YT_PLAYER_ERR });
+    }
+    const retry = document.querySelector(
+      'ytd-button-renderer button, .ytp-error-retry, button[aria-label*="Retry"], button[aria-label*="retry"]'
+    );
+    try { retry?.click(); } catch (_) {}
+  }
+
   function dismissAdblockPopup() {
+    if (_playbackRecovery || hasPlayerError282()) {
+      if (hasPlayerError282()) enterPlaybackRecovery();
+      return;
+    }
     const enforcement = document.querySelector(
       'ytd-enforcement-message-view-model, .ytd-enforcement-message-view-model'
     );
@@ -182,7 +228,11 @@
     }
   }
 
-  function tick() { handleAd(); removeOverlays(); handleYTMusicAd(); dismissAdblockPopup(); }
+  function tick() {
+    if (hasPlayerError282()) { enterPlaybackRecovery(); return; }
+    if (_playbackRecovery) return;
+    handleAd(); removeOverlays(); handleYTMusicAd(); dismissAdblockPopup();
+  }
 
   const _tickInterval = setInterval(tick, 750);
   tick();
@@ -249,7 +299,10 @@
     if (!relevant) return;
     const nowDisabled = _liveYtOff || _livePaused || _liveWl;
     try { localStorage.setItem('__sbYtOff', nowDisabled ? '1' : '0'); } catch (_) {}
-    if (!nowDisabled) return;
+    if (!nowDisabled) {
+      try { sessionStorage.removeItem('__sbYtRecovery'); } catch (_) {}
+      return;
+    }
     _disableNow();
   });
 

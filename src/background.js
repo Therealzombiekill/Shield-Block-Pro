@@ -2513,6 +2513,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(lifetime ?? { total:0 });
         break;
       }
+      // Popup live view — includes not-yet-flushed pending counts/time
+      case 'GET_POPUP_STATS': {
+        const { stats, lifetime, timeSaved } = await chrome.storage.local.get([
+          'stats', 'lifetime', 'timeSaved',
+        ]);
+        const pendingBlocks = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
+        const session = (stats?.total ?? 0) + pendingBlocks;
+        const life = (lifetime?.total ?? 0) + pendingBlocks;
+        sendResponse({
+          session,
+          lifetime: life,
+          timeSavedSeconds: (timeSaved ?? 0) + _pendingTimeSaved,
+        });
+        break;
+      }
       case 'RESET_STATS':
         await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
         try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}

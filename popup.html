@@ -55,7 +55,6 @@ body{
   display:grid;grid-template-columns:1fr 1fr;gap:10px;
   padding-top:14px;border-top:1px solid var(--border);
 }
-.stat-row--one{grid-template-columns:1fr}
 .stat-box{
   background:var(--card2);border-radius:12px;padding:12px 10px;
   border:1px solid rgba(255,255,255,.04);
@@ -68,6 +67,7 @@ body{
   font-family:var(--mono);font-size:22px;font-weight:700;
   color:var(--green);letter-spacing:-.02em;
 }
+.stat-box dd.time-saved{font-size:18px;color:var(--accent2)}
 
 .support{
   background:linear-gradient(135deg,rgba(0,112,186,.18),rgba(139,124,255,.12));
@@ -121,10 +121,14 @@ body{
       <span id="session-count" class="session-num">0</span>
       <span class="session-unit">ads blocked</span>
     </div>
-    <dl class="stat-row stat-row--one">
+    <dl class="stat-row">
       <div class="stat-box">
-        <dt>Lifetime ads blocked</dt>
+        <dt>Lifetime blocked</dt>
         <dd id="lifetime-count">0</dd>
+      </div>
+      <div class="stat-box">
+        <dt>Time saved</dt>
+        <dd id="time-saved" class="time-saved">0s</dd>
       </div>
     </dl>
   </section>
@@ -142,7 +146,7 @@ body{
 
   <footer class="foot">
     <a id="privacy-link" href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>
-    <span class="ver">v2.16.0</span>
+    <span class="ver">v2.16.1</span>
   </footer>
 
 </div>

@@ -1,6 +1,9 @@
-// ShieldBlock Pro — minimal popup
+// ShieldBlock Pro — minimal popup (live stats while open)
 
 const $ = id => document.getElementById(id);
+
+const REFRESH_MS = 1000;
+let _refreshTimer = null;
 
 async function msg(type, extra = {}) {
   try {
@@ -28,15 +31,49 @@ function fmt(n) {
   return String(n);
 }
 
+function formatTimeSaved(seconds) {
+  let s = Math.floor(seconds || 0);
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm';
+  if (s < 86400) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  return h ? `${d}d ${h}h` : `${d}d`;
+}
+
 async function refreshStats() {
-  const [stats, lifetime] = await Promise.all([
-    msg('GET_STATS'),
-    msg('GET_LIFETIME'),
-  ]);
-  const session = stats?.total ?? 0;
-  const life = lifetime?.total ?? 0;
-  if ($('session-count')) $('session-count').textContent = fmt(session);
-  if ($('lifetime-count')) $('lifetime-count').textContent = fmt(life);
+  const live = await msg('GET_POPUP_STATS');
+  if (!live) return;
+
+  const session = live.session ?? 0;
+  const life = live.lifetime ?? 0;
+  const saved = live.timeSavedSeconds ?? 0;
+
+  const sessionEl = $('session-count');
+  if (sessionEl) sessionEl.textContent = fmt(session);
+
+  const lifeEl = $('lifetime-count');
+  if (lifeEl) lifeEl.textContent = fmt(life);
+
+  const savedEl = $('time-saved');
+  if (savedEl) savedEl.textContent = formatTimeSaved(saved);
+}
+
+function startLiveRefresh() {
+  refreshStats();
+  if (_refreshTimer) clearInterval(_refreshTimer);
+  _refreshTimer = setInterval(refreshStats, REFRESH_MS);
+}
+
+function stopLiveRefresh() {
+  if (_refreshTimer) {
+    clearInterval(_refreshTimer);
+    _refreshTimer = null;
+  }
 }
 
 function init() {
@@ -44,8 +81,23 @@ function init() {
   if (privacy) {
     privacy.href = chrome.runtime.getURL('privacy.html');
   }
-  refreshStats();
-  setInterval(refreshStats, 4000);
+
+  startLiveRefresh();
+
+  // Instant bump when background flushes stats to storage
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.stats || changes.lifetime || changes.timeSaved) {
+      refreshStats();
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') startLiveRefresh();
+    else stopLiveRefresh();
+  });
+
+  window.addEventListener('pagehide', stopLiveRefresh);
 }
 
 if (document.readyState === 'loading') {

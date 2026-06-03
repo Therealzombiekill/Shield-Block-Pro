@@ -1,0 +1,19 @@
+Chrome Web Store upload — read this first
+==========================================
+
+The manifest "description" field must be ≤ 132 characters.
+
+Use ONLY this zip (or a fresh zip from v2.17.2+ source):
+  ShieldBlock-Pro-STORE-v2.17.2.zip
+
+Before uploading, confirm inside the zip:
+  manifest.json → "description" is about 85 characters
+  NOT the old 163-character text mentioning Spotify, Hulu, Kick.
+
+Wrong (163 chars — WILL FAIL):
+  "...Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance..."
+
+Correct (v2.17.2):
+  "Block ads, trackers and cookie banners. Privacy and fingerprint protection for the web."
+
+Version in manifest.json must say 2.17.2 or newer.

@@ -29,6 +29,9 @@
   .btn-back:hover{opacity:.85}
   .btn-proceed{background:transparent;color:var(--muted);border:1px solid var(--border);font-size:12px}
   .btn-proceed:hover{color:var(--text)}
+  .always-allow{display:flex;align-items:center;justify-content:center;gap:8px;
+    font-size:12px;color:var(--muted);margin-bottom:16px;cursor:pointer}
+  .always-allow input{cursor:pointer}
   .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:24px}
   .badge{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600;letter-spacing:.04em}
   .badge-malware{background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.3)}
@@ -52,6 +55,10 @@
     <div class="url-label">Blocked URL</div>
     <div id="blocked-url">—</div>
   </div>
+
+  <label class="always-allow">
+    <input type="checkbox" id="always-allow"> Always allow this site (stop warning me)
+  </label>
 
   <div class="actions">
     <button class="btn btn-back">← Go Back to Safety</button>

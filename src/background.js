@@ -1229,7 +1229,12 @@ function checkSafeBrowsing(url) {
 async function isSafeBrowsingAllowed(url) {
   try {
     const host = new URL(url).hostname.replace(/^www\./, '');
-    const { safeBrowsingAllow = {} } = await chrome.storage.local.get('safeBrowsingAllow');
+    const { safeBrowsingAllow = {}, sbUserAllow = [] } =
+      await chrome.storage.local.get(['safeBrowsingAllow', 'sbUserAllow']);
+    // Permanent, user-chosen "always allow this site" exceptions (incl. subdomains).
+    if (Array.isArray(sbUserAllow) &&
+        sbUserAllow.some(d => host === d || host.endsWith('.' + d))) return true;
+    // Short-lived "Proceed anyway" exceptions with a TTL.
     const now = Date.now();
     let changed = false;
     for (const [allowedHost, expiry] of Object.entries(safeBrowsingAllow)) {
@@ -1252,6 +1257,21 @@ async function allowSafeBrowsingUrl(url) {
     const { safeBrowsingAllow = {} } = await chrome.storage.local.get('safeBrowsingAllow');
     safeBrowsingAllow[host] = Date.now() + SB_ALLOW_TTL_MS;
     await chrome.storage.local.set({ safeBrowsingAllow });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// "Always allow this site" — a permanent safe-browsing exception, kept separate
+// from the ad-blocking whitelist so the two trust decisions don't bleed together.
+async function allowSafeBrowsingSitePermanent(url) {
+  if (!url || !/^https?:\/\//.test(url)) return false;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const { sbUserAllow = [] } = await chrome.storage.local.get('sbUserAllow');
+    const list = Array.isArray(sbUserAllow) ? sbUserAllow : [];
+    if (!list.includes(host)) { list.push(host); await chrome.storage.local.set({ sbUserAllow: list }); }
     return true;
   } catch (_) {
     return false;
@@ -2742,7 +2762,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
       case 'ALLOW_SAFE_BROWSING_URL':
-        sendResponse({ ok: await allowSafeBrowsingUrl(msg.url) });
+        sendResponse({ ok: msg.permanent
+          ? await allowSafeBrowsingSitePermanent(msg.url)
+          : await allowSafeBrowsingUrl(msg.url) });
         break;
       case 'PAUSE_ALL': {
         const { minutes: paMins = 30 } = msg;

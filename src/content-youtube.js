@@ -193,12 +193,17 @@
   const _tickInterval = setInterval(tick, 750);
   tick();
 
-  // Fast path: click skip button the moment it appears in the DOM
+  // Fast path: click skip button the moment it appears in the DOM.
+  // YouTube's player mutates constantly, so debounce to ~1 click/sec — otherwise
+  // a single ad triggers dozens of redundant clicks (and log spam) per second,
+  // which can disrupt playback (especially on YouTube Music).
+  let _lastSkipClick = 0;
   const _skipObserver = new MutationObserver(() => {
+    if (Date.now() - _lastSkipClick < 1000) return;
     const skip = document.querySelector(
       '.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern'
     );
-    if (skip) { skip.click(); _sbLog('info', 'Ad: MutationObserver skip button clicked'); }
+    if (skip) { skip.click(); _lastSkipClick = Date.now(); _sbLog('info', 'Ad: skip button clicked'); }
   });
   _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
 

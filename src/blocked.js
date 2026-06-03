@@ -43,8 +43,10 @@
       const u = new URL(blocked);
       // Only ever navigate to http(s) — never javascript:, data:, etc.
       if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
-      // Tell the background to allow this URL so safe-browsing doesn't re-block it.
-      try { await chrome.runtime.sendMessage({ type: 'ALLOW_SAFE_BROWSING_URL', url: blocked }); } catch (_) {}
+      // "Always allow" → permanent per-site exception; otherwise a short-lived one.
+      const permanent = document.getElementById('always-allow')?.checked || false;
+      // Tell the background to allow this site so safe-browsing doesn't re-block it.
+      try { await chrome.runtime.sendMessage({ type: 'ALLOW_SAFE_BROWSING_URL', url: blocked, permanent }); } catch (_) {}
       location.href = u.href;
     } catch (_) {}
   });

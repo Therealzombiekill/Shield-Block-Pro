@@ -164,12 +164,34 @@
   }
 
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.cosmetic === false) {
+    if (!changes.settings) return;
+    const _cos = changes.settings.newValue?.cosmetic;
+    if (_cos === false) {
       _procObserver?.disconnect();
       _procObserver = null;
       clearTimeout(_procDeb);
       // Remove injected style block
       document.getElementById('_sb_domain_cosmetic')?.remove();
+    } else if (_cos === true) {
+      // Re-arm after a re-enable — otherwise procedural/domain cosmetics stayed
+      // dead until a page reload. Re-inject the <style> and restart the observer.
+      if (plain.length > 0 && !document.getElementById('_sb_domain_cosmetic')) {
+        try {
+          const css = [...new Set(plain)].join(',\n') + ' { display:none!important; }';
+          const style = document.createElement('style');
+          style.id = '_sb_domain_cosmetic';
+          style.textContent = css;
+          (document.head || document.documentElement).appendChild(style);
+        } catch (_e) { console.warn('[SB:procedural]', _e?.message ?? _e); }
+      }
+      if (procedural.length > 0 && !_procObserver) {
+        runProcedural();
+        _procObserver = new MutationObserver((muts) => {
+          if (muts.every(m => m.type === 'characterData')) return;
+          clearTimeout(_procDeb); _procDeb = setTimeout(runProcedural, 500);
+        });
+        _procObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      }
     }
   });
 

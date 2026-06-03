@@ -96,15 +96,19 @@
   let _deb = null;
   const _obs = new MutationObserver(() => { clearTimeout(_deb); _deb = setTimeout(tick, 300); });
   _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
-  const _int = setInterval(tick, 1000);
+  let _int = setInterval(tick, 1000);
 
   window.addEventListener('beforeunload', () => {
     _obs.disconnect(); clearInterval(_int); clearTimeout(_deb);
   }, { once: true });
 
-  // Cleanup on toggle-off — restore audio and disconnect
+  // Cleanup on toggle-off / re-arm on toggle-on (so re-enabling resumes without reload)
+  let _armed = true;
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.kick === false) {
+    if (!changes.settings) return;
+    const _v = changes.settings.newValue?.kick;
+    if (_v === false && _armed) {
+      _armed = false;
       _obs.disconnect();
       clearInterval(_int);
       clearTimeout(_deb);
@@ -113,6 +117,11 @@
         if (video) video.muted = wasMuted;
         adActive = false;
       }
+    } else if (_v === true && !_armed) {
+      _armed = true;
+      _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      _int = setInterval(tick, 1000);
+      tick();
     }
   });
 

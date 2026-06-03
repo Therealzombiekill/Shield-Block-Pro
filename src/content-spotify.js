@@ -188,7 +188,7 @@
   });
   _spotObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
-  const _spotInterval = setInterval(tick, 1000);
+  let _spotInterval = setInterval(tick, 1000);
   tick();
 
   // Cleanup on navigation — prevents observer accumulation on SPA route changes
@@ -198,13 +198,22 @@
     clearTimeout(debounce);
   }, { once: true });
 
-  // Cleanup on toggle-off — restore audio and disconnect
+  // Cleanup on toggle-off / re-arm on toggle-on (so re-enabling resumes without reload)
+  let _armed = true;
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.spotify === false) {
+    if (!changes.settings) return;
+    const _v = changes.settings.newValue?.spotify;
+    if (_v === false && _armed) {
+      _armed = false;
       _spotObserver.disconnect();
       clearInterval(_spotInterval);
       clearTimeout(debounce);
       if (adActive) { muteAudio(wasMuted); hideOverlay(); adActive = false; }
+    } else if (_v === true && !_armed) {
+      _armed = true;
+      _spotObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      _spotInterval = setInterval(tick, 1000);
+      tick();
     }
   });
 

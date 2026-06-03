@@ -178,11 +178,21 @@ function _removeAmazonCss() {
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
+  let _armed = true;
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.amazon === false) {
+    if (!changes.settings) return;
+    const _v = changes.settings.newValue?.amazon;
+    if (_v === false && _armed) {
+      _armed = false;
       observer.disconnect();
       clearTimeout(debounce);
       _removeAmazonCss();
+    } else if (_v === true && !_armed) {
+      // Re-arm after a re-enable — otherwise the script stayed dead until reload.
+      _armed = true;
+      _injectAmazonCss();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      clean();
     }
   });
 

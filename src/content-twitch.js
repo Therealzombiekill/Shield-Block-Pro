@@ -188,14 +188,15 @@
   }
 
   // ── Safety timeout: force-recover if muted for > 90s ─────────────────────────
-  const safetyInterval = setInterval(() => {
+  function _safetyCheck() {
     if (adActive && Date.now() - adStartTime > 90000) {
       adActive = false;
       unmuteVideo();
       hideToast();
       _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
     }
-  }, 5000);
+  }
+  let safetyInterval = setInterval(_safetyCheck, 5000);
 
   // ── Buffering monitor ─────────────────────────────────────────────────────────
   let _lastPos     = -1;
@@ -204,7 +205,7 @@
   let _lastFixAt   = 0;
   const _FIX_COOLDOWN = 5000;
 
-  const bufferInterval = setInterval(() => {
+  function _bufferCheck() {
     if (adActive) { _frozenTicks = 0; return; }
     const video = document.querySelector('video');
     if (!video || video.paused || document.hidden) { _frozenTicks = 0; _lastPos = -1; _lastBuf = -1; return; }
@@ -227,7 +228,8 @@
       _lastBuf     = buf;
       _frozenTicks = 0;
     }
-  }, 500);
+  }
+  let bufferInterval = setInterval(_bufferCheck, 500);
 
   // ── Observer + polling ────────────────────────────────────────────────────────
   let debounce = null;
@@ -236,10 +238,16 @@
     debounce = setTimeout(domTick, 300);
   });
   observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
-  const interval = setInterval(domTick, 1000);
+  let interval = setInterval(domTick, 1000);
 
+  // Cleanup on toggle-off / re-arm on toggle-on (so re-enabling resumes without reload)
+  let _armed = true;
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.twitch === false) {
+    if (!changes.settings) return;
+    const _v = changes.settings.newValue?.twitch;
+    if (_v === false && _armed) {
+      _armed = false;
+      window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
       observer.disconnect();
       clearInterval(interval);
       clearInterval(safetyInterval);
@@ -248,6 +256,15 @@
       clearTimeout(toastTimeout);
       hideToast();
       unmuteVideo();
+    } else if (_v === true && !_armed) {
+      // Re-arm after a re-enable — otherwise Twitch ad handling stayed dead until reload.
+      _armed = true;
+      window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
+      observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
+      interval = setInterval(domTick, 1000);
+      safetyInterval = setInterval(_safetyCheck, 5000);
+      bufferInterval = setInterval(_bufferCheck, 500);
+      domTick();
     }
   });
 

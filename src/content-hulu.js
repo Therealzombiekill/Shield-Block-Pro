@@ -137,7 +137,7 @@
   _huluObserver.observe(document.body || document.documentElement, {
     childList: true, subtree: true,
   });
-  const _huluInterval = setInterval(tick, 1000);
+  let _huluInterval = setInterval(tick, 1000);
 
   // Cleanup on page unload — prevents memory leak on SPA navigation
   window.addEventListener('beforeunload', () => {
@@ -146,13 +146,22 @@
     clearTimeout(_huluDebounce);
   }, { once: true });
 
-  // Cleanup on toggle-off — restore audio and disconnect
+  // Cleanup on toggle-off / re-arm on toggle-on (so re-enabling resumes without reload)
+  let _armed = true;
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.hulu === false) {
+    if (!changes.settings) return;
+    const _v = changes.settings.newValue?.hulu;
+    if (_v === false && _armed) {
+      _armed = false;
       _huluObserver.disconnect();
       clearInterval(_huluInterval);
       clearTimeout(_huluDebounce);
       if (adActive) { restoreAfterAd(); adActive = false; }
+    } else if (_v === true && !_armed) {
+      _armed = true;
+      _huluObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      _huluInterval = setInterval(tick, 1000);
+      tick();
     }
   });
 

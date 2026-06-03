@@ -423,16 +423,25 @@
     childList: true, subtree: true,
   });
 
-  const _interval = setInterval(clean, 3000);
+  let _interval = setInterval(clean, 3000);
   clean();
 
-  // Teardown
+  // Teardown / re-arm on toggle
+  let _armed = true;
   chrome.storage.onChanged.addListener((changes) => {
-    const _nv = changes.settings?.newValue;
-    if (_nv?.social === false) {
+    if (!changes.settings) return;
+    const _v = changes.settings.newValue?.social;
+    if (_v === false && _armed) {
+      _armed = false;
       clearInterval(_interval);
       _observer.disconnect();
       clearTimeout(_debounce);
+    } else if (_v === true && !_armed) {
+      // Re-arm after a re-enable — otherwise the script stayed dead until reload.
+      _armed = true;
+      _observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
+      _interval = setInterval(clean, 3000);
+      clean();
     }
   });
 

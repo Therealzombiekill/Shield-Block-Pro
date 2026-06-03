@@ -267,23 +267,31 @@
     });
   }
 
+  // Two independent suppression sources — the cosmetic toggle and global pause —
+  // tracked separately so re-enabling one doesn't override the other (resuming
+  // from pause must not re-arm while cosmetic is still disabled, and vice versa).
+  let _cosmeticOff  = false;
+  let _globalPaused = false;
+  function _startCosmetics() {
+    if (_cosmeticOff || _globalPaused) return;
+    if (_target) { _observer.observe(_target, { childList: true, subtree: true }); tick(); }
+  }
+  function _stopCosmetics() {
+    _observer.disconnect();
+    clearTimeout(_debounce);
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.cosmetic === false) {
-      _observer.disconnect();
-      clearTimeout(_debounce);
-    }
+    if (!changes.settings) return;
+    const _v = changes.settings.newValue?.cosmetic;
+    if (_v === false)      { _cosmeticOff = true;  _stopCosmetics(); }
+    else if (_v === true)  { _cosmeticOff = false; _startCosmetics(); }
   });
 
   // Handle global pause/resume messages from background
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'GLOBAL_PAUSE') {
-      _observer.disconnect();
-      clearTimeout(_debounce);
-    }
-    if (msg.type === 'GLOBAL_RESUME') {
-      if (_target) _observer.observe(_target, { childList: true, subtree: true });
-      tick();
-    }
+    if (msg.type === 'GLOBAL_PAUSE')  { _globalPaused = true;  _stopCosmetics(); }
+    if (msg.type === 'GLOBAL_RESUME') { _globalPaused = false; _startCosmetics(); }
   });
 
 })().catch(e => console.warn('[SB:general] script error:', e?.message ?? e));

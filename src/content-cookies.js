@@ -447,10 +447,19 @@
     setTimeout(handleBanners, delay);
   }
 
+  let _armed = true;
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.cookies === false) {
+    if (!changes.settings) return;
+    const _v = changes.settings.newValue?.cookies;
+    if (_v === false && _armed) {
+      _armed = false;
       observer.disconnect();
       clearTimeout(_debounce);
+    } else if (_v === true && !_armed) {
+      // Re-arm after a re-enable — otherwise the script stayed dead until reload.
+      _armed = true;
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      handleBanners();
     }
   });
 

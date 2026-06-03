@@ -2673,7 +2673,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       default: sendResponse({ error: 'Unknown message' });
     }
-  })();
+  })().catch((err) => {
+    // return true (below) holds the message channel open for the async response. If a
+    // case throws before its sendResponse, the channel would hang until the caller
+    // times out — so settle it here with an error instead.
+    logEvent('message', 'error', `onMessage handler error for ${msg?.type}: ${err?.message ?? err}`);
+    try { sendResponse({ ok: false, error: err?.message ?? String(err) }); } catch (_) {}
+  });
   return true;
 });
 

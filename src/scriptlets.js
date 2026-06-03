@@ -489,7 +489,13 @@
         try {
           const text = await res.clone().text();
           const patched = text.replace(bodyRe, repl);
-          return new Response(patched, { status: res.status, headers: res.headers });
+          // Drop content-length/-encoding: the body has been decoded and rewritten,
+          // so the original values describe a different payload and would make the
+          // consumer fail to parse it (same fix as m3u-prune below).
+          const h = new Headers(res.headers);
+          h.delete('content-length');
+          h.delete('content-encoding');
+          return new Response(patched, { status: res.status, statusText: res.statusText, headers: h });
         } catch (_) { return res; }
       };
     },

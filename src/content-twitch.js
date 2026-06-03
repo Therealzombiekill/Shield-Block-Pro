@@ -28,19 +28,18 @@
   }
 
   const _wl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return;
-
-  if (!settings?.twitch) {
-    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
-    return;
-  }
-  window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
-
   const _hostname = location.hostname.replace(/^www\./, '');
-  if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) {
-    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
-    return;
-  }
+  const _whitelisted = _wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+
+  // Single authoritative decision. settings is null only if the SW never responded
+  // even after the retry above — fail safe to "disabled" (don't touch the stream).
+  const _shouldDisable = !settings || !settings.twitch || !!settings.globalPause || _whitelisted;
+
+  // One signal — no ENABLE→DISABLE flip-flop on whitelisted sites, and globalPause
+  // now correctly tells the MAIN world to stop (previously it returned silently, so
+  // inject-twitch.js kept patching GQL all session).
+  window.postMessage({ type: _shouldDisable ? 'SB_TWITCH_DISABLE' : 'SB_TWITCH_ENABLE' }, '*');
+  if (_shouldDisable) return;
 
   _sbLog('info', `Init — ${_hostname}`);
 
@@ -238,17 +237,41 @@
   observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
   const interval = setInterval(domTick, 1000);
 
+  function _cleanup() {
+    observer.disconnect();
+    clearInterval(interval);
+    clearInterval(safetyInterval);
+    clearInterval(bufferInterval);
+    clearTimeout(debounce);
+    clearTimeout(toastTimeout);
+    hideToast();
+    unmuteVideo();
+  }
+
+  // Track live decision inputs. twitch lives inside the `settings` object, but
+  // globalPause and whitelist are SEPARATE storage keys — each must be read from
+  // its own `changes` entry. (Re-enabling still needs a reload — the loop is torn
+  // down below.)
+  let _liveTwitchOff = false, _livePaused = false, _liveWl = false;
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.twitch === false) {
-      observer.disconnect();
-      clearInterval(interval);
-      clearInterval(safetyInterval);
-      clearInterval(bufferInterval);
-      clearTimeout(debounce);
-      clearTimeout(toastTimeout);
-      hideToast();
-      unmuteVideo();
+    let relevant = false;
+    if (changes.settings)    { _liveTwitchOff = !changes.settings.newValue?.twitch; relevant = true; }
+    if (changes.globalPause) {
+      const gp = changes.globalPause.newValue;
+      _livePaused = !!(gp && gp.until > Date.now());
+      relevant = true;
     }
+    if (changes.whitelist) {
+      const nwl = changes.whitelist.newValue;
+      _liveWl = Array.isArray(nwl) && nwl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+      relevant = true;
+    }
+    if (!relevant) return;
+    if (!(_liveTwitchOff || _livePaused || _liveWl)) return;
+    _cleanup();
+    // Also stop the MAIN-world GQL/ad-endpoint hook — previously this was never
+    // signalled on toggle-off, so inject-twitch.js kept running.
+    window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
   });
 
   domTick();

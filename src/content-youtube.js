@@ -89,12 +89,18 @@
     if (skip) { skip.click(); _sbLog('info', 'Ad: clicked skip button'); return; }
 
     // 2. Seek past short ads.
-    // Guard: only seek if .ad-showing is on the player — this class is set
-    // by YouTube itself and is the most reliable ad signal. The duration < 120
-    // guard prevents accidentally seeking a short legitimate video (Shorts, clips).
+    // The seek-to-end is destructive, so require BOTH the .ad-showing player class
+    // AND a corroborating ad-UI element before doing it — a transient false-positive
+    // .ad-showing on a short legitimate video (Shorts, clips) must never fast-forward
+    // the user's content to the end. The duration < 120 guard keeps us to short ads.
+    // If corroboration is missing we fall through to muting, which is non-destructive.
     const vid = document.querySelector('video');
     const playerHasAdClass = !!document.querySelector('.ad-showing');
-    if (vid && playerHasAdClass && isFinite(vid.duration) && vid.duration > 0 && vid.duration < 120) {
+    const adUiPresent = !!document.querySelector(
+      '.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-preview-text, ' +
+      '.ytp-ad-text, .ytp-ad-skip-button, .ytp-ad-skip-button-modern'
+    );
+    if (vid && playerHasAdClass && adUiPresent && isFinite(vid.duration) && vid.duration > 0 && vid.duration < 120) {
       vid.currentTime = vid.duration;
       _sbLog('info', `Ad: seeked past (${vid.duration.toFixed(1)}s)`);
       return;
@@ -113,7 +119,8 @@
   const OVERLAY_SELS = [
     // In-player overlays
     '.ytp-ad-overlay-container', '.ytp-ad-overlay-slot',
-    '.ytp-ce-element',                      // end-cards
+    // NOTE: .ytp-ce-element (end-screen cards) is deliberately NOT here — those are
+    // creator-added content, not ads, and removing them breaks legitimate end cards.
     '.ytp-suggested-action',                // "Visit advertiser" CTA
     '.ytp-ad-image-overlay',
     // Page-level ad placements
@@ -141,11 +148,13 @@
   ];
 
   let _overlayLogThrottle = 0;
+  const _overlaySel = OVERLAY_SELS.join(',');
   function removeOverlays() {
     let removed = 0;
-    for (const sel of OVERLAY_SELS) {
-      document.querySelectorAll(sel).forEach(el => { try { el.remove(); removed++; } catch (_) {} });
-    }
+    // Single combined query — one DOM traversal per tick instead of one per selector.
+    try {
+      document.querySelectorAll(_overlaySel).forEach(el => { try { el.remove(); removed++; } catch (_) {} });
+    } catch (_) {}
     if (removed > 0 && Date.now() - _overlayLogThrottle > 5000) {
       _overlayLogThrottle = Date.now();
       _sbLog('info', `Removed ${removed} ad overlay element(s)`);
@@ -246,17 +255,31 @@
     _skipObserver.disconnect();
   }
   window.addEventListener('beforeunload', _cleanup, { once: true });
+  // Track the live decision inputs. We only reach this point because interception
+  // was enabled for this load, so all three start "enabled". IMPORTANT: youtube
+  // lives inside the `settings` object, but globalPause and whitelist are SEPARATE
+  // storage keys — each must be read from its own `changes` entry, and a single
+  // event usually carries only the key that changed.
+  let _liveYtOff = false, _livePaused = false, _liveWl = false;
   chrome.storage.onChanged.addListener((changes) => {
-    const ns = changes.settings?.newValue;
-    if (!ns) return;
-    // React to any mid-session change that should stop interception: the youtube
-    // toggle, globalPause, or this host being added to the whitelist. (Re-enabling
-    // still requires a reload — the intervals/observers are torn down below.)
-    const nowDisabled = !ns.youtube || !!ns.globalPause ||
-      (Array.isArray(ns.whitelist) && ns.whitelist.some(d => _host === d || _host.endsWith('.' + d)));
-    if (!nowDisabled) return;
-    // Keep the document_start cache in sync so the next load also starts disabled.
-    try { localStorage.setItem('__sbYtOff', '1'); } catch (_) {}
+    let relevant = false;
+    if (changes.settings)    { _liveYtOff = !changes.settings.newValue?.youtube; relevant = true; }
+    if (changes.globalPause) {
+      const gp = changes.globalPause.newValue;
+      _livePaused = !!(gp && gp.until > Date.now());
+      relevant = true;
+    }
+    if (changes.whitelist) {
+      const nwl = changes.whitelist.newValue;
+      _liveWl = Array.isArray(nwl) && nwl.some(d => _host === d || _host.endsWith('.' + d));
+      relevant = true;
+    }
+    if (!relevant) return;
+    const nowDisabled = _liveYtOff || _livePaused || _liveWl;
+    // Sync the document_start cache in BOTH directions so the next full load starts
+    // in the correct state — re-enabling here propagates to the next load too.
+    try { localStorage.setItem('__sbYtOff', nowDisabled ? '1' : '0'); } catch (_) {}
+    if (!nowDisabled) return; // re-enabling still needs a reload to restart the loop
     _cleanup(); // idempotent — safe to call more than once
     // Restore audio if we muted it for an ad
     if (_muted || _ytmAdActive) {

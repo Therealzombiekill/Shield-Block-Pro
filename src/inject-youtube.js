@@ -29,10 +29,16 @@
   // first video's ads would always leak through (the #1 user complaint).
   //
   // So we seed the flag synchronously at document_start from a decision cached in
-  // the page's localStorage by content-youtube.js on a previous load (localStorage
-  // is shared between the ISOLATED and MAIN worlds on the same origin). Default to
-  // ENABLED when no cache exists, matching the default youtube:true setting. The
-  // postMessage signals below remain authoritative and correct any drift.
+  // the page's localStorage by content-youtube.js (localStorage is shared between
+  // the ISOLATED and MAIN worlds on the same origin). Default to ENABLED when no
+  // cache exists, matching the default youtube:true setting.
+  //
+  // Known limitation: the cache reflects the *previous* load's decision. If the user
+  // flips the youtube / whitelist / pause state while no YouTube tab is open, the
+  // very first response of the next load uses the stale value (a one-load lag). The
+  // postMessage signals below correct every *subsequent* response, and the
+  // storage.onChanged sync in content-youtube.js keeps the cache fresh whenever a
+  // YouTube tab is open — so in practice the lag only affects that one narrow edge.
   // NOTE: NOT using {once:true} — the user may toggle the youtube setting on/off
   // within the same session and we need to respond to both messages.
   let _disabled = false;
@@ -92,10 +98,13 @@
     } catch (_) { return false; }
   }
 
-  // Does this URL look like an InnerTube endpoint that can carry ad data?
+  // Does this URL look like an InnerTube endpoint that can carry ad data? Matches
+  // the player endpoint precisely (path ending in /player — not e.g. /player_xxx)
+  // and the Shorts/reel watch sequence endpoint. Query string is ignored.
   function _isAdCarryingUrl(url) {
-    return url.includes('/youtubei/') &&
-           (url.includes('/player') || url.includes('/reel_watch_sequence'));
+    if (!url.includes('/youtubei/')) return false;
+    const path = url.split('?')[0];
+    return /\/player$/.test(path) || path.includes('reel_watch_sequence');
   }
 
   // ── 1. fetch hook — primary path ─────────────────────────────────────────────
@@ -172,9 +181,12 @@
             let cache; let computed = false;
             const compute = () => {
               if (computed) return cache;
+              // Read the native body first. If this throws, leave `computed` false
+              // and let the exception propagate — that is the native behavior, and
+              // masking it as '' could feed the player an empty body.
+              const raw = rtDesc.get.call(this);
               computed = true;
               try {
-                const raw = rtDesc.get.call(this);
                 const json = JSON.parse(raw);
                 if (stripAds(json)) {
                   cache = JSON.stringify(json);
@@ -183,7 +195,7 @@
                   cache = raw;
                 }
               } catch (_) {
-                try { cache = rtDesc.get.call(this); } catch (e) { cache = ''; }
+                cache = raw; // not JSON after all — pass the original body through untouched
               }
               return cache;
             };

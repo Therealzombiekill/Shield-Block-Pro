@@ -20,12 +20,23 @@
   'use strict';
 
   // ── Disable flag ──────────────────────────────────────────────────────────────
-  // MAIN world can't call chrome APIs. content-youtube.js reads settings and
-  // posts SB_YOUTUBE_DISABLE / SB_YOUTUBE_ENABLE here.
-  // Starts disabled until content-youtube.js sends SB_YOUTUBE_ENABLE.
+  // MAIN world can't call chrome APIs. content-youtube.js (ISOLATED, document_idle)
+  // reads settings and posts SB_YOUTUBE_DISABLE / SB_YOUTUBE_ENABLE here.
+  //
+  // The catch: the *initial* player payload (ytInitialPlayerResponse, and often the
+  // first /player fetch) is processed by YouTube before document_idle — i.e. before
+  // content-youtube.js can send a signal. If we started disabled and waited, the
+  // first video's ads would always leak through (the #1 user complaint).
+  //
+  // So we seed the flag synchronously at document_start from a decision cached in
+  // the page's localStorage by content-youtube.js on a previous load (localStorage
+  // is shared between the ISOLATED and MAIN worlds on the same origin). Default to
+  // ENABLED when no cache exists, matching the default youtube:true setting. The
+  // postMessage signals below remain authoritative and correct any drift.
   // NOTE: NOT using {once:true} — the user may toggle the youtube setting on/off
   // within the same session and we need to respond to both messages.
-  let _disabled = true;
+  let _disabled = false;
+  try { if (localStorage.getItem('__sbYtOff') === '1') _disabled = true; } catch (_) {}
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     if (e.data?.type === 'SB_YOUTUBE_DISABLE') _disabled = true;
@@ -91,12 +102,14 @@
   // SPA navigations re-request /player via the InnerTube API. This is the
   // mechanism uBlock Origin's json-prune-fetch-response relies on.
   const _origFetch = window.fetch;
-  window.fetch = async function (...args) {
+  const _sbFetch = async function (...args) {
     const res = await _origFetch.apply(this, args);
     if (_disabled) return res;
     try {
       const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url ?? '');
-      if (_isAdCarryingUrl(url)) {
+      // res.ok guard: error/opaque responses (status 0, 3xx, 4xx, 5xx) carry no
+      // ad data and would make `new Response(..., {status})` throw a RangeError.
+      if (res.ok && _isAdCarryingUrl(url)) {
         const json = await res.clone().json();
         if (stripAds(json)) {
           _sbLog('info', 'InnerTube fetch: stripped ad data', { path: url.split('?')[0].split('/').slice(-2).join('/') });
@@ -119,7 +132,14 @@
     }
     return res;
   };
-  try { window.fetch.toString = () => _origFetch.toString(); } catch (_) {}
+  // Only the assignment can throw (if a locker made window.fetch non-writable);
+  // guarding it keeps the XHR + ytInitial hooks below installable regardless.
+  try {
+    window.fetch = _sbFetch;
+    try { window.fetch.toString = () => _origFetch.toString(); } catch (_) {}
+  } catch (e) {
+    _sbLog('warn', `fetch hook install failed (locker?): ${e?.message ?? e}`);
+  }
 
   // ── 2. XMLHttpRequest hook — secondary path ──────────────────────────────────
   // Some YouTube clients/embeds request /player via XHR. We capture the native

@@ -24,21 +24,26 @@
     catch (e) { _sbLog('error', `GET_SETTINGS failed after retry: ${e?.message ?? e}`); settings = null; }
   }
   const _wl = settings?.whitelist ?? [];
-  if (settings?.globalPause) return; // global pause active — skip all processing
-
-  if (!settings?.youtube) {
-    // Signal MAIN world to stop intercepting
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return;
-  }
-  // Signal MAIN world to ensure interception is active (handles re-enable after toggle)
-  window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
-
   const _host = location.hostname.replace(/^www\./, '');
-  if (_wl.some(d => _host === d || _host.endsWith('.' + d))) {
-    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
-    return;
+  const _whitelisted = _wl.some(d => _host === d || _host.endsWith('.' + d));
+
+  // Single source of truth for whether YouTube interception should run. settings
+  // is null only if the SW failed to respond even after the retry above — in that
+  // case fail safe to "disabled" (don't block) and leave the cache untouched.
+  const _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
+
+  // Cache the decision so inject-youtube.js (MAIN world) can read it synchronously
+  // at document_start on the next load and handle the initial player response
+  // before this script runs. Only write when we have real settings, so a transient
+  // SW-wakeup failure can't poison the cache for the next load.
+  if (settings) {
+    try { localStorage.setItem('__sbYtOff', _shouldDisable ? '1' : '0'); } catch (_) {}
   }
+
+  // One authoritative signal — no enable→disable flip-flop, and globalPause now
+  // correctly tells the MAIN world to stop (previously it returned silently).
+  window.postMessage({ type: _shouldDisable ? 'SB_YOUTUBE_DISABLE' : 'SB_YOUTUBE_ENABLE' }, '*');
+  if (_shouldDisable) return;
 
   _sbLog('info', `Init — ${_host}`, { ytMusic: _host.includes('music.') });
 
@@ -242,16 +247,24 @@
   }
   window.addEventListener('beforeunload', _cleanup, { once: true });
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.youtube === false) {
-      _cleanup();
-      // Restore audio if we muted it for an ad
-      if (_muted || _ytmAdActive) {
-        const media = document.querySelector('video') || document.querySelector('audio');
-        try { if (media) media.muted = false; } catch (_) {}
-        _muted = false; _ytmAdActive = false;
-      }
-      window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+    const ns = changes.settings?.newValue;
+    if (!ns) return;
+    // React to any mid-session change that should stop interception: the youtube
+    // toggle, globalPause, or this host being added to the whitelist. (Re-enabling
+    // still requires a reload — the intervals/observers are torn down below.)
+    const nowDisabled = !ns.youtube || !!ns.globalPause ||
+      (Array.isArray(ns.whitelist) && ns.whitelist.some(d => _host === d || _host.endsWith('.' + d)));
+    if (!nowDisabled) return;
+    // Keep the document_start cache in sync so the next load also starts disabled.
+    try { localStorage.setItem('__sbYtOff', '1'); } catch (_) {}
+    _cleanup(); // idempotent — safe to call more than once
+    // Restore audio if we muted it for an ad
+    if (_muted || _ytmAdActive) {
+      const media = document.querySelector('video') || document.querySelector('audio');
+      try { if (media) media.muted = false; } catch (_) {}
+      _muted = false; _ytmAdActive = false;
     }
+    window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
   });
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'youtube', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}

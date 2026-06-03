@@ -33,6 +33,7 @@
   const host  = location.hostname.replace(/^www\./, '');
   // Skip entirely on YouTube — nothing to do there
   if (host.includes('youtube.com') || host.includes('youtu.be')) return;
+  if (host.includes('amazon.')) return;
   const _wl   = settings?.whitelist ?? [];
   if (_wl.some(d => host === d || host.endsWith('.' + d))) return;
 

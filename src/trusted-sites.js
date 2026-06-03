@@ -33,7 +33,32 @@ export const PROTECTED_DOMAINS = new Set([
   'drive.usercontent.google.com', 'chat.google.com', 'keep.google.com', 'photos.google.com',
   // GA / GTM dashboards (first-party apps)
   'analytics.google.com', 'tagmanager.google.com',
+  // Amazon shopping (first-party APIs — blocking breaks checkout/search)
+  'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.ca', 'amazon.com.au',
+  'amazon.co.jp', 'amazon.in', 'amazon.fr', 'amazon.es', 'amazon.it',
+  'amazon.com.mx', 'amazon.com.br', 'amazon.nl', 'amazon.pl', 'amazon.se', 'amazon.sg',
+  'media-amazon.com', 'ssl-images-amazon.com',
 ]);
+
+/** Regional Amazon storefronts — allowlisted in v2.13+ (no Amazon-specific scripts). */
+export const AMAZON_STABILITY_DOMAINS = [
+  'amazon.com', 'www.amazon.com',
+  'amazon.co.uk', 'www.amazon.co.uk',
+  'amazon.de', 'www.amazon.de',
+  'amazon.ca', 'www.amazon.ca',
+  'amazon.com.au', 'www.amazon.com.au',
+  'amazon.co.jp', 'www.amazon.co.jp',
+  'amazon.in', 'www.amazon.in',
+  'amazon.fr', 'www.amazon.fr',
+  'amazon.es', 'www.amazon.es',
+  'amazon.it', 'www.amazon.it',
+  'amazon.com.mx', 'www.amazon.com.mx',
+  'amazon.com.br', 'www.amazon.com.br',
+  'amazon.nl', 'www.amazon.nl',
+  'amazon.pl', 'www.amazon.pl',
+  'amazon.se', 'www.amazon.se',
+  'amazon.sg', 'www.amazon.sg',
+];
 
 /** Never block shared Google endpoints when the page is one of these initiators. */
 export const SHARED_GOOGLE_API_EXCLUDED_INITIATORS = [
@@ -57,7 +82,10 @@ export const SB_DOMAIN_ALLOWLIST = new Set([
   'google.com', 'gstatic.com', 'googleusercontent.com', 'youtube.com', 'youtu.be',
   'analytics.google.com', 'tagmanager.google.com',
   'microsoft.com', 'live.com', 'office.com', 'sharepoint.com', 'apple.com', 'icloud.com',
-  'amazon.com', 'cloudflare.com', 'facebook.com', 'instagram.com', 'x.com', 'twitter.com',
+  'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.ca', 'amazon.com.au', 'amazon.co.jp',
+  'amazon.in', 'amazon.fr', 'amazon.es', 'amazon.it', 'amazon.com.mx', 'amazon.com.br',
+  'amazon.nl', 'amazon.pl', 'amazon.se', 'amazon.sg',
+  'cloudflare.com', 'facebook.com', 'instagram.com', 'x.com', 'twitter.com',
   'linkedin.com', 'reddit.com', 'wikipedia.org', 'mozilla.org', 'anthropic.com', 'claude.ai',
 ]);
 
@@ -70,6 +98,7 @@ export const PRIVACY_URL_CLEAN_SKIP_HOSTS = new Set([
   'mail.google.com', 'calendar.google.com', 'meet.google.com', 'classroom.google.com',
   'chat.google.com', 'keep.google.com', 'photos.google.com',
   'drive.usercontent.google.com',
+  ...AMAZON_STABILITY_DOMAINS,
 ]);
 
 export function hostMatchesSet(host, domainSet) {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.12.0",
+  "version": "2.13.0",
   "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
@@ -53,6 +53,22 @@
     },
     {
       "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/browser-compat.js",
+        "src/content-cookies.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "exclude_matches": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*",
+        "*://music.youtube.com/*",
         "*://*.amazon.com/*",
         "*://*.amazon.co.uk/*",
         "*://*.amazon.de/*",
@@ -69,31 +85,6 @@
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
         "*://*.amazon.sg/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-amazon.js"
-      ],
-      "run_at": "document_start"
-    },
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-cookies.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "exclude_matches": [
-        "*://www.youtube.com/*",
-        "*://youtube.com/*",
-        "*://music.youtube.com/*"
       ],
       "js": [
         "src/browser-compat.js",

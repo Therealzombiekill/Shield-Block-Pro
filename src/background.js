@@ -4,7 +4,10 @@
 
 import './browser-compat.js';
 import { parseFilterList } from './filter-parser.js';
-import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
+import {
+  AMAZON_STABILITY_DOMAINS,
+  isSafeBrowsingAllowlisted,
+} from './trusted-sites.js';
 
 const MAX_DYNAMIC_RULES = 5000;
 const MAX_FILTER_RULES = 4300; // reserve dynamic-rule headroom for pause, whitelist, matrix, and privacy rules
@@ -210,13 +213,14 @@ const YOUTUBE_STABILITY_DOMAINS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  twitch: true, amazon: true, general: true,
+  twitch: true, amazon: false, general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
   spotify: true,
   hulu: true,
   kick: true,
   youtube: false, // no YouTube blocking in v2.12+ (stability)
+  // amazon: false — no Amazon DOM/DNR breakage in v2.13+ (stability)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
   paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
@@ -1514,12 +1518,12 @@ async function ensureFilterHealthMetadata() {
   return repairFilterHealthForCheck();
 }
 
-async function ensureYouTubeStabilityMode() {
+async function ensurePlatformStabilityMode() {
   const { settings = {}, whitelist = [] } = await chrome.storage.local.get(['settings', 'whitelist']);
-  const mergedSettings = { ...DEFAULT_SETTINGS, ...settings, youtube: false };
+  const mergedSettings = { ...DEFAULT_SETTINGS, ...settings, youtube: false, amazon: false };
   const wl = [...whitelist];
   let wlChanged = false;
-  for (const d of YOUTUBE_STABILITY_DOMAINS) {
+  for (const d of [...YOUTUBE_STABILITY_DOMAINS, ...AMAZON_STABILITY_DOMAINS]) {
     if (!wl.includes(d)) { wl.push(d); wlChanged = true; }
   }
   await chrome.storage.local.set({
@@ -1531,7 +1535,7 @@ async function ensureYouTubeStabilityMode() {
     await applyWhitelistRules();
     await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
   }
-  logEvent('system', 'info', 'YouTube stability: no YT scripts, allowlisted for normal playback');
+  logEvent('system', 'info', 'Platform stability: YouTube + Amazon allowlisted, platform scripts off');
 }
 
 async function syncFilterLists(force = false) {
@@ -2182,10 +2186,11 @@ async function injectCosmetics(tabId, tabUrl) {
   try {
     domain = new URL(tabUrl).hostname.replace(/^www\./, '');
     if (domainMatchesWhitelist(domain, wl)) return;
-    // Skip YouTube entirely — no ad blocking there, cosmetics only break the player
+    // Skip YouTube/Amazon — platform stability (cosmetics break player/shopping UX)
     const SKIP_DOMAINS = ['youtube.com','youtu.be','youtube-nocookie.com',
                           'music.youtube.com','tv.youtube.com'];
     if (SKIP_DOMAINS.some(d => domain === d || domain.endsWith('.' + d))) return;
+    if (domain.includes('amazon.')) return;
   } catch (_) { return; }
 
   const tabState = _tabCosmeticState.get(tabId) ?? { baseCss: false, css: '' };
@@ -2455,7 +2460,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'SET_SETTINGS': {
         if (!msg.settings || typeof msg.settings !== 'object') { sendResponse({ ok: false }); break; }
-        const merged = { ...(await getSettings()), ...msg.settings, youtube: false };
+        const merged = { ...(await getSettings()), ...msg.settings, youtube: false, amazon: false };
         await chrome.storage.local.set({ settings: merged });
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
         await applySettingsSideEffects(merged, { syncFilters: 'general' in msg.settings && merged.general });
@@ -3341,9 +3346,9 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 
   try {
     const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
-    if (sbStabilityVersion !== '2.12.0') {
-      await ensureYouTubeStabilityMode();
-      await chrome.storage.local.set({ sbStabilityVersion: '2.12.0' });
+    if (sbStabilityVersion !== '2.13.0') {
+      await ensurePlatformStabilityMode();
+      await chrome.storage.local.set({ sbStabilityVersion: '2.13.0' });
     }
   } catch (_) {}
 
@@ -3426,9 +3431,9 @@ chrome.runtime.onStartup.addListener(async () => {
   await repairFilterHealthForCheck();
   try {
     const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
-    if (sbStabilityVersion !== '2.12.0') {
-      await ensureYouTubeStabilityMode();
-      await chrome.storage.local.set({ sbStabilityVersion: '2.12.0' });
+    if (sbStabilityVersion !== '2.13.0') {
+      await ensurePlatformStabilityMode();
+      await chrome.storage.local.set({ sbStabilityVersion: '2.13.0' });
     }
   } catch (_) {}
 

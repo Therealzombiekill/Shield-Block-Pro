@@ -42,6 +42,8 @@
   const _host = location.hostname.replace(/^www\./, '');
   // Never run on YouTube — our selectors can match player elements and cause black screens
   if (_host.includes('youtube.com') || _host.includes('youtu.be')) return;
+  // Never run on Amazon — cosmetics/DOM removal breaks search, cart, and checkout
+  if (_host.includes('amazon.')) return;
   if (_genWl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
   async function injectBundledCosmeticCSS() {

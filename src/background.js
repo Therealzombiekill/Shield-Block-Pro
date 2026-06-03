@@ -203,6 +203,12 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 
 // ── Settings ───────────────────────────────────────────────────────────────
 
+/** v2.12+ — YouTube gets no extension scripts; allowlist so DNR/features stay off. */
+const YOUTUBE_STABILITY_DOMAINS = [
+  'youtube.com', 'www.youtube.com', 'youtu.be',
+  'music.youtube.com', 'tv.youtube.com', 'youtube-nocookie.com',
+];
+
 const DEFAULT_SETTINGS = {
   twitch: true, amazon: true, general: true,
   cosmetic: true, social: true, cookies: true,
@@ -210,7 +216,7 @@ const DEFAULT_SETTINGS = {
   spotify: true,
   hulu: true,
   kick: true,
-  youtube: true,
+  youtube: false, // no YouTube blocking in v2.12+ (stability)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
   paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
@@ -1508,6 +1514,26 @@ async function ensureFilterHealthMetadata() {
   return repairFilterHealthForCheck();
 }
 
+async function ensureYouTubeStabilityMode() {
+  const { settings = {}, whitelist = [] } = await chrome.storage.local.get(['settings', 'whitelist']);
+  const mergedSettings = { ...DEFAULT_SETTINGS, ...settings, youtube: false };
+  const wl = [...whitelist];
+  let wlChanged = false;
+  for (const d of YOUTUBE_STABILITY_DOMAINS) {
+    if (!wl.includes(d)) { wl.push(d); wlChanged = true; }
+  }
+  await chrome.storage.local.set({
+    settings: mergedSettings,
+    ...(wlChanged ? { whitelist: wl } : {}),
+  });
+  invalidateSettingsCache();
+  if (wlChanged) {
+    await applyWhitelistRules();
+    await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
+  }
+  logEvent('system', 'info', 'YouTube stability: no YT scripts, allowlisted for normal playback');
+}
+
 async function syncFilterLists(force = false) {
   if (_syncLock) return;
   _syncLock = true;
@@ -2429,7 +2455,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'SET_SETTINGS': {
         if (!msg.settings || typeof msg.settings !== 'object') { sendResponse({ ok: false }); break; }
-        const merged = { ...(await getSettings()), ...msg.settings };
+        const merged = { ...(await getSettings()), ...msg.settings, youtube: false };
         await chrome.storage.local.set({ settings: merged });
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
         await applySettingsSideEffects(merged, { syncFilters: 'general' in msg.settings && merged.general });
@@ -3309,11 +3335,17 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     if (!existingWl)       toWrite.whitelist = [];
     await chrome.storage.local.set(toWrite);
   } else if (reason === 'update' && existingSettings) {
-    // Extension update — merge new default keys into existing settings so new
-    // toggles are available to existing users without resetting their preferences
     const merged = { ...DEFAULT_SETTINGS, ...existingSettings };
     await chrome.storage.local.set({ settings: merged });
   }
+
+  try {
+    const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
+    if (sbStabilityVersion !== '2.12.0') {
+      await ensureYouTubeStabilityMode();
+      await chrome.storage.local.set({ sbStabilityVersion: '2.12.0' });
+    }
+  } catch (_) {}
 
   await applySettingsSideEffects(await getSettings(), { syncFilters: false });
 
@@ -3392,6 +3424,13 @@ chrome.runtime.onStartup.addListener(async () => {
   } catch (_) {}
 
   await repairFilterHealthForCheck();
+  try {
+    const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
+    if (sbStabilityVersion !== '2.12.0') {
+      await ensureYouTubeStabilityMode();
+      await chrome.storage.local.set({ sbStabilityVersion: '2.12.0' });
+    }
+  } catch (_) {}
 
   setTimeout(() => {
     syncFilterLists(false).catch(e => {

@@ -4,95 +4,35 @@ Guidance for AI agents working in this repository.
 
 ## Project overview
 
-ShieldBlock Pro is a Manifest V3 Chrome/Firefox browser extension. There is **no build step**, **no package manager**, and **no automated test suite**. Source files are loaded directly by the browser as an unpacked extension.
+ShieldBlock Pro is a Manifest V3 Chrome/Firefox browser extension. **No build step**, **no package manager**, **no automated tests**. Load unpacked from the repo root.
 
-See `CLAUDE.md` for architecture, storage layout, DNR rule ID ranges, and manual testing workflow.
+See `CLAUDE.md` for architecture and DNR ID ranges.
 
-## Trusted sites (v2.11.0+)
+## v2.12.0 — stability release (YouTube)
 
-**Single source:** `src/trusted-sites.js` — protected filter domains, Google API initiator exclusions, safe-browsing allowlist, and privacy URL-clean skip hosts.
+**YouTube ad blocking is removed.** Do not re-add `inject-youtube.js` or `content-youtube.js` to `manifest.json` without explicit user request and playback testing.
 
-| Consumer | Uses |
-|----------|------|
-| `src/filter-parser.js` | `isDomainProtected`, `SHARED_GOOGLE_API_EXCLUDED_INITIATORS` |
-| `src/background.js` | `isSafeBrowsingAllowlisted` (+ `sanitizeSbDomains`) |
-| `src/content-privacy.js` | `shouldSkipPrivacyUrlClean` → `SB_PRIVACY_CONFIG.skipUrlClean` |
+| What | Behavior on YouTube |
+|------|---------------------|
+| Dedicated YT scripts | **Not loaded** |
+| `inject-privacy.js` / `scriptlets.js` | **Excluded** via `exclude_matches` |
+| Network / cosmetics | **Allowlisted** (`ensureYouTubeStabilityMode`) |
+| Default `settings.youtube` | `false` |
 
-When adding GitHub / Google Workspace / GA dashboard protection, update **trusted-sites.js** first, then mirror `excludedInitiatorDomains` on static `apis.google.com` / `boq.google.com` rules in `rules/hosts.json` if needed.
+Filter lists still **protect** `googlevideo.com`, `youtube.com`, etc. via `trusted-sites.js` so lists do not break playback from network rules.
 
-## Cursor Cloud specific instructions
+## Trusted sites
 
-### What runs locally
+Single source: `src/trusted-sites.js`. Content scripts use `browser-compat.js` (`__sbShouldSkipPrivacyUrlClean`) — not ES `import`.
 
-| Component | Required? | Notes |
-|-----------|-----------|-------|
-| Google Chrome ≥ 116 (or Firefox ≥ 128) | **Yes** | Primary dev path is Chrome |
-| Node.js | Optional | Ad-hoc validation only |
-| Local dev server / Docker / database | **No** | State in `chrome.storage.local` + IndexedDB |
+## Cursor Cloud
 
-Nothing is started from the terminal. Runtime is the extension service worker (`src/background.js`).
+- Chrome ≥ 116, load unpacked from `/workspace`
+- Validate: `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` and `node --check src/background.js`
+- Hello-world: Support → Run check (v2.12.0+)
 
-### Loading the extension for development
+## Do not regress
 
-1. Chrome → `chrome://extensions` → Developer mode → **Load unpacked** → `/workspace`
-2. After edits, **Reload** the extension card
-
-DevTools: service worker console on the extension card; popup via right-click toolbar icon → Inspect Popup.
-
-### Lint / test / build
-
-| Task | Command / workflow |
-|------|-------------------|
-| Lint | Not configured |
-| Automated tests | None — manual browser testing |
-| Build | None |
-| Structure validation | `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` |
-| JS syntax check | `node --check src/background.js` |
-
-### Hello-world verification
-
-1. Extension enabled on `chrome://extensions` (v2.11.0+).
-2. Open popup → **Support** → **Extension Health** → **Run check**.
-3. Expect **Trusted sites**, **Version**, and filter checks to pass.
-
-### Regression checklist (before merging YouTube / DNR / privacy changes)
-
-| Site / feature | How to verify |
-|----------------|---------------|
-| YouTube playback | Video plays; no error **282054944**; log tag `2.11.0-stable` |
-| YouTube ads | DOM skip/mute works; **no** `InnerTube fetch: stripped` in logs |
-| GitHub | Sign-in, repo browse, assets load |
-| Google Drive / Docs | Open files, edit |
-| GA dashboard | `analytics.google.com` loads reports (third-party trackers still blocked elsewhere) |
-| Safe browsing | Health: GitHub/Drive/GA not in malware cache |
-
-### YouTube — play-first (v2.11.1+)
-
-**Let the player start, then block ads.** Do **not** re-add `fetch`/`XHR` `Response` rewriting (black screen + 282054944).
-
-| Phase | Behavior |
-|-------|----------|
-| Until `playing` | No overlay removal, no skip/mute, no `ytInitial` prune |
-| After playback + ~2s grace | `SB_YT_PLAYBACK_READY` → DOM ad handling + optional `ytInitial` prune on later SPA sets |
-| Browse / no video | After 12s, feed-only overlay cleanup (no in-player touches) |
-
-Log tag: `2.11.1-playfirst`. Never remove all `tp-yt-iron-overlay-backdrop` nodes.
-
-### Chrome on cloud VMs
-
-```bash
-google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps &
-```
-
-### Reload gotchas
-
-- **Background:** reload extension; check service worker console.
-- **Content scripts:** reload the **page** tab.
-- **Popup:** close and reopen after reload.
-
-### VM update script (dependency refresh only)
-
-```text
-node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
-node --check src/background.js
-```
+- No InnerTube `fetch`/`XHR` hooks in `inject-youtube.js` (file kept but unloaded)
+- No `import` in content scripts — use `browser-compat.js` shims
+- Popup panels must stay `opacity: 1` when active (no stuck invisible UI)

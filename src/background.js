@@ -487,9 +487,34 @@ const PERSIST_LOG_MAX = 1000; // entries kept in chrome.storage for quick SW-res
 
 // ── IndexedDB — permanent all-time log ────────────────────────────────────────
 // chrome.storage.local is capped at ~10 MB. IndexedDB has no practical limit
-// and persists forever. We write every logEvent here (fire-and-forget) so the
+// and persists long-term. We write every logEvent here (fire-and-forget) so the
 // full history survives across SW restarts, browser restarts, and extension updates.
+// Bounded to MAX_LOG_ENTRIES so it can't grow without limit over months of use
+// (which would bloat storage and make the all-time getAll() read load everything
+// into memory). Oldest entries (lowest autoIncrement keys) are pruned first.
+const MAX_LOG_ENTRIES = 10000;
 let _logDB = null;
+let _logWriteCount = 0;
+
+function _pruneLogDB(db) {
+  try {
+    const tx = db.transaction('events', 'readwrite');
+    const store = tx.objectStore('events');
+    const countReq = store.count();
+    countReq.onsuccess = () => {
+      let excess = countReq.result - MAX_LOG_ENTRIES;
+      if (excess <= 0) return;
+      const curReq = store.openCursor(); // ascending = oldest insertion order first
+      curReq.onsuccess = () => {
+        const cursor = curReq.result;
+        if (!cursor || excess <= 0) return;
+        cursor.delete();
+        excess--;
+        cursor.continue();
+      };
+    };
+  } catch (_) { /* pruning is best-effort; never block logging */ }
+}
 
 function _getLogDB() {
   if (_logDB) return Promise.resolve(_logDB);
@@ -509,6 +534,7 @@ function _getLogDB() {
       // re-opens it instead of using a dead handle forever.
       _logDB.addEventListener('close', () => { _logDB = null; });
       _logDB.addEventListener('error', () => { _logDB = null; });
+      _pruneLogDB(_logDB); // bound the all-time log on each SW startup
       resolve(_logDB);
     };
     req.onerror   = ()  => reject(req.error);
@@ -524,6 +550,9 @@ function _writeLogToDB(entry) {
       // Reset on transaction failure so the next write re-opens the connection
       // instead of re-using a handle that is no longer valid.
       tx.onerror = () => { _logDB = null; };
+      // Throttled prune so a long-lived SW session (e.g. during a big sync) can't
+      // overshoot the cap between startups.
+      if (++_logWriteCount % 500 === 0) _pruneLogDB(db);
     })
     .catch(() => { _logDB = null; }); // allow reconnect on next write attempt
 }

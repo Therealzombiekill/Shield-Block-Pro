@@ -38,6 +38,8 @@ YouTube and Twitch each use two coordinated scripts:
 
 The MAIN world script receives enable/disable signals from the ISOLATED script via `window.postMessage({ type: 'SB_YOUTUBE_DISABLE' })` etc., since MAIN world cannot read settings from storage.
 
+`content-youtube.js` also implements opt-in **YouTube Extras** (`settings.youtubeExtras`, default off): hide Shorts shelves/nav and remove end-screen cards. These run only inside the active ad-blocking path and use narrow, page-level selectors to avoid the player-cosmetic black-screen risk.
+
 ### DNR rule ID space
 
 All Declarative Net Request rules share a single integer ID namespace. Collisions cause silent rule drops. The layout is documented in `background.js` lines 13–17 and the filter list table at lines 108–176:
@@ -98,19 +100,29 @@ const _host = location.hostname.replace(/^www\./, '');
 if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 ```
 
-### SSAI streaming platforms (Twitch, Hulu, Kick, Spotify)
+### SSAI streaming platforms
 
-These platforms use Server-Side Ad Insertion — ads and content are a single continuous stream. Full ad removal is not possible without a network proxy. The strategy for all four:
-1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements)
+Server-Side Ad Insertion stitches ads into the content stream, so they can't be removed at the network layer. Two layers handle it:
+- **Dedicated scripts**: `content-twitch.js`, `content-hulu.js`, `content-kick.js`, `content-spotify.js`
+- **Generic handler**: `content-streaming.js` (`settings.streaming`) covers Max, Disney+, Paramount+, Peacock, Pluto TV and Tubi via a per-host config map.
+
+The strategy:
+1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements) — `content-streaming.js` adds a player-scoped "Ad…" text detector as a durable fallback
 2. Mute the video element (`video.muted = true`) for the ad duration
-3. Remove ad UI overlays from the DOM
-4. Restore original mute state when ad ends
+3. Remove ad UI overlays from the DOM (the dedicated scripts; `content-streaming.js` is **mute-only** to stay playback-safe on players we can't test)
+4. Restore original mute state when the ad ends
 
 Spotify additionally attempts a skip (seeks to `audio.duration - 0.1` or clicks the next-track button).
+
+### Annoyance blocker
+
+`content-annoyances.js` (ISOLATED, `document_idle`, `settings.annoyances`) removes intrusive third-party widgets the general cosmetic engine doesn't cover: live-chat widgets, web-push permission pre-prompts, smart app-install banners, survey/feedback bubbles, and sticky social-share bars. Selectors are vendor-scoped (named IDs/classes) to keep false positives near zero. Newsletter popups, anti-adblock walls and high-z interstitials remain in `content-general.js` (under `settings.cosmetic`) — do not duplicate them here.
 
 ### Browser compatibility
 
 `src/browser-compat.js` must be the first script loaded in every content script context (it's listed first in every `manifest.json` content_scripts entry). It maps `globalThis.chrome = globalThis.browser` in Firefox so all code can use `chrome.*` uniformly. The background SW imports it at the top: `import './browser-compat.js'`.
+
+`content-privacy.js` is a module content script (`"type": "module"`) that imports `./trusted-sites.js`. ES-module imports in content scripts are fetched over the extension URL, so any imported module **must** be listed in `web_accessible_resources` — `src/trusted-sites.js` is.
 
 Firefox-specific callouts in the codebase:
 - `chrome.declarativeNetRequest.getMatchedRules` is not implemented in Firefox — guarded with `if (!chrome.declarativeNetRequest.getMatchedRules)`

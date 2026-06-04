@@ -1,18 +1,21 @@
 /**
  * ShieldBlock Pro — Additional Streaming Platforms (SSAI)
  *
- * Max, Disney+, Paramount+, Peacock, Pluto TV and Tubi use Server-Side Ad
- * Insertion: ads are stitched into the same stream as the content, so they can't
- * be dropped at the network layer (see CLAUDE.md → "SSAI streaming platforms").
- * The realistic, playback-safe strategy — like content-hulu.js / content-kick.js —
- * is to MUTE the <video> for the duration of a detected ad break and restore the
- * original mute state afterwards. We intentionally do NOT remove player DOM: these
- * are unfamiliar players we can't test, and muting alone delivers the core win
- * without any risk of breaking the UI or detection.
+ * Max, Disney+, Paramount+, Peacock, Pluto TV, Tubi, the Roku Channel, Sling,
+ * Fubo, Crackle, Discovery+, Plex, Xumo and Vudu use Server-Side Ad Insertion:
+ * ads are stitched into the same stream as the content, so they can't be dropped
+ * at the network layer (see CLAUDE.md → "SSAI streaming platforms"). The realistic,
+ * playback-safe strategy — like content-hulu.js / content-kick.js — is to MUTE the
+ * <video> for a detected ad break and restore the original mute state afterwards.
+ * Mute-only: no DOM removal, so we can never break the UI on players we can't test.
  *
- * Detection is deliberately conservative — if nothing matches we do NOTHING, so a
- * missed selector never wrongly mutes real content. Toggle: settings.streaming.
- * Stat bucket: 'streaming'.
+ * Detection is deliberately CONSERVATIVE because a false positive = muting real
+ * content for the whole session. We therefore avoid substring selectors like
+ * [class*="ad-"] (which also match "load-more", "thread-…", "upload-…", etc.) and
+ * use exact-token class selectors + only-distinctive substrings, plus a tightly
+ * anchored player-scoped "Ad" text detector. If nothing matches we do NOTHING.
+ *
+ * Toggle: settings.streaming. Stat bucket: 'streaming'.
  */
 
 (async () => {
@@ -34,42 +37,51 @@
   const _wl = settings?.whitelist ?? [];
   if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
-  // ── Per-platform ad markers ─────────────────────────────────────────────────
-  // Best-effort selectors that indicate an ad is active. Vendors rename classes
-  // often, so a player-scoped "Ad…" text detector (below) is the durable fallback.
-  const PLATFORMS = {
-    'max.com':            ['[data-testid*="ad-control" i]', '[class*="AdsControls"]', '[class*="ad-countdown" i]', '[aria-label*="Advertisement" i]'],
-    'disneyplus.com':     ['[data-testid="ad-badge"]', '[class*="adBadge"]', '[class*="ad-badge" i]', '[data-gv2containername*="ad_" i]'],
-    'paramountplus.com':  ['.ad-ui', '[class*="ad-overlay" i]', '[data-ui-tracking*="ad" i]', '.skin-ad'],
-    'peacocktv.com':      ['[data-testid*="ad-" i]', '.ad-marker', '[class*="adCountdown"]', '[class*="ad-indicator" i]'],
-    'pluto.tv':           ['[data-testid*="ad-break" i]', '[class*="ad-grace"]', '[class*="adBreak"]', '[class*="ad-indicator" i]'],
-    'tubitv.com':         ['[data-testid*="ad-" i]', '[class*="adBadge"]', '[class*="ad-count" i]', '.ad-overlay'],
+  // Friendly platform name (for logging). Manifest already scopes which hosts run.
+  const HOSTS = {
+    'max.com': 'Max', 'disneyplus.com': 'Disney+', 'paramountplus.com': 'Paramount+',
+    'peacocktv.com': 'Peacock', 'pluto.tv': 'Pluto TV', 'tubitv.com': 'Tubi',
+    'roku.com': 'Roku Channel', 'sling.com': 'Sling', 'fubo.tv': 'Fubo',
+    'crackle.com': 'Crackle', 'discoveryplus.com': 'Discovery+', 'plex.tv': 'Plex',
+    'xumo.com': 'Xumo', 'vudu.com': 'Vudu',
   };
-
-  let _key = null, _selectors = null;
-  for (const key of Object.keys(PLATFORMS)) {
-    if (_host === key || _host.endsWith('.' + key)) { _key = key; _selectors = PLATFORMS[key]; break; }
+  let _name = _host;
+  for (const key of Object.keys(HOSTS)) {
+    if (_host === key || _host.endsWith('.' + key)) { _name = HOSTS[key]; break; }
   }
-  if (!_key) return; // not one of our platforms (manifest already scopes matches)
-  const _adSel = _selectors.join(',');
 
-  // Matches a leaf label that STARTS with the word "ad"/"advertisement" — e.g.
-  // "Ad", "Ad 1 of 3", "Advertisement", "Ad · 0:15". The \b after the optional
-  // "vertisement" means it never matches "Add…", and it never matches a bare
-  // "0:15" timer (which is the normal playback clock — matching that would mute
-  // real content).
-  const AD_TEXT_RE = /^\s*ad(vertisement)?\b/i;
+  // ── Ad markers (SHARED, safe across all platforms) ──────────────────────────
+  // Exact-token class selectors do CSS token matching, so ".ad-badge" matches an
+  // element whose class list contains exactly "ad-badge" — it can NOT hide inside
+  // "thread-badge"/"load-badge" the way [class*="ad-badge"] would. The substring
+  // selectors are limited to "advertisement"/"AdsControls", which appear in no
+  // ordinary word, plus exact data-testids.
+  const AD_SEL = [
+    '.ad-badge', '.ad-marker', '.ad-overlay', '.ad-countdown', '.ad-indicator',
+    '.ad-ui', '.ad-grace', '.ad-break', '.ad-banner', '.ad-active', '.skin-ad',
+    '.preroll', '.pre-roll', '.ad-slate',
+    '[class*="advertisement" i]', '[aria-label*="advertisement" i]',
+    '[aria-label*="ad break" i]', '[class*="AdsControls"]',
+    '[data-testid="ad-badge"]', '[data-testid="ad-countdown"]', '[data-testid="ad-overlay"]',
+  ].join(',');
+
+  // Whole-label match only — anchored with $ so it matches "Ad", "Advertisement",
+  // "Ad 1 of 3", "Ad · 0:15", "Ad: 15s", "Ad break", but NOT "Ad-free",
+  // "Ad-supported", "Ad info", "AdChoices", "Ad feedback" (trailing words) nor a
+  // bare "0:15" timer. (content-kick.js / content-hulu.js use the same anchored style.)
+  const AD_TEXT_RE = /^\s*ad(vertisement)?(\s*[·:]?\s*(\d+(\s*of\s*\d+)?|\d+:\d{2}|\d+\s*s(ec)?|break))?\s*$/i;
 
   function isAdPlaying() {
-    try { if (document.querySelector(_adSel)) return true; } catch (_) {}
+    try { if (document.querySelector(AD_SEL)) return true; } catch (_) {}
     const video = document.querySelector('video');
     if (!video) return false;
     const player = video.closest('[class*="player" i], [class*="Player"], [data-testid*="player" i]');
     if (!player) return false; // no player scope → don't risk a page-wide text scan
     let scanned = 0;
     for (const el of player.querySelectorAll('span, div, p')) {
-      if (el.children.length !== 0) continue;     // leaf nodes only
-      if (++scanned > 300) break;                  // bound the scan on huge DOMs
+      if (el.children.length !== 0) continue;      // leaf nodes only
+      if (++scanned > 300) break;                   // bound the scan on huge DOMs
+      if (el.closest('a, button')) continue;        // skip "AdChoices"/"Ad info" disclosure links
       if (AD_TEXT_RE.test(el.textContent)) return true;
     }
     return false;
@@ -77,24 +89,32 @@
 
   let adActive = false;
   let wasMuted = false;
+  let _adVideo = null;   // the exact <video> we muted, so SPA element swaps don't strand it
   let _adStart = 0;
+
+  function _restore() {
+    // Restore the element we actually muted; the player may have swapped <video>
+    if (_adVideo && _adVideo.isConnected) _adVideo.muted = wasMuted;
+    else { const v = document.querySelector('video'); if (v) v.muted = wasMuted; }
+    _adVideo = null;
+  }
 
   function tick() {
     if (globalThis.__sbGlobalPause) return;
-    const video = document.querySelector('video');
     const hasAd = isAdPlaying();
 
     if (hasAd && !adActive) {
       adActive = true;
       _adStart = Date.now();
-      if (video) { wasMuted = video.muted; video.muted = true; }
+      const video = document.querySelector('video');
+      if (video) { wasMuted = video.muted; video.muted = true; _adVideo = video; }
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'streaming' }).catch(() => {});
-      _sbLog('info', `Ad start — muted (SSAI)`, { platform: _key });
+      _sbLog('info', `Ad start — muted (SSAI)`, { platform: _name });
     } else if (!hasAd && adActive) {
       const dur = `${((Date.now() - _adStart) / 1000).toFixed(1)}s`;
       adActive = false;
-      if (video) video.muted = wasMuted;
-      _sbLog('info', `Ad end — audio restored, duration ${dur}`, { platform: _key });
+      _restore();
+      _sbLog('info', `Ad end — audio restored, duration ${dur}`, { platform: _name });
     }
   }
 
@@ -107,11 +127,7 @@
     _obs.disconnect();
     clearInterval(_int);
     clearTimeout(_deb);
-    if (adActive) {
-      const video = document.querySelector('video');
-      if (video) video.muted = wasMuted;
-      adActive = false;
-    }
+    if (adActive) { _restore(); adActive = false; }
   }
 
   window.addEventListener('beforeunload', stopStreamingBlocking, { once: true });
@@ -130,7 +146,7 @@
     }
   });
 
-  _sbLog('info', `Init — ${_host}`, { platform: _key });
+  _sbLog('info', `Init — ${_host}`, { platform: _name });
   tick();
 })().catch(e => {
   try { chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'streaming', level: 'error', message: `Script error: ${e?.message ?? e}`, data: {} }).catch(() => {}); } catch (_) {}

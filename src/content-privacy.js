@@ -18,9 +18,8 @@
   }
 
   function postConfig() {
-    const onAmazon = typeof globalThis.__sbIsAmazonShoppingHost === 'function'
-      ? globalThis.__sbIsAmazonShoppingHost(host)
-      : host.includes('amazon.');
+    // browser-compat.js always runs first in this context, so the helper is defined.
+    const onAmazon = !!globalThis.__sbIsAmazonShoppingHost?.(host);
     const disabled = globalPaused || isWhitelisted() || onAmazon;
     window.postMessage({
       type: 'SB_PRIVACY_CONFIG',

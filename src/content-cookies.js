@@ -30,7 +30,6 @@
   // No cookie auto-click on YouTube or Amazon — breaks players / checkout
   if (_host.includes('youtube.com') || _host.includes('youtu.be')) return;
   if (typeof globalThis.__sbIsAmazonShoppingHost === 'function' && globalThis.__sbIsAmazonShoppingHost(_host)) return;
-  if (_host.includes('amazon.')) return;
   if (_ckWl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
   // ── Banner container selectors ─────────────────────────────────────────────

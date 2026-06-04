@@ -1471,7 +1471,9 @@ async function rebuildAggregatedFilterCaches() {
     const meta = stored[`fm_${list.key}`];
     if (meta?.at > latestAt) latestAt = meta.at;
     const fc = stored[`fc_${list.key}`];
-    if (Array.isArray(fc)) allCosmetics.push(...fc);
+    // for...of rather than push(...fc): a very large per-list cosmetic array would
+    // overflow the call stack when spread into push() arguments.
+    if (Array.isArray(fc)) for (const sel of fc) allCosmetics.push(sel);
     const fd = stored[`fd_${list.key}`] ?? {};
     for (const [dom, sels] of Object.entries(fd)) {
       if (!allDomainCosmetics[dom]) allDomainCosmetics[dom] = [];
@@ -2329,7 +2331,7 @@ async function injectCosmetics(tabId, tabUrl) {
     const SKIP_DOMAINS = ['youtube.com','youtu.be','youtube-nocookie.com',
                           'music.youtube.com','tv.youtube.com'];
     if (SKIP_DOMAINS.some(d => domain === d || domain.endsWith('.' + d))) return;
-    if (domain.includes('amazon.')) return;
+    if (isAmazonShoppingHost(domain)) return;
   } catch (_) { return; }
 
   const tabState = _tabCosmeticState.get(tabId) ?? { baseCss: false, css: '' };

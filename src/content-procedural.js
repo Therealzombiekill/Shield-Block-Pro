@@ -33,7 +33,8 @@
   const host  = location.hostname.replace(/^www\./, '');
   // Skip entirely on YouTube — nothing to do there
   if (host.includes('youtube.com') || host.includes('youtu.be')) return;
-  if (host.includes('amazon.')) return;
+  // Suffix-match helper avoids false-matching notamazon.com / amazon.evil.com.
+  if (globalThis.__sbIsAmazonShoppingHost?.(host)) return;
   const _wl   = settings?.whitelist ?? [];
   if (_wl.some(d => host === d || host.endsWith('.' + d))) return;
 

@@ -97,6 +97,8 @@ const TIME_SAVED_SECONDS = {
   general:   5, // typical ad script load time
   social:    2, // skipped sponsored post
   cookies:   8, // time to find + click "reject all"
+  annoyances: 3, // dismissed nag / widget / banner
+  streaming: 30, // SSAI ad break (additional platforms)
 };
 
 // ── Browser detection ─────────────────────────────────────────────────────────
@@ -211,6 +213,9 @@ const DEFAULT_SETTINGS = {
   hulu: true,
   kick: true,
   youtube: true,
+  youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
+  annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
+  streaming: true,      // SSAI ad-mute on additional streaming platforms (Max, Disney+, etc.)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
   paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
@@ -743,9 +748,8 @@ function incrementStat(type, tabId) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
     ps.total = (ps.total | 0) + 1;
     ps.dom   = (ps.dom   | 0) + 1;
-    if (ps[type] !== undefined || ['amazon','general','social','cookies','spotify'].includes(type)) {
-      ps[type] = (ps[type] | 0) + 1;
-    }
+    // Record every stat type per-tab so the popup "This page" breakdown is complete
+    ps[type] = (ps[type] | 0) + 1;
     _pageStats.set(tabId, ps);
   }
   // Accumulate — flush to storage in a single write after 500ms idle

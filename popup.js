@@ -186,6 +186,8 @@ async function refreshStats() {
       if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
       if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);
       if (page.general > 0) parts.push(`${fmt(page.general)} web`);
+      if (page.annoyances > 0) parts.push(`${fmt(page.annoyances)} nags`);
+      if (page.streaming  > 0) parts.push(`${fmt(page.streaming)} stream`);
       $('stat-page').textContent = parts.length
         ? fmt(n) + ' · ' + parts.join(' · ')
         : fmt(n) + ' blocked';

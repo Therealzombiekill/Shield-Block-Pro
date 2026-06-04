@@ -26,8 +26,11 @@ const PAUSE_ALL_RULE_ID = 49999;
 // so they never collide with either.
 const REMOVEPARAM_BASE  = 30000; // 30000-30999: global + domain-scoped removeparam rules
 const MATRIX_BASE       = 31000; // 31000-31999: per-domain filtering matrix rules
-const USER_DNR_BASE     = 48000; // 48000-48499: user-typed network block rules
-const USER_DNR_END      = 48499;
+// NOTE: must NOT overlap WHITELIST_BASE (48000-49998). applyWhitelistRules() clears the
+// whole 48000-49998 span and applyUserFilterRules() clears USER_DNR_BASE-USER_DNR_END, so a
+// shared base silently deleted whitelisted-domain allow rules. Park user rules above the matrix.
+const USER_DNR_BASE     = 32000; // 32000-32499: user-typed network block rules
+const USER_DNR_END      = 32499;
 const DNR_RESOURCE_TYPES = [
   'main_frame','sub_frame','script','image','stylesheet','object',
   'xmlhttprequest','ping','media','websocket','font','other',
@@ -364,6 +367,30 @@ const HTTPS_UPGRADE_ID   = 47001; // upgradeScheme — http → https for main/s
 const DNT_GPC_RULE_ID    = 47002; // set DNT: 1 and Sec-GPC: 1 on all outbound requests
 const AMAZON_ALLOW_INIT_ID = 47003; // allow subresources when shopping on Amazon
 const AMAZON_ALLOW_MAIN_ID = 47004; // allow main-frame navigations to Amazon storefronts
+
+// Sanity-check: the feature DNR ID ranges must be mutually disjoint. A silent overlap
+// (WHITELIST_BASE === USER_DNR_BASE) previously let applyWhitelistRules() and
+// applyUserFilterRules() delete each other's rules. Logged at startup so it can't recur.
+(function _checkFeatureRanges() {
+  const ranges = [
+    ['removeparam', REMOVEPARAM_BASE,  REMOVEPARAM_BASE + 999],
+    ['matrix',      MATRIX_BASE,       MATRIX_BASE + 999],
+    ['user-dnr',    USER_DNR_BASE,     USER_DNR_END],
+    ['privacy',     REFERRER_RULE_ID,  AMAZON_ALLOW_MAIN_ID],
+    ['whitelist',   WHITELIST_BASE,    PAUSE_ALL_RULE_ID - 1],
+    ['pause-all',   PAUSE_ALL_RULE_ID, PAUSE_ALL_RULE_ID],
+  ];
+  for (let i = 0; i < ranges.length; i++) {
+    for (let j = i + 1; j < ranges.length; j++) {
+      if (ranges[i][1] <= ranges[j][2] && ranges[j][1] <= ranges[i][2]) {
+        logEvent('system', 'error',
+          `Feature DNR range overlap: ${ranges[i][0]} [${ranges[i][1]},${ranges[i][2]}] overlaps ` +
+          `${ranges[j][0]} [${ranges[j][1]},${ranges[j][2]}]`);
+      }
+    }
+  }
+})();
+
 /** Bumped when stability maintenance (Amazon allowlist, DNR allow rules) must re-run. */
 const STABILITY_VERSION = '2.17.0';
 

@@ -164,13 +164,21 @@
     _procObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
   }
 
+  function _teardown() {
+    _procObserver?.disconnect();
+    _procObserver = null;
+    clearTimeout(_procDeb);
+    // Remove injected style block so hidden elements reappear
+    document.getElementById('_sb_domain_cosmetic')?.remove();
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.settings?.newValue?.cosmetic === false) {
-      _procObserver?.disconnect();
-      _procObserver = null;
-      clearTimeout(_procDeb);
-      // Remove injected style block
-      document.getElementById('_sb_domain_cosmetic')?.remove();
+    const wl = changes.whitelist?.newValue;
+    const isWhitelisted = Array.isArray(wl) && wl.some(d => host === d || host.endsWith('.' + d));
+    const gp = changes.globalPause?.newValue;
+    const isPaused = !!(gp && gp.until > Date.now());
+    if (changes.settings?.newValue?.cosmetic === false || isWhitelisted || isPaused) {
+      _teardown();
     }
   });
 
@@ -322,6 +330,14 @@
 
   // Listen for messages from popup/background
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    // Stop hiding/observing when the user pauses globally or whitelists this site
+    // (mirrors content-general.js — every sibling content script honours these).
+    if (msg.type === 'GLOBAL_PAUSE') { _teardown(); return; }
+    if (msg.type === 'WHITELIST_CHANGED') {
+      const wl = msg.whitelist ?? [];
+      if (wl.some(d => host === d || host.endsWith('.' + d))) _teardown();
+      return;
+    }
     if (msg.type === 'ACTIVATE_PICKER') {
       activatePicker();
       sendResponse({ ok: true });

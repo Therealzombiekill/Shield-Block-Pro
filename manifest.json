@@ -382,7 +382,8 @@
         "rules/extended.json",
         "rules/tracking.json",
         "rules/hosts.json",
-        "src/filter-catalog.json"
+        "src/filter-catalog.json",
+        "src/cosmetic.css"
       ],
       "matches": [
         "<all_urls>"

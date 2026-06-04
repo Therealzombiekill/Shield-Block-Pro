@@ -47,11 +47,19 @@
     'amazon.co.jp', 'amazon.in', 'amazon.fr', 'amazon.es', 'amazon.it',
     'amazon.com.mx', 'amazon.com.br', 'amazon.nl', 'amazon.pl', 'amazon.se', 'amazon.sg',
   ]);
+  // Complete Amazon storefront + first-party CDN apexes (suffix-matched).
+  // Mirrors AMAZON_SHOPPING_HOSTS in trusted-sites.js — keep in sync.
+  const _amazonHosts = new Set([
+    'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.ca', 'amazon.com.au',
+    'amazon.co.jp', 'amazon.in', 'amazon.fr', 'amazon.es', 'amazon.it',
+    'amazon.com.mx', 'amazon.com.br', 'amazon.nl', 'amazon.pl', 'amazon.se', 'amazon.sg',
+    'amazon.ae', 'amazon.com.tr', 'amazon.sa', 'amazon.eg', 'amazon.com.be', 'amazon.cl', 'amazon.com.co',
+    'media-amazon.com', 'ssl-images-amazon.com',
+  ]);
   globalThis.__sbIsAmazonShoppingHost = function (host) {
-    if (!host) return false;
-    host = host.replace(/^www\./, '').toLowerCase();
-    if (host.includes('amazon.')) return true;
-    return globalThis.__sbHostMatchesSet(host, _privacySkipHosts);
+    // Suffix-match (smile.amazon.com → amazon.com). Previously host.includes('amazon.')
+    // false-matched notamazon.com / amazon.evil.com, disabling protections on them.
+    return globalThis.__sbHostMatchesSet(host, _amazonHosts);
   };
   globalThis.__sbHostMatchesSet = function (host, domainSet) {
     if (!host) return false;

@@ -139,12 +139,11 @@ export function shouldSkipPrivacyUrlClean(host) {
 
 /** Any Amazon storefront host (regional TLDs and subdomains like smile.amazon.com). */
 export function isAmazonShoppingHost(host) {
-  if (!host) return false;
-  host = host.replace(/^www\./, '').toLowerCase();
-  if (host.includes('amazon.')) return true;
-  return hostMatchesSet(host, new Set(
-    AMAZON_STABILITY_DOMAINS.map(d => d.replace(/^www\./, '')),
-  ));
+  // Suffix-match against the known Amazon storefront/CDN apexes. hostMatchesSet already
+  // covers subdomains (smile.amazon.com → amazon.com). Previously this used
+  // host.includes('amazon.'), which false-matched unrelated sites (notamazon.com,
+  // amazon.evil.com), silently disabling cookie/privacy/removeparam protection on them.
+  return hostMatchesSet(host, AMAZON_SHOPPING_HOSTS);
 }
 
 /** Apex domains for DNR excludedInitiatorDomains on static Amazon ad rules. */
@@ -154,6 +153,12 @@ export const AMAZON_INITIATOR_EXCLUSIONS = [
   'amazon.com.mx', 'amazon.com.br', 'amazon.nl', 'amazon.pl', 'amazon.se', 'amazon.sg',
   'amazon.ae', 'amazon.com.tr', 'amazon.sa', 'amazon.eg', 'amazon.com.be', 'amazon.cl', 'amazon.com.co',
 ];
+
+/** Storefront + first-party CDN apexes, suffix-matched (covers subdomains via hostMatchesSet). */
+const AMAZON_SHOPPING_HOSTS = new Set([
+  ...AMAZON_INITIATOR_EXCLUSIONS,
+  'media-amazon.com', 'ssl-images-amazon.com',
+]);
 
 /** Manifest exclude_matches — keep in sync with content-general exclusions. */
 export const AMAZON_EXCLUDE_MATCHES = [

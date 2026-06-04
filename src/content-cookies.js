@@ -293,6 +293,13 @@
   function handleBanners() {
     let anyAction = false;
 
+    // Prune shadow roots whose host element has been detached, otherwise the set
+    // grows unbounded on long-lived SPA pages — retaining detached DOM (memory
+    // leak) and slowing every debounce tick. `document` is always kept.
+    for (const root of knownRoots) {
+      if (root !== document && root.host && !root.host.isConnected) knownRoots.delete(root);
+    }
+
     for (const root of knownRoots) {
       const doc = root === document ? document : root.ownerDocument ?? document;
 

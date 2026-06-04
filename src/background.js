@@ -3,7 +3,7 @@
  */
 
 import './browser-compat.js';
-import { parseFilterList } from './filter-parser.js';
+import { parseFilterList, sanitizeDnrRule } from './filter-parser.js';
 
 const MAX_DYNAMIC_RULES = 5000;
 const MAX_FILTER_RULES = 4300; // reserve dynamic-rule headroom for pause, whitelist, matrix, and privacy rules
@@ -662,7 +662,9 @@ async function _retryFailedLists() {
     try {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set(existing.map(r => r.id));
-      const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
+      // Sanitize so one Chrome-rejected rule can't fail the whole retry batch.
+      const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)))
+        .map(sanitizeDnrRule).filter(Boolean);
       const budget = 5000 - existing.length;
       if (budget > 0 && uniqueNew.length > 0) {
         await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
@@ -891,9 +893,11 @@ let _syncListStatus = {}; // { [key]: { status:'ok'|'error'|'cached'|'304', rule
 // can't cause it to leak. The interval itself also keeps the SW alive since
 // the callback re-registers the timer.
 let _keepAliveTimer = null;
+let _keepAliveRefs  = 0; // refcount: multiple long ops can hold the keep-alive at once
 
 function _startKeepAlive(label) {
-  if (_keepAliveTimer) return; // already running (nested call guard)
+  _keepAliveRefs++;
+  if (_keepAliveTimer) return; // timer already running; this caller just holds a ref
   _keepAliveTimer = setInterval(() => {
     chrome.storage.local.get('__ka').catch(() => {}); // reset idle timer
   }, 20000); // 20s < Chrome's 30s idle threshold
@@ -901,6 +905,11 @@ function _startKeepAlive(label) {
 }
 
 function _stopKeepAlive() {
+  if (_keepAliveRefs > 0) _keepAliveRefs--;
+  // Only tear down the timer once the LAST holder releases it. Without refcounting,
+  // an overlapping op (e.g. safe-browsing refresh finishing before a filter sync)
+  // would clear the shared timer and let Chrome kill the SW mid-operation.
+  if (_keepAliveRefs > 0) return;
   if (!_keepAliveTimer) return;
   clearInterval(_keepAliveTimer);
   _keepAliveTimer = null;
@@ -1629,7 +1638,11 @@ async function syncFilterLists(force = false) {
     // different IDs — wastes slots for identical blocking behaviour.
     const seenIds  = new Set();
     const seenUrls = new Set();
-    let deduped  = allRules.filter(r => {
+    // Sanitize first: a single rule Chrome rejects (non-ASCII urlFilter, wildcard
+    // or non-canonical initiator domain) makes updateDynamicRules drop the entire
+    // 500-rule batch. This also cleans rules reused from older-parser caches.
+    const sanitizedRules = allRules.map(sanitizeDnrRule).filter(Boolean);
+    let deduped  = sanitizedRules.filter(r => {
       if (!Number.isInteger(r.id) || r.id <= 0)           return false;
       if (!r.action?.type || !r.condition?.urlFilter)      return false;
       const len = r.condition.urlFilter.length;
@@ -2155,6 +2168,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // External pages cannot send runtime messages, but validating here is defense-in-depth.
   if (sender.id !== chrome.runtime.id) return;
   (async () => {
+    try {
     switch (msg.type) {
 
       // License — extension is free, always valid
@@ -2961,6 +2975,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       default: sendResponse({ error: 'Unknown message' });
+    }
+    } catch (e) {
+      // A throw inside any case would otherwise leave sendResponse uncalled —
+      // the caller (popup/content script) then hangs until the port times out
+      // ("message port closed"). Always respond, even on failure.
+      try { logEvent('system', 'error', `Message handler error (${msg?.type}): ${e?.message ?? e}`); } catch (_) {}
+      try { sendResponse({ ok: false, error: e?.message ?? String(e) }); } catch (_) {}
     }
   })();
   return true;

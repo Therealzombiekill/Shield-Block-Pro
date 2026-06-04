@@ -77,6 +77,52 @@ function isDomainProtected(filter) {
   return false;
 }
 
+// ── DNR rule validity guard ────────────────────────────────────────────────
+// Chrome's declarativeNetRequest.updateDynamicRules is atomic: if ANY rule in a
+// batch is malformed it rejects the ENTIRE batch (up to 500 real blocking rules
+// are silently dropped). Filter lists routinely contain entries that produce
+// rules Chrome rejects — non-ASCII/IDN hosts in `urlFilter`, and wildcard/regex
+// or non-canonical domains in `initiatorDomains`/`excludedInitiatorDomains`.
+// These guards run at the apply chokepoints so a single bad entry can never
+// poison a batch.
+
+// A canonical DNR domain: lowercase ASCII, ≥2 dot-separated labels, each label
+// starting/ending alphanumeric, no wildcard, no regex, no leading/trailing dot.
+export function isValidDnrDomain(d) {
+  return typeof d === 'string' &&
+    d.length > 0 && d.length <= 253 &&
+    /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d);
+}
+
+// Sanitize a DNR rule (from this or an older parser version, fresh or cached) so
+// Chrome never rejects the batch. Returns a cleaned rule, or null if it can't be
+// made valid. Mutates the passed rule's condition in place.
+//   - urlFilter must be printable ASCII with no spaces (Chrome requires ASCII).
+//   - initiator/excluded domains are lowercased and filtered to valid domains.
+//   - a domain-scoped rule that loses ALL its initiator domains is dropped, not
+//     promoted to a global rule (which would silently over-block the whole web).
+//   - any domain appearing in both lists is removed from the excluded list.
+export function sanitizeDnrRule(rule) {
+  try {
+    const c = rule?.condition;
+    if (!c || typeof c.urlFilter !== 'string') return null;
+    if (!/^[\x21-\x7E]+$/.test(c.urlFilter)) return null;
+    if (Array.isArray(c.initiatorDomains)) {
+      const hadDomains = c.initiatorDomains.length > 0;
+      const valid = [...new Set(c.initiatorDomains.map(d => String(d).toLowerCase()).filter(isValidDnrDomain))];
+      if (hadDomains && valid.length === 0) return null;
+      if (valid.length) c.initiatorDomains = valid; else delete c.initiatorDomains;
+    }
+    if (Array.isArray(c.excludedInitiatorDomains)) {
+      const initSet = new Set(c.initiatorDomains ?? []);
+      const valid = [...new Set(c.excludedInitiatorDomains.map(d => String(d).toLowerCase()).filter(isValidDnrDomain))]
+        .filter(d => !initSet.has(d));
+      if (valid.length) c.excludedInitiatorDomains = valid; else delete c.excludedInitiatorDomains;
+    }
+    return rule;
+  } catch (_) { return null; }
+}
+
 // Cosmetic pseudo-classes that Chrome can't handle — skip these
 function hasUnsupportedPseudo(selector) {
   return (

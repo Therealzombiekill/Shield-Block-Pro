@@ -31,7 +31,7 @@
   const _host = location.hostname.replace(/^www\./, '');
   const _whitelisted = _wl.some(d => _host === d || _host.endsWith('.' + d));
 
-  const _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
+  let _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
 
   if (settings) {
     try {

@@ -401,8 +401,9 @@
   }
 
   // ── Dispatch ───────────────────────────────────────────────────────────────
+  let _stopped = false;
   function clean() {
-    if (globalThis.__sbGlobalPause) return;
+    if (globalThis.__sbGlobalPause || _stopped) return;
     blocked = 0; // reset counter each cycle so report() fires correctly
     if (host.includes('facebook.com'))                    cleanFacebook();
     else if (host.includes('instagram.com'))              cleanInstagram();
@@ -428,6 +429,7 @@
 
   // Teardown
   function stopSocialBlocking() {
+    _stopped = true; // also halts clean() still reachable via the patched history methods
     clearInterval(_interval);
     _observer.disconnect();
     clearTimeout(_debounce);

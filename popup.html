@@ -91,7 +91,7 @@ body::before{
   0%{transform:scale(.92)}60%{transform:scale(1.04)}100%{transform:scale(1)}
 }
 .dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}
 
 /* ── Nav ─────────────────────────────────────────────────────────────── */
 .nav{
@@ -193,6 +193,8 @@ body.sb-ready .sc:nth-child(9){animation-delay:.28s}
 .sc.sp .sc-n{color:#1db954}
 .sc.hl .sc-n{color:#1ce783}
 .sc.kk .sc-n{color:#53fc18}
+.sc.an .sc-n{color:#f59e0b}
+.sc.st .sc-n{color:#6366f1}
 
 /* Page + lifetime rows */
 .info-rows{border-top:1px solid var(--border)}
@@ -666,6 +668,14 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div class="sc wb">
           <span class="sc-n" id="s-wb">0</span>
           <span class="sc-l">Web</span>
+        </div>
+        <div class="sc an">
+          <span class="sc-n" id="s-an">0</span>
+          <span class="sc-l">Nags</span>
+        </div>
+        <div class="sc st">
+          <span class="sc-n" id="s-st">0</span>
+          <span class="sc-l">Streaming</span>
         </div>
       </div>
     </div>

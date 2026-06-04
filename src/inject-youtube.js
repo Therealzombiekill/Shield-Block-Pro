@@ -1,20 +1,26 @@
 /**
  * ShieldBlock Pro — YouTube MAIN World (playback-safe mode)
  *
- * Do not add fetch/XHR Response rewriting — causes black screen / error 282054944.
+ * ONE stable strategy — do not add fetch/XHR Response rewriting here.
+ * Reconstructing fetch Responses (even with fixed headers) has repeatedly caused
+ * black-screen playback while googlevideo.com still loads. DOM fallback in
+ * content-youtube.js handles ads that play in the player UI.
  *
- * ytInitialPlayerResponse is only pruned AFTER content-youtube.js signals
- * SB_YT_PLAYBACK_READY (video has started). First paint stays pristine so the
- * player can initialize; SPA navigations after that may be pruned.
+ * What we DO here (cannot break the network layer):
+ *   • ytInitialPlayerResponse setter — in-place JSON prune on first paint only
+ *   • SB_YOUTUBE_ENABLE / DISABLE listener (for toggles)
+ *
+ * SPA video changes re-fetch /player in the page; those responses stay pristine.
+ * Skip/mute/overlay removal in the ISOLATED script covers those ads.
  */
 
 (function () {
   'use strict';
 
   let _disabled = false;
-  let _playbackReady = false;
   try {
     if (localStorage.getItem('__sbYtOff') === '1') _disabled = true;
+    // Tab session recovery after YouTube error 282054944 — do not prune InnerTube.
     if (sessionStorage.getItem('__sbYtRecovery') === '1') _disabled = true;
   } catch (_) {}
 
@@ -22,13 +28,13 @@
     if (e.source !== window) return;
     if (e.data?.type === 'SB_YOUTUBE_DISABLE') _disabled = true;
     if (e.data?.type === 'SB_YOUTUBE_ENABLE')  _disabled = false;
-    if (e.data?.type === 'SB_YT_PLAYBACK_READY') _playbackReady = true;
   });
 
   function _sbLog(level, message, data) {
     try { window.postMessage({ type: 'SB_YT_LOG', level, message, data: data ?? {} }, '*'); } catch (_) {}
   }
 
+  // Conservative prune — ad slots only. Do NOT delete auxiliaryUi (breaks player chrome).
   function stripAds(obj, depth) {
     if (!obj || typeof obj !== 'object') return false;
     depth = depth || 0;
@@ -49,11 +55,10 @@
     Object.defineProperty(window, 'ytInitialPlayerResponse', {
       get() { return _ytInitial; },
       set(v) {
-        _ytInitial = v;
-        if (_disabled || !_playbackReady) return;
         try {
-          if (stripAds(v)) _sbLog('info', 'ytInitial: stripped ad placements (post-playback)');
+          if (!_disabled && stripAds(v)) _sbLog('info', 'ytInitial: stripped ad placements');
         } catch (_) { /* never block assign */ }
+        _ytInitial = v;
       },
       configurable: true,
     });

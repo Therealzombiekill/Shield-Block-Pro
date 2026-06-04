@@ -195,10 +195,17 @@ const FILTER_LISTS = [
   for (let i = 0; i < ranges.length; i++) {
     for (let j = i + 1; j < ranges.length; j++) {
       if (ranges[i][0] <= ranges[j][1] && ranges[j][0] <= ranges[i][1]) {
-        logEvent('system', 'error', `Rule ID range overlap: ${ranges[i][2]} overlaps ${ranges[j][2]}`);
+        // Runs at module-eval, before logEvent/_eventLog exist — must use console here.
+        // (Calling logEvent would hit a TDZ ReferenceError and abort SW startup — i.e.
+        // the self-check would crash exactly when it found the problem it guards against.)
+        console.error(`[SB] Rule ID range overlap: ${ranges[i][2]} overlaps ${ranges[j][2]}`);
       }
     }
   }
+  // Chrome hard-caps updateDynamicRules at 5,000 rules total — warn if the configured
+  // sum of per-list maxes ever drifts past it (the table comment is not self-enforcing).
+  const sumMax = FILTER_LISTS.reduce((a, l) => a + (l.max | 0), 0);
+  if (sumMax > 5000) console.warn(`[SB] FILTER_LISTS max sum ${sumMax} exceeds the 5000 dynamic-rule cap`);
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
@@ -1523,12 +1530,14 @@ async function syncFilterLists(force = false) {
           } else {
             _syncListStatus[failKey] = { status: 'error', error: failMsg };
           }
-          // Queue for a single retry in 5 minutes — recovers from transient network blips
+          // Queue for a single retry in 5 minutes — recovers from transient network blips.
+          // NOTE: cached data + list status were already restored inline above
+          // (the if/else on `cached.length`). Do NOT also call _appendCachedListData
+          // here — doing so appended cached rules/removeparams a second time and
+          // overwrote the 'error' status of a genuinely-failed (uncached) list with
+          // a misleading 'cached'/ruleCount:0.
           if (failedEntry) {
             _retryQueue.push({ list: failedEntry.list, limit: failedEntry.limit });
-            _appendCachedListData(stored, failedEntry.list, failedEntry.limit, {
-              allRules, allCosmetics, allDomainCosmetics, allScriptletRules, allRemoveParams,
-            });
           }
           continue;
         }
@@ -2032,7 +2041,6 @@ async function injectCosmetics(tabId, tabUrl) {
     ]);
   if (globalPause && globalPause.until > Date.now()) return;
   if (!s?.cosmetic) return;
-  if (globalPause && globalPause.until > Date.now()) return;
 
   let domain;
   try {

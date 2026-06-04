@@ -131,7 +131,15 @@
         if (!_privacyEnabled) return _gp.apply(this, arguments);
         if (p === 37446) return SPOOFED_RENDERER; // UNMASKED_RENDERER_WEBGL
         if (p === 37445) return SPOOFED_VENDOR;   // UNMASKED_VENDOR_WEBGL
-        if (GL_PARAM_OVERRIDES.has(p)) return GL_PARAM_OVERRIDES.get(p);
+        if (GL_PARAM_OVERRIDES.has(p)) {
+          // Clamp to the real value, never above it: over-reporting a capability
+          // (e.g. MAX_TEXTURE_SIZE) makes apps on low-end GPUs allocate resources the
+          // device can't create -> WebGL errors / black canvas. Normalizing DOWN is
+          // safe and still defeats the fingerprint in the common (real > cap) case.
+          const _real = _gp.apply(this, arguments);
+          const _cap  = GL_PARAM_OVERRIDES.get(p);
+          return (typeof _real === 'number' && _real > 0) ? Math.min(_real, _cap) : _cap;
+        }
         return _gp.apply(this, arguments);
       };
     } catch (_) {}

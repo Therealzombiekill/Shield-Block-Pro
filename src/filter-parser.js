@@ -86,12 +86,15 @@ function isDomainProtected(filter) {
 // These guards run at the apply chokepoints so a single bad entry can never
 // poison a batch.
 
-// A canonical DNR domain: lowercase ASCII, ≥2 dot-separated labels, each label
-// starting/ending alphanumeric, no wildcard, no regex, no leading/trailing dot.
+// A canonical DNR domain: lowercase ASCII, one or more dot-separated labels,
+// each label starting/ending alphanumeric, no wildcard, no regex, no leading/
+// trailing/double dot. Single-label hosts (localhost, intranet names) are valid
+// — Chrome accepts them as initiator/request domains, and the per-domain matrix
+// feeds real page hostnames here, so requiring a dot would drop localhost rules.
 export function isValidDnrDomain(d) {
   return typeof d === 'string' &&
     d.length > 0 && d.length <= 253 &&
-    /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d);
+    /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(d);
 }
 
 // Sanitize a DNR rule (from this or an older parser version, fresh or cached) so

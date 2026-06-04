@@ -1118,7 +1118,7 @@ async function applyMatrixRules() {
     // Swap existing matrix rules: only remove IDs actually present
     const existingMxRules = await chrome.declarativeNetRequest.getDynamicRules();
     const mxRemoveIds = existingMxRules
-      .filter(r => r.id >= MATRIX_BASE && r.id < 32000)
+      .filter(r => r.id >= MATRIX_BASE && r.id <= MATRIX_BASE + 999)
       .map(r => r.id);
 
     // Validate the per-domain hostname (filterMatrix keys are unvalidated) so a
@@ -2268,6 +2268,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
            'userDnrRules','userRemoveParams']
         );
         await applyUserFilterRules();
+        // Also sweep the legacy 48000-range: pre-relocation builds stored user
+        // rules at IDs 48000+. applyWhitelistRules owns that band now and removes
+        // any leftover rules there, so clearing filters fully clears them even if
+        // a whitelist apply hasn't run since an upgrade.
+        await applyWhitelistRules();
         await applyRemoveParamRules();
         sendResponse({ ok: true });
         break;

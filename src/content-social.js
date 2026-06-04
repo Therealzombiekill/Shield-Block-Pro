@@ -427,9 +427,13 @@
   const _interval = setInterval(clean, 3000);
   clean();
 
-  // Teardown
-  function stopSocialBlocking() {
-    _stopped = true; // also halts clean() still reachable via the patched history methods
+  // Teardown. `permanent` (toggle-off / whitelist) also sets _stopped so clean()
+  // can't be revived via the patched history methods. A temporary global pause
+  // passes permanent=false: it tears down the observer/interval but leaves
+  // _stopped clear, so clean() (gated on __sbGlobalPause) resumes on SPA
+  // navigation once the pause expires — instead of staying dead until reload.
+  function stopSocialBlocking(permanent = true) {
+    if (permanent) _stopped = true;
     clearInterval(_interval);
     _observer.disconnect();
     clearTimeout(_debounce);
@@ -440,13 +444,14 @@
     const wl = changes.whitelist?.newValue;
     const isWhitelisted = Array.isArray(wl) && wl.some(d => host === d || host.endsWith('.' + d));
     const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
-    if (_nv?.social === false || isWhitelisted || paused) stopSocialBlocking();
+    if (_nv?.social === false || isWhitelisted) stopSocialBlocking(true);
+    else if (paused) stopSocialBlocking(false);
   });
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === 'GLOBAL_PAUSE') stopSocialBlocking();
+    if (message?.type === 'GLOBAL_PAUSE') stopSocialBlocking(false);
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
-      if (wl.some(d => host === d || host.endsWith('.' + d))) stopSocialBlocking();
+      if (wl.some(d => host === d || host.endsWith('.' + d))) stopSocialBlocking(true);
     }
   });
 

@@ -81,6 +81,17 @@
     },
     {
       "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/browser-compat.js",
+        "src/content-annoyances.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
         "<all_urls>"
       ],
       "exclude_matches": [
@@ -187,6 +198,21 @@
       "js": [
         "src/browser-compat.js",
         "src/content-kick.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.max.com/*",
+        "*://*.disneyplus.com/*",
+        "*://*.paramountplus.com/*",
+        "*://*.peacocktv.com/*",
+        "*://*.pluto.tv/*",
+        "*://*.tubitv.com/*"
+      ],
+      "js": [
+        "src/browser-compat.js",
+        "src/content-streaming.js"
       ],
       "run_at": "document_idle"
     },

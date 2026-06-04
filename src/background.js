@@ -20,8 +20,12 @@ const PAUSE_ALL_RULE_ID = 49999;
 // so they never collide with either.
 const REMOVEPARAM_BASE  = 30000; // 30000-30999: global + domain-scoped removeparam rules
 const MATRIX_BASE       = 31000; // 31000-31999: per-domain filtering matrix rules
-const USER_DNR_BASE     = 48000; // 48000-48499: user-typed network block rules
-const USER_DNR_END      = 48499;
+// NOTE: must NOT overlap WHITELIST_BASE (48000-49998). It previously sat at
+// 48000-48499, colliding with whitelist allow rules — the two paths wiped each
+// other's rules and, applied concurrently in reapplyFeatureRules, dropped rules
+// on an ID clash. Relocated into the free 32000-46999 gap.
+const USER_DNR_BASE     = 32000; // 32000-32499: user-typed network block rules
+const USER_DNR_END      = 32499;
 const DNR_RESOURCE_TYPES = [
   'main_frame','sub_frame','script','image','stylesheet','object',
   'xmlhttprequest','ping','media','websocket','font','other',
@@ -330,9 +334,18 @@ async function applyUserFilterRules() {
     const removeIds = existing
       .filter(r => r.id >= USER_DNR_BASE && r.id <= USER_DNR_END)
       .map(r => r.id);
+    // Re-id into the current USER_DNR range. Rules stored by an older build may
+    // carry stale IDs (the range moved to fix a whitelist collision); re-iding on
+    // every apply makes that migration automatic and guarantees no overlap.
+    let _uid = USER_DNR_BASE;
+    const addRules = userDnrRules.map(sanitizeDnrRule).filter(Boolean)
+      .slice(0, USER_DNR_END - USER_DNR_BASE + 1)
+      .map(r => ({ ...r, id: _uid++ }));
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: removeIds,
-      addRules: userDnrRules.slice(0, USER_DNR_END - USER_DNR_BASE + 1),
+      // Sanitize so one invalid user-typed rule (IDN host, wildcard domain=)
+      // can't make Chrome reject the entire custom rule set.
+      addRules,
     });
   } catch (e) {
     logEvent('user-filters', 'warn', `applyUserFilterRules failed: ${e.message}`);
@@ -1079,12 +1092,15 @@ async function applyMatrixRules() {
       .filter(r => r.id >= MATRIX_BASE && r.id < 32000)
       .map(r => r.id);
 
+    // Validate the per-domain hostname (filterMatrix keys are unvalidated) so a
+    // malformed entry can't make Chrome reject the whole matrix batch.
+    const mxAddRules = newRules.map(sanitizeDnrRule).filter(Boolean);
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: mxRemoveIds,
-      addRules: newRules,
+      addRules: mxAddRules,
     });
 
-    logEvent('matrix', 'info', `Applied ${newRules.length} matrix rules across ${Object.keys(filterMatrix).length} domains`);
+    logEvent('matrix', 'info', `Applied ${mxAddRules.length} matrix rules across ${Object.keys(filterMatrix).length} domains`);
   } catch (e) {
     logEvent('matrix', 'warn', `applyMatrixRules failed: ${e.message}`);
   }

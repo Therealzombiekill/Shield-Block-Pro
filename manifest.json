@@ -331,7 +331,8 @@
         "rules/extended.json",
         "rules/tracking.json",
         "rules/hosts.json",
-        "src/filter-catalog.json"
+        "src/filter-catalog.json",
+        "src/trusted-sites.js"
       ],
       "matches": [
         "<all_urls>"

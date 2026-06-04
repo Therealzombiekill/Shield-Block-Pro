@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.10.7",
-  "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
+  "version": "2.17.2",
+  "description": "Block ads, trackers and cookie banners. Privacy and fingerprint protection for the web.",
   "permissions": [
     "storage",
     "declarativeNetRequest",
@@ -28,24 +28,12 @@
       "matches": [
         "<all_urls>"
       ],
-      "js": [
-        "src/inject-privacy.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-privacy.js"
-      ],
-      "run_at": "document_start"
-    },
-    {
-      "matches": [
+      "exclude_matches": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*",
+        "*://youtu.be/*",
+        "*://music.youtube.com/*",
+        "*://tv.youtube.com/*",
         "*://*.amazon.com/*",
         "*://*.amazon.co.uk/*",
         "*://*.amazon.de/*",
@@ -61,17 +49,84 @@
         "*://*.amazon.nl/*",
         "*://*.amazon.pl/*",
         "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
+      ],
+      "js": [
+        "src/inject-privacy.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "exclude_matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",
-        "src/content-amazon.js"
+        "src/content-privacy.js"
       ],
       "run_at": "document_start"
     },
     {
       "matches": [
         "<all_urls>"
+      ],
+      "exclude_matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",
@@ -86,7 +141,30 @@
       "exclude_matches": [
         "*://www.youtube.com/*",
         "*://youtube.com/*",
-        "*://music.youtube.com/*"
+        "*://music.youtube.com/*",
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",
@@ -115,6 +193,36 @@
       "matches": [
         "<all_urls>"
       ],
+      "exclude_matches": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*",
+        "*://youtu.be/*",
+        "*://music.youtube.com/*",
+        "*://tv.youtube.com/*",
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
+      ],
       "js": [
         "src/scriptlets.js"
       ],
@@ -127,6 +235,31 @@
         "http://*/*",
         "https://*/*"
       ],
+      "exclude_matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
+      ],
       "js": [
         "src/browser-compat.js",
         "src/content-procedural.js"
@@ -136,87 +269,32 @@
     },
     {
       "matches": [
-        "*://www.twitch.tv/*",
-        "*://twitch.tv/*",
-        "*://*.twitch.tv/*"
-      ],
-      "js": [
-        "src/inject-twitch.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "*://www.twitch.tv/*",
-        "*://twitch.tv/*",
-        "*://*.twitch.tv/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-twitch.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://open.spotify.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-spotify.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://www.hulu.com/*",
-        "*://hulu.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-hulu.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://kick.com/*",
-        "*://www.kick.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-kick.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://www.youtube.com/*",
-        "*://youtube.com/*",
-        "*://music.youtube.com/*"
-      ],
-      "js": [
-        "src/inject-youtube.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "*://www.youtube.com/*",
-        "*://youtube.com/*",
-        "*://music.youtube.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-youtube.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
         "*://*/*"
+      ],
+      "exclude_matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.sg/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*",
+        "*://*.amazon.sa/*",
+        "*://*.amazon.eg/*",
+        "*://*.amazon.com.be/*",
+        "*://*.amazon.cl/*",
+        "*://*.amazon.com.co/*"
       ],
       "js": [
         "src/browser-compat.js",
@@ -287,7 +365,7 @@
       "description": "Activate element picker"
     }
   },
-  "homepage_url": "https://astonishing-swan-da7249.netlify.app/",
+  "homepage_url": "https://shieldblock.pro/",
   "browser_specific_settings": {
     "gecko": {
       "id": "shieldblock-pro@shieldblock.ext",

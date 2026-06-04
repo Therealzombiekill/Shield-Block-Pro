@@ -18,11 +18,17 @@
   }
 
   function postConfig() {
-    const disabled = globalPaused || isWhitelisted();
+    const onAmazon = typeof globalThis.__sbIsAmazonShoppingHost === 'function'
+      ? globalThis.__sbIsAmazonShoppingHost(host)
+      : host.includes('amazon.');
+    const disabled = globalPaused || isWhitelisted() || onAmazon;
     window.postMessage({
       type: 'SB_PRIVACY_CONFIG',
       privacy: settings?.privacy !== false && !disabled,
       tracking: settings?.tracking !== false && !disabled,
+      skipUrlClean: typeof globalThis.__sbShouldSkipPrivacyUrlClean === 'function'
+        ? globalThis.__sbShouldSkipPrivacyUrlClean(host)
+        : false,
     }, '*');
   }
 

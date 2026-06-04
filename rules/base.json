@@ -2948,59 +2948,6 @@
     }
   },
   {
-    "id": 230,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||device-metrics-us.amazon.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "ping",
-        "image"
-      ]
-    }
-  },
-  {
-    "id": 231,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||device-metrics-us-2.amazon.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "ping",
-        "image"
-      ]
-    }
-  },
-  {
-    "id": 232,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||mads-eu.amazon.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other",
-        "stylesheet"
-      ]
-    }
-  },
-  {
     "id": 233,
     "priority": 2,
     "action": {
@@ -3451,27 +3398,6 @@
         "xmlhttprequest",
         "ping",
         "image"
-      ]
-    }
-  },
-  {
-    "id": 261,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||aan.amazon.com^",
-      "resourceTypes": [
-        "script",
-        "image",
-        "xmlhttprequest",
-        "sub_frame",
-        "media",
-        "font",
-        "ping",
-        "other",
-        "stylesheet"
       ]
     }
   },

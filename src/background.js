@@ -4,6 +4,12 @@
 
 import './browser-compat.js';
 import { parseFilterList } from './filter-parser.js';
+import {
+  AMAZON_INITIATOR_EXCLUSIONS,
+  AMAZON_STABILITY_DOMAINS,
+  isAmazonShoppingHost,
+  isSafeBrowsingAllowlisted,
+} from './trusted-sites.js';
 
 const MAX_DYNAMIC_RULES = 5000;
 const MAX_FILTER_RULES = 4300; // reserve dynamic-rule headroom for pause, whitelist, matrix, and privacy rules
@@ -117,73 +123,51 @@ function adGuardUrl(filterId) {
 }
 
 // ── Filter list registry ──────────────────────────────────────────────────────
-// Rules are pulled from each list up to `max` entries.
-// ID ranges MUST NOT overlap — each list's [start, start+max-1] must be disjoint.
-// Chrome hard-caps updateDynamicRules at 5,000 total; sync truncates lists to the reserved filter budget.
-//
-//   List                │ start  │ max  │ end (exclusive)
-//   ────────────────────┼────────┼──────┼────────────────
-//   EasyList            │ 10000  │ 1600 │ 11600
-//   EasyPrivacy         │ 12000  │  700 │ 12700
-//   Peter Lowe          │ 13000  │  200 │ 13200
-//   AdGuard Tracking    │ 13500  │  350 │ 13850   ← new, replaces AdGuard Annoyances
-//   uBlock Annoyances   │ 14000  │  150 │ 14150
-//   uBlock Filters      │ 14500  │  550 │ 15050   ← new: uBO main list
-//   Fanboy Social       │ 15500  │  120 │ 15620   ← new: social widget blocking
-//   AdGuard Base        │ 16000  │  300 │ 16300
-//   uBlock Badware      │ 16500  │  150 │ 16650
-//   Liste FR            │ 17000  │   80 │ 17080
-//   EasyList Germany    │ 17200  │   80 │ 17280
-//   RU AdList           │ 17400  │   80 │ 17480
-//   AdGuard Annoyances  │ 17600  │  300 │ 17900   ← kept but after the new ones
-//   ────────────────────┼────────┼──────┼────────────────
-//   Total               │        │~4950 │          (> 4300 filter budget)
+// Rules are pulled from each list up to `max` entries (sum of max ≈ MAX_FILTER_RULES).
+// ID ranges MUST NOT overlap. Sync walks lists in order until the 4,300-rule budget is full.
 
 const FILTER_LISTS = [
-  // Core ad blocking
-  { name: 'EasyList',              url: 'https://easylist.to/easylist/easylist.txt',                                                                                   key: 'easylist',      max: 1100, start: 10000 },
-  { name: 'EasyPrivacy',           url: 'https://easylist.to/easylist/easyprivacy.txt',                                                                                key: 'easyprivacy',   max:  540, start: 12000 },
-  { name: 'Peter Lowe',            url: 'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext',                         key: 'peterlow',      max:  200, start: 13000 },
-  // Tracking & privacy
-  { name: 'AdGuard Tracking',      url: adGuardUrl(3),                                                                                                                  key: 'adguard_track', max:  350, start: 13500 },
-  { name: 'uBlock Annoyances',     url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt',                               key: 'ublock_ann',    max:  150, start: 14000 },
-  // uBlock Origin main filter list — high-quality, minimal overlap with EasyList
-  { name: 'uBlock Filters',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',                                           key: 'ublock_main',   max:  300, start: 14500 },
-  // Social widget & share-button tracking
-  { name: 'Fanboy Social',         url: 'https://easylist.to/easylist/fanboy-social.txt',                                                                              key: 'fanboy_social', max:  120, start: 15500 },
-  // Broader ad network coverage
-  { name: 'AdGuard Base',          url: adGuardUrl(2),                                                                                                                  key: 'adguard_base',  max:  300, start: 16000 },
-  { name: 'uBlock Badware',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt',                                           key: 'ublock_bad',    max:  150, start: 16500 },
-  // Regional lists
-  { name: 'Liste FR',              url: 'https://easylist-downloads.adblockplus.org/liste_fr.txt',                                                                     key: 'listefr',       max:   80, start: 17000 },
-  { name: 'EasyList Germany',      url: 'https://easylist.to/easylistgermany/easylistgermany.txt',                                                                     key: 'easylistde',    max:   80, start: 17200 },
-  { name: 'RU AdList',             url: 'https://easylist-downloads.adblockplus.org/advblock.txt',                                                                     key: 'ruadlist',      max:   80, start: 17400 },
-  // Annoyances (newsletter popups, notification prompts, cookie notices)
-  { name: 'AdGuard Annoyances',    url: adGuardUrl(14),                                                                                                                 key: 'adguard_ann',   max:  300, start: 17600 },
-  // Scriptlet-heavy lists — these provide ##+js() rules that defuse anti-adblock scripts
-  { name: 'uBlock Origin Filters 2', url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters-2024.txt',                                     key: 'ublock_2024',   max:  200, start: 17900 },
-  { name: 'uBlock Annoyances Full',  url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances.txt',                                       key: 'ublock_ann2',   max:  150, start: 18200 },
-  // Anti-adblock bypass rules
-  { name: 'Anti-Adblock Killer',    url: 'https://raw.githubusercontent.com/reek/anti-adblock-killer/master/anti-adblock-killer-filters.txt',                           key: 'anti_adblock',  max:  100, start: 18400 },
-  // Regional lists
-  { name: 'EasyList Polish',          url: 'https://easylist-downloads.adblockplus.org/easylistpolish.txt',                                                                    key: 'easylist_pl',   max:   80, start: 19000 },
-  { name: 'uBlock Unbreak',            url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt',                                              key: 'ublock_unbr',   max:   80, start: 19200 },
-  { name: 'EasyList Korean',          url: 'https://raw.githubusercontent.com/yous/YousList/master/youslist.txt',                                                              key: 'easylist_kr',   max:   80, start: 19400 },
-  { name: 'AdGuard Turkish',           url: adGuardUrl(9),                                                                                                                  key: 'adguard_tr',    max:   80, start: 19600 },
-  { name: 'ChinaList',               url: 'https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjxlist.txt',                                                            key: 'chinalist',     max:   80, start: 19800 },
-  // Anti-cryptomining
-  { name: 'NoCoin',                   url: 'https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt',                                               key: 'nocoin',        max:   80, start: 19900 },
-  // ── Regional language lists ──────────────────────────────────────────────
-  { name: 'EasyList Spanish',       url: 'https://easylist-downloads.adblockplus.org/easylistspanish.txt',           key: 'easylist_es',  max:  30, start: 22000 },
-  { name: 'EasyList Italian',       url: 'https://easylist-downloads.adblockplus.org/easylistitaly.txt',             key: 'easylist_it',  max:  30, start: 22030 },
-  { name: 'EasyList Dutch',         url: 'https://easylist-downloads.adblockplus.org/easylistdutch.txt',             key: 'easylist_nl',  max:  30, start: 22060 },
-  { name: 'AdGuard Japanese',       url: adGuardUrl(7),                                                                                                                  key: 'adguard_ja',   max:  30, start: 22090 },
-  { name: 'Liste AR Arabic',        url: 'https://easylist-downloads.adblockplus.org/Liste_AR.txt',                  key: 'liste_ar',     max:  25, start: 22120 },
-  { name: 'Czech and Slovak',       url: 'https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt', key: 'easylist_cs',  max:  25, start: 22145 },
-  { name: 'ABP Indonesian',         url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                   key: 'abp_id',       max:  25, start: 22170 },
-  { name: 'Hebrew List',            url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt', key: 'hebrew_il',    max:  25, start: 22195 },
-  { name: 'ABPVN Vietnamese',       url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',    key: 'abp_vn',       max:  25, start: 22220 },
-  { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20alternate%20versions/NordicFiltersABP-Inclusion.txt', key: 'nordic', max: 25, start: 22245 },
+  // ── Core (EasyList + uBlock + AdGuard) ───────────────────────────────────
+  { name: 'EasyList',                 url: 'https://easylist.to/easylist/easylist.txt',                                                                 key: 'easylist',       max:  930, start: 10000 },
+  { name: 'EasyPrivacy',              url: 'https://easylist.to/easylist/easyprivacy.txt',                                                              key: 'easyprivacy',    max:  480, start: 10950 },
+  { name: 'Peter Lowe',               url: 'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext',          key: 'peterlow',       max:  170, start: 11430 },
+  { name: 'AdGuard Tracking',         url: adGuardUrl(3),                                                                                               key: 'adguard_track',  max:  320, start: 11600 },
+  { name: 'AdGuard Social',           url: adGuardUrl(4),                                                                                               key: 'adguard_social', max:   60, start: 11920 },
+  { name: 'uBlock Cookie Notices',    url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt',                key: 'ublock_cookies', max:  120, start: 11980 },
+  { name: 'uBlock Filters',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',                         key: 'ublock_main',    max:  400, start: 12100 },
+  { name: 'Fanboy Annoyances',        url: 'https://easylist.to/easylist/fanboy-annoyance.txt',                                                         key: 'fanboy_ann',     max:   70, start: 12500 },
+  { name: 'Fanboy Cookie Monster',    url: 'https://secure.fanboy.co.nz/fanboy-cookiemonster.txt',                                                      key: 'fanboy_cookies', max:   90, start: 12570 },
+  { name: 'Fanboy Social',            url: 'https://easylist.to/easylist/fanboy-social.txt',                                                            key: 'fanboy_social',  max:   80, start: 12660 },
+  { name: 'AdGuard Base',             url: adGuardUrl(2),                                                                                               key: 'adguard_base',   max:  280, start: 12740 },
+  { name: 'uBlock Badware',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt',                         key: 'ublock_bad',     max:   90, start: 13020 },
+  { name: 'uBlock Unbreak',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt',                         key: 'ublock_unbr',    max:   80, start: 13110 },
+  { name: 'AdGuard Annoyances',       url: adGuardUrl(14),                                                                                              key: 'adguard_ann',    max:  200, start: 13190 },
+  { name: 'uBlock Filters 2024',      url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters-2024.txt',                    key: 'ublock_2024',    max:  110, start: 13390 },
+  { name: 'uBlock Annoyances',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances.txt',                      key: 'ublock_ann',     max:   70, start: 13500 },
+  { name: 'Anti-Adblock Killer',      url: 'https://raw.githubusercontent.com/reek/anti-adblock-killer/master/anti-adblock-killer-filters.txt',         key: 'anti_adblock',   max:   60, start: 13570 },
+  { name: 'NoCoin',                   url: 'https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt',                           key: 'nocoin',         max:   50, start: 13630 },
+  { name: 'uBlock Resource Abuse',    url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/resource-abuse.txt',                  key: 'ublock_res',     max:   50, start: 13680 },
+  { name: 'uBlock Privacy',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt',                         key: 'ublock_priv',    max:   70, start: 13730 },
+  { name: 'Adblock Warning Removal',  url: 'https://easylist-downloads.adblockplus.org/adblock_warning_removal_list.txt',                               key: 'warn_removal',   max:   40, start: 13800 },
+  // ── Regional (smaller slices — sync budget shared with core) ─────────────
+  { name: 'Liste FR',                 url: 'https://easylist-downloads.adblockplus.org/liste_fr.txt',                                                   key: 'listefr',        max:   40, start: 13840 },
+  { name: 'EasyList Germany',         url: 'https://easylist.to/easylistgermany/easylistgermany.txt',                                                    key: 'easylistde',     max:   40, start: 13880 },
+  { name: 'RU AdList',                url: 'https://easylist-downloads.adblockplus.org/advblock.txt',                                                   key: 'ruadlist',       max:   40, start: 13920 },
+  { name: 'EasyList Polish',          url: 'https://easylist-downloads.adblockplus.org/easylistpolish.txt',                                               key: 'easylist_pl',    max:   35, start: 13960 },
+  { name: 'ChinaList',                url: 'https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjxlist.txt',                                       key: 'chinalist',      max:   35, start: 13995 },
+  { name: 'EasyList Korean',          url: 'https://raw.githubusercontent.com/yous/YousList/master/youslist.txt',                                       key: 'easylist_kr',    max:   35, start: 14030 },
+  { name: 'AdGuard Turkish',          url: adGuardUrl(9),                                                                                               key: 'adguard_tr',     max:   35, start: 14065 },
+  { name: 'EasyList Spanish',         url: 'https://easylist-downloads.adblockplus.org/easylistspanish.txt',                                              key: 'easylist_es',    max:   20, start: 14100 },
+  { name: 'EasyList Italian',         url: 'https://easylist-downloads.adblockplus.org/easylistitaly.txt',                                                key: 'easylist_it',    max:   20, start: 14120 },
+  { name: 'EasyList Dutch',           url: 'https://easylist-downloads.adblockplus.org/easylistdutch.txt',                                                key: 'easylist_nl',    max:   20, start: 14140 },
+  { name: 'AdGuard Japanese',         url: adGuardUrl(7),                                                                                               key: 'adguard_ja',     max:   20, start: 14160 },
+  { name: 'Liste AR Arabic',          url: 'https://easylist-downloads.adblockplus.org/Liste_AR.txt',                                                     key: 'liste_ar',       max:   20, start: 14180 },
+  { name: 'Czech and Slovak',         url: 'https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt',                        key: 'easylist_cs',    max:   20, start: 14200 },
+  { name: 'ABP Indonesian',           url: 'https://easylist-downloads.adblockplus.org/abpindo.txt',                                                      key: 'abp_id',         max:   20, start: 14220 },
+  { name: 'Hebrew List',              url: 'https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt',                       key: 'hebrew_il',      max:   20, start: 14240 },
+  { name: 'ABPVN Vietnamese',         url: 'https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn.txt',                                   key: 'abp_vn',         max:   20, start: 14260 },
+  { name: 'Nordic List',              url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20alternate%20versions/NordicFiltersABP-Inclusion.txt', key: 'nordic', max: 20, start: 14280 },
+  { name: 'ABP Japanese',             url: 'https://raw.githubusercontent.com/k2jp/abp-japanese-filters/master/abpjf.txt',                                  key: 'abp_ja',         max:   20, start: 14300 },
 ];
 
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
@@ -202,14 +186,20 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 
 // ── Settings ───────────────────────────────────────────────────────────────
 
+/** v2.12+ — YouTube gets no extension scripts; allowlist so DNR/features stay off. */
+const YOUTUBE_STABILITY_DOMAINS = [
+  'youtube.com', 'www.youtube.com', 'youtu.be',
+  'music.youtube.com', 'tv.youtube.com', 'youtube-nocookie.com',
+];
+
 const DEFAULT_SETTINGS = {
-  twitch: true, amazon: true, general: true,
+  twitch: false, amazon: false, general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
-  spotify: true,
-  hulu: true,
-  kick: true,
-  youtube: true,
+  spotify: false,
+  hulu: false,
+  kick: false,
+  youtube: false, // network lists only — no player/inject scripts (v2.14+)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
   paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
@@ -354,15 +344,16 @@ async function purgeFilterListDynamicRules() {
 
 async function reapplyFeatureRules() {
   const s = await getSettings();
-  await Promise.all([
-    applyRemoveParamRules(),
-    applyMatrixRules(),
-    applyReferrerRule(s.referrerStrip !== false),
-    applyHttpsUpgradeRule(s.httpsUpgrade !== false),
-    applyPrivacyHeadersRule(s.privacyHeaders !== false),
-    applyUserFilterRules(),
-    applyWhitelistRules(),
-  ]);
+  // Serialize DNR writers — parallel updates race on the shared dynamic rule pool.
+  await applyWhitelistRules();
+  await applyUserFilterRules();
+  await applyRemoveParamRules();
+  await applyMatrixRules();
+  await applyReferrerRule(s.referrerStrip !== false);
+  await applyHttpsUpgradeRule(s.httpsUpgrade !== false);
+  await applyPrivacyHeadersRule(s.privacyHeaders !== false);
+  await applyAmazonShoppingAllowRules();
+  await refreshAllowRuleIds();
   await restoreGlobalPauseIfActive();
 }
 
@@ -371,6 +362,45 @@ async function reapplyFeatureRules() {
 const REFERRER_RULE_ID   = 47000;
 const HTTPS_UPGRADE_ID   = 47001; // upgradeScheme — http → https for main/sub frames
 const DNT_GPC_RULE_ID    = 47002; // set DNT: 1 and Sec-GPC: 1 on all outbound requests
+const AMAZON_ALLOW_INIT_ID = 47003; // allow subresources when shopping on Amazon
+const AMAZON_ALLOW_MAIN_ID = 47004; // allow main-frame navigations to Amazon storefronts
+/** Bumped when stability maintenance (Amazon allowlist, DNR allow rules) must re-run. */
+const STABILITY_VERSION = '2.17.0';
+
+/** Cloud sync is opt-in only — auto sync/restore can look like enterprise control on managed profiles. */
+async function isCloudSyncEnabled() {
+  try {
+    const { sbCloudSyncEnabled } = await chrome.storage.local.get('sbCloudSyncEnabled');
+    return sbCloudSyncEnabled === true;
+  } catch (_) {
+    return false;
+  }
+}
+const STATS_EXEMPT_RULE_IDS = new Set([
+  REFERRER_RULE_ID, HTTPS_UPGRADE_ID, DNT_GPC_RULE_ID,
+  AMAZON_ALLOW_INIT_ID, AMAZON_ALLOW_MAIN_ID, PAUSE_ALL_RULE_ID,
+]);
+let _allowRuleIds = new Set(STATS_EXEMPT_RULE_IDS);
+
+async function refreshAllowRuleIds() {
+  try {
+    const next = new Set(STATS_EXEMPT_RULE_IDS);
+    const rules = await chrome.declarativeNetRequest.getDynamicRules();
+    for (const r of rules) {
+      if (r.action?.type === 'allow') next.add(r.id);
+    }
+    _allowRuleIds = next;
+  } catch (_) {}
+}
+
+function shouldCountBlockedRequest(url, ruleId) {
+  if (ruleId != null && _allowRuleIds.has(ruleId)) return false;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (isAmazonShoppingHost(host)) return false;
+  } catch (_) {}
+  return true;
+}
 
 // ── Settings cache ─────────────────────────────────────────────────────────
 // getSettings() is called on every webNavigation.onBeforeNavigate event plus
@@ -613,6 +643,7 @@ async function _retryFailedLists() {
     try { await chrome.alarms.create('retrySync', { delayInMinutes: 2 }); } catch (_) {}
     return;
   }
+  _syncLock = true;
   const toRetry = _retryQueue.splice(0);
   _startKeepAlive('_retryFailedLists');
   logEvent('filter-sync', 'info', `Retrying ${toRetry.length} failed list(s)`, { lists: toRetry.map(l => l.list.name) });
@@ -663,7 +694,7 @@ async function _retryFailedLists() {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set(existing.map(r => r.id));
       const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
-      const budget = 5000 - existing.length;
+      const budget = Math.max(0, MAX_DYNAMIC_RULES - existing.length);
       if (budget > 0 && uniqueNew.length > 0) {
         await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
         logEvent('filter-sync', 'info', `Retry: added ${Math.min(uniqueNew.length, budget)} rules`);
@@ -717,7 +748,10 @@ async function _retryFailedLists() {
       await applyRemoveParamRules();
     } catch (e) { logEvent('filter-sync', 'warn', `Retry removeparam merge failed: ${e.message}`); }
   }
-  } finally { _stopKeepAlive(); }
+  } finally {
+    _syncLock = false;
+    _stopKeepAlive();
+  }
 }
 
 // ── Network connectivity gate ─────────────────────────────────────────────
@@ -759,8 +793,9 @@ function incrementStat(type, tabId) {
   }
 }
 
-function logBlockedRequest(url, tabId) {
+function logBlockedRequest(url, tabId, ruleId) {
   try {
+    if (!shouldCountBlockedRequest(url, ruleId)) return;
     const hostname = new URL(url).hostname;
     _requestLog.push({ url: hostname, ts: Date.now(), tabId });
     if (_requestLog.length > LOG_MAX) _requestLog.shift();
@@ -775,14 +810,16 @@ function logBlockedRequest(url, tabId) {
 }
 
 // Real-time log via declarativeNetRequestFeedback (dev mode + production with permission)
-try {
-  chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
-    logBlockedRequest(info.request.url, info.request.tabId);
-  });
-} catch (_) {}
+// Domain stats come from countNetworkBlocks on navigation — debug listener duplicates counts.
 
 async function countNetworkBlocks(tabId, url) {
   if (_navCounted.has(tabId) || _navCounting.has(tabId)) return;
+  let pageHost = '';
+  try { pageHost = new URL(url).hostname.replace(/^www\./, ''); } catch (_) {}
+  if (isAmazonShoppingHost(pageHost)) {
+    _navCounted.add(tabId);
+    return;
+  }
   // getMatchedRules is not implemented in Firefox — skip gracefully
   if (!chrome.declarativeNetRequest.getMatchedRules) {
     _navCounted.add(tabId);
@@ -792,11 +829,13 @@ async function countNetworkBlocks(tabId, url) {
   try {
     const minTs = _navStart.get(tabId) ?? (Date.now() - 30000);
     const matched = await chrome.declarativeNetRequest.getMatchedRules({ tabId, minTimeStamp: minTs });
-    const count = matched?.rulesMatchedInfo?.length ?? 0;
+    const blockMatches = (matched?.rulesMatchedInfo ?? []).filter(m =>
+      shouldCountBlockedRequest(m.request?.url || url, m.rule?.ruleId),
+    );
+    const count = blockMatches.length;
     _navCounted.add(tabId); // only mark as counted after successful API call
-    // Log each matched rule for the request log panel
-    matched?.rulesMatchedInfo?.forEach(m => {
-      try { logBlockedRequest(m.request?.url || url, tabId); } catch(_) {}
+    blockMatches.forEach(m => {
+      try { logBlockedRequest(m.request?.url || url, tabId, m.rule?.ruleId); } catch (_) {}
     });
     if (count === 0) return;
 
@@ -804,7 +843,6 @@ async function countNetworkBlocks(tabId, url) {
     ps.total   = (ps.total   | 0) + count;
     ps.network = (ps.network | 0) + count;
     const cat = url?.includes('twitch.tv')  ? 'twitch'
-              : url?.includes('amazon.')     ? 'amazon'
               : 'general';
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
@@ -891,9 +929,11 @@ let _syncListStatus = {}; // { [key]: { status:'ok'|'error'|'cached'|'304', rule
 // can't cause it to leak. The interval itself also keeps the SW alive since
 // the callback re-registers the timer.
 let _keepAliveTimer = null;
+let _keepAliveRefs = 0;
 
 function _startKeepAlive(label) {
-  if (_keepAliveTimer) return; // already running (nested call guard)
+  _keepAliveRefs++;
+  if (_keepAliveTimer) return;
   _keepAliveTimer = setInterval(() => {
     chrome.storage.local.get('__ka').catch(() => {}); // reset idle timer
   }, 20000); // 20s < Chrome's 30s idle threshold
@@ -901,7 +941,8 @@ function _startKeepAlive(label) {
 }
 
 function _stopKeepAlive() {
-  if (!_keepAliveTimer) return;
+  if (_keepAliveRefs > 0) _keepAliveRefs--;
+  if (_keepAliveRefs > 0 || !_keepAliveTimer) return;
   clearInterval(_keepAliveTimer);
   _keepAliveTimer = null;
 }
@@ -975,6 +1016,7 @@ async function applyRemoveParamRules() {
         condition: {
           urlFilter: '|http',
           resourceTypes: ['main_frame', 'sub_frame'],
+          excludedInitiatorDomains: AMAZON_INITIATOR_EXCLUSIONS,
         },
       });
       if (idCursor > REMOVEPARAM_BASE + 999) break;
@@ -983,6 +1025,7 @@ async function applyRemoveParamRules() {
     // Domain-scoped rules (e.g. remove 'ref' only on amazon.com)
     for (const group of domainGroups) {
       if (!group.params?.length) continue;
+      if (group.initDomains?.some(d => isAmazonShoppingHost(d.replace(/^www\./, '')))) continue;
       for (const params of chunkParams(group.params)) {
         const condition = {
           urlFilter: '|http',
@@ -1112,31 +1155,6 @@ const SB_ALLOW_TTL_MS = 10 * 60 * 1000;
 // (github.com/u/repo, drive.google.com/file/…) extracting the bare hostname
 // blocks the entire legitimate domain — a false positive. Never block these
 // shared-hosting platforms or top-reputation apexes (matched incl. subdomains).
-const SB_DOMAIN_ALLOWLIST = new Set([
-  // Shared hosting where the malicious part is the PATH, not the domain
-  'github.com','githubassets.com','githubusercontent.com','raw.githubusercontent.com','gist.github.com','github.io',
-  'drive.google.com','docs.google.com','drive.usercontent.google.com','storage.googleapis.com',
-  'dropbox.com','dropboxusercontent.com','mega.nz','mediafire.com',
-  'cdn.discordapp.com','media.discordapp.net','t.me',
-  // Top-reputation apexes (an apex entry in a feed is a false positive)
-  'google.com','gstatic.com','googleusercontent.com','youtube.com','youtu.be',
-  'analytics.google.com','tagmanager.google.com',
-  'microsoft.com','live.com','office.com','sharepoint.com','apple.com','icloud.com',
-  'amazon.com','cloudflare.com','facebook.com','instagram.com','x.com','twitter.com',
-  'linkedin.com','reddit.com','wikipedia.org','mozilla.org','anthropic.com','claude.ai',
-]);
-
-function isSafeBrowsingAllowlisted(host) {
-  if (!host) return false;
-  host = host.replace(/^www\./, '');
-  if (SB_DOMAIN_ALLOWLIST.has(host)) return true;
-  const parts = host.split('.');
-  for (let i = 1; i < parts.length - 1; i++) {
-    if (SB_DOMAIN_ALLOWLIST.has(parts.slice(i).join('.'))) return true;
-  }
-  return false;
-}
-
 // Malware feeds list URLs on shared platforms (github.com/foo) — never keep apex hosts.
 function sanitizeSbDomains(domains) {
   const out = [];
@@ -1408,6 +1426,223 @@ function _appendCachedListData(stored, list, limit, buckets) {
   }
   _syncListStatus[list.key] = { status: 'cached', ruleCount: cached.length };
   logEvent('filter-sync', 'warn', `${list.name}: fetch failed — ${cached.length} cached rules reused`);
+}
+
+/** Rebuild aggregated cosmetic/scriptlet caches from per-list fc_/fd_/fs_ storage. */
+async function rebuildAggregatedFilterCaches() {
+  const storeKeys = FILTER_LISTS.flatMap(l => [
+    `fm_${l.key}`, `fc_${l.key}`, `fd_${l.key}`, `fs_${l.key}`, `frp_${l.key}`,
+  ]);
+  const stored = await chrome.storage.local.get(storeKeys);
+  const allCosmetics = [];
+  const allDomainCosmetics = {};
+  const allScriptletRules = {};
+  const allRemoveParams = { global: new Set(), domain: [] };
+  let latestAt = 0;
+
+  for (const list of FILTER_LISTS) {
+    const meta = stored[`fm_${list.key}`];
+    if (meta?.at > latestAt) latestAt = meta.at;
+    const fc = stored[`fc_${list.key}`];
+    if (Array.isArray(fc)) allCosmetics.push(...fc);
+    const fd = stored[`fd_${list.key}`] ?? {};
+    for (const [dom, sels] of Object.entries(fd)) {
+      if (!allDomainCosmetics[dom]) allDomainCosmetics[dom] = [];
+      allDomainCosmetics[dom].push(...sels);
+    }
+    const fs = stored[`fs_${list.key}`] ?? {};
+    for (const [dom, rules] of Object.entries(fs)) {
+      if (!allScriptletRules[dom]) allScriptletRules[dom] = [];
+      allScriptletRules[dom].push(...rules);
+    }
+    const rp = stored[`frp_${list.key}`];
+    if (rp) {
+      for (const p of rp.global ?? []) allRemoveParams.global.add(p);
+      allRemoveParams.domain.push(...(rp.domain ?? []));
+    }
+  }
+
+  const cosmeticsDeduped = [...new Set(allCosmetics)];
+  const domainCosmeticsFinal = {};
+  for (const [dom, sels] of Object.entries(allDomainCosmetics)) {
+    domainCosmeticsFinal[dom] = [...new Set(sels)].slice(0, 200);
+  }
+  const scriptletRulesFinal = {};
+  for (const [dom, rules] of Object.entries(allScriptletRules)) {
+    const seen = new Set();
+    scriptletRulesFinal[dom] = rules.filter(r => {
+      const k = r.name + JSON.stringify(r.args);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }).slice(0, 50);
+  }
+
+  const hasData = cosmeticsDeduped.length > 0 ||
+    Object.keys(domainCosmeticsFinal).length > 0 ||
+    Object.keys(scriptletRulesFinal).length > 0;
+
+  if (!hasData) return { repaired: false, cosmeticCount: 0 };
+
+  const { filterSyncedAt } = await chrome.storage.local.get('filterSyncedAt');
+  const patch = {
+    cosmeticSelectors: cosmeticsDeduped,
+    domainCosmetics: domainCosmeticsFinal,
+    scriptletRules: scriptletRulesFinal,
+    removeParamData: {
+      global: [...allRemoveParams.global],
+      domain: allRemoveParams.domain,
+    },
+  };
+  if (!filterSyncedAt) patch.filterSyncedAt = latestAt > 0 ? latestAt : Date.now();
+
+  await chrome.storage.local.set(patch);
+  try { await applyRemoveParamRules(); } catch (_) {}
+
+  logEvent('filter-sync', 'info',
+    `Rebuilt filter caches: ${cosmeticsDeduped.length} cosmetics, sync ts restored`);
+  return { repaired: true, cosmeticCount: cosmeticsDeduped.length };
+}
+
+async function repairFilterHealthForCheck() {
+  let cosmeticCount = 0;
+  let syncQueued = false;
+  try {
+    const rebuilt = await rebuildAggregatedFilterCaches();
+    if (rebuilt.repaired) cosmeticCount = rebuilt.cosmeticCount;
+
+    const all = await chrome.storage.local.get(null);
+    let latestFm = 0;
+    for (const k of Object.keys(all)) {
+      if (k.startsWith('fm_') && all[k]?.at > latestFm) latestFm = all[k].at;
+    }
+
+    const { filterSyncedAt, cosmeticSelectors = [] } =
+      await chrome.storage.local.get(['filterSyncedAt', 'cosmeticSelectors']);
+    const dyn = await chrome.declarativeNetRequest.getDynamicRules();
+    const filterRuleCount = dyn.filter(r => isFilterListRuleId(r.id)).length;
+    cosmeticCount = cosmeticSelectors.length || cosmeticCount;
+
+    const ts = Number(filterSyncedAt);
+    const tsValid = Number.isFinite(ts) && ts > 1_000_000_000_000;
+    const patch = {};
+
+    if (filterRuleCount > 100 && !tsValid) {
+      patch.filterSyncedAt = latestFm > 0 ? latestFm : Date.now();
+    }
+    if (Object.keys(patch).length) {
+      await chrome.storage.local.set(patch);
+      logEvent('filter-sync', 'info', 'Health check restored filterSyncedAt from list metadata');
+    }
+
+    if (filterRuleCount > 100 && cosmeticCount < 50 && !_syncLock) {
+      syncQueued = true;
+      syncFilterLists(true).catch(e =>
+        logEvent('filter-sync', 'warn', `Health-triggered sync failed: ${e?.message ?? e}`));
+    }
+  } catch (e) {
+    logEvent('filter-sync', 'warn', `Health repair failed: ${e?.message ?? e}`);
+  }
+  return { cosmeticCount, syncQueued };
+}
+
+async function ensureFilterHealthMetadata() {
+  return repairFilterHealthForCheck();
+}
+
+/** Remove auto-whitelist entries so filter lists can block ads on YouTube again (network-only). */
+async function pruneYoutubeFromWhitelist() {
+  const { whitelist = [] } = await chrome.storage.local.get('whitelist');
+  const drop = new Set(YOUTUBE_STABILITY_DOMAINS.map(d => d.replace(/^www\./, '')));
+  const wl = whitelist.filter(d => {
+    const bare = d.replace(/^www\./, '');
+    return !drop.has(d) && !drop.has(bare) && ![...drop].some(x => bare === x || bare.endsWith('.' + x));
+  });
+  if (wl.length === whitelist.length) return false;
+  await chrome.storage.local.set({ whitelist: wl });
+  await applyWhitelistRules();
+  await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
+  logEvent('system', 'info', 'Removed YouTube domains from whitelist — network blocking enabled');
+  return true;
+}
+
+/** Always-on DNR allow for Amazon shopping (independent of user whitelist edits). */
+async function applyAmazonShoppingAllowRules() {
+  try {
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const removeRuleIds = existing
+      .filter(r => r.id === AMAZON_ALLOW_INIT_ID || r.id === AMAZON_ALLOW_MAIN_ID)
+      .map(r => r.id);
+    const addRules = [
+      {
+        id: AMAZON_ALLOW_INIT_ID,
+        priority: 9999,
+        action: { type: 'allow' },
+        condition: {
+          initiatorDomains: AMAZON_INITIATOR_EXCLUSIONS,
+          resourceTypes: DNR_RESOURCE_TYPES.filter(t => t !== 'main_frame'),
+        },
+      },
+      {
+        id: AMAZON_ALLOW_MAIN_ID,
+        priority: 9999,
+        action: { type: 'allow' },
+        condition: {
+          requestDomains: AMAZON_INITIATOR_EXCLUSIONS,
+          resourceTypes: ['main_frame', 'sub_frame'],
+        },
+      },
+    ];
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
+    await refreshAllowRuleIds();
+  } catch (e) {
+    logEvent('system', 'warn', `Amazon allow rules failed: ${e?.message ?? e}`);
+  }
+}
+
+async function ensurePlatformStabilityMode() {
+  const { settings = {}, whitelist = [] } = await chrome.storage.local.get(['settings', 'whitelist']);
+  const mergedSettings = {
+    ...DEFAULT_SETTINGS, ...settings,
+    youtube: false, amazon: false,
+    twitch: false, spotify: false, hulu: false, kick: false,
+  };
+  const wl = [...whitelist];
+  let wlChanged = false;
+  for (const d of AMAZON_STABILITY_DOMAINS) {
+    if (!wl.includes(d)) { wl.push(d); wlChanged = true; }
+  }
+  await chrome.storage.local.set({
+    settings: mergedSettings,
+    ...(wlChanged ? { whitelist: wl } : {}),
+  });
+  invalidateSettingsCache();
+  await applyAmazonShoppingAllowRules();
+  if (wlChanged) {
+    await applyWhitelistRules();
+    await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
+  }
+  logEvent('system', 'info', 'Maximum stability: Amazon fully protected; no Amazon extension scripts');
+}
+
+async function runStabilityMaintenanceIfNeeded() {
+  try {
+    const { sbStabilityVersion } = await chrome.storage.local.get('sbStabilityVersion');
+    if (sbStabilityVersion === STABILITY_VERSION) return;
+    await ensurePlatformStabilityMode();
+    await pruneYoutubeFromWhitelist();
+    await applyAmazonShoppingAllowRules();
+    await refreshAllowRuleIds();
+    await chrome.storage.local.set({ sbStabilityVersion: STABILITY_VERSION });
+    logEvent('system', 'info', `Stability maintenance applied (${STABILITY_VERSION})`);
+  } catch (e) {
+    logEvent('system', 'warn', `Stability maintenance failed: ${e?.message ?? e}`);
+  }
+}
+
+function safeStatInt(n) {
+  const v = Number(n);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 }
 
 async function syncFilterLists(force = false) {
@@ -1929,6 +2164,7 @@ async function applyWhitelistRules() {
     if (removeRuleIds.length || addRules.length) {
       await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
     }
+    await refreshAllowRuleIds();
   } catch (e) {
     logEvent('settings', 'warn', `Whitelist DNR apply failed: ${e.message}`);
   }
@@ -1983,6 +2219,7 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
     applyHttpsUpgradeRule(merged.httpsUpgrade !== false),
     applyPrivacyHeadersRule(merged.privacyHeaders !== false),
     applyWhitelistRules(),
+    applyAmazonShoppingAllowRules(),
     restoreGlobalPauseRule(),
     applyRemoveParamRules(), // self-gates on the tracking toggle
   ]);
@@ -2007,6 +2244,9 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
 // down to metadata only (url/name/key/enabled) since cached rule data belongs
 // in local storage, not sync.
 async function pushToCloud() {
+  if (!(await isCloudSyncEnabled())) {
+    return { ok: false, error: 'Cloud sync is off (local-only mode)' };
+  }
   try {
     const data = await chrome.storage.local.get(
       ['settings', 'whitelist', 'userFilterText', 'customFilterLists']
@@ -2058,10 +2298,11 @@ async function injectCosmetics(tabId, tabUrl) {
   try {
     domain = new URL(tabUrl).hostname.replace(/^www\./, '');
     if (domainMatchesWhitelist(domain, wl)) return;
-    // Skip YouTube entirely — no ad blocking there, cosmetics only break the player
+    // Skip YouTube/Amazon — platform stability (cosmetics break player/shopping UX)
     const SKIP_DOMAINS = ['youtube.com','youtu.be','youtube-nocookie.com',
                           'music.youtube.com','tv.youtube.com'];
     if (SKIP_DOMAINS.some(d => domain === d || domain.endsWith('.' + d))) return;
+    if (domain.includes('amazon.')) return;
   } catch (_) { return; }
 
   const tabState = _tabCosmeticState.get(tabId) ?? { baseCss: false, css: '' };
@@ -2311,8 +2552,38 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(lifetime ?? { total:0 });
         break;
       }
+      // Popup live view — includes not-yet-flushed pending counts/time
+      case 'GET_POPUP_STATS': {
+        try {
+          const { stats, lifetime, timeSaved } = await chrome.storage.local.get([
+            'stats', 'lifetime', 'timeSaved',
+          ]);
+          const pendingBlocks = Object.values(_pendingStats).reduce(
+            (a, b) => a + safeStatInt(b), 0,
+          );
+          sendResponse({
+            session: safeStatInt(stats?.total) + pendingBlocks,
+            lifetime: safeStatInt(lifetime?.total) + pendingBlocks,
+            timeSavedSeconds: safeStatInt(timeSaved) + safeStatInt(_pendingTimeSaved),
+            amazonProtected: true,
+          });
+        } catch (_) {
+          sendResponse({ session: 0, lifetime: 0, timeSavedSeconds: 0, amazonProtected: true });
+        }
+        break;
+      }
       case 'RESET_STATS':
-        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
+        _pendingStats = {};
+        _pendingTimeSaved = 0;
+        if (_pendingFlush) {
+          clearTimeout(_pendingFlush);
+          _pendingFlush = null;
+        }
+        await chrome.storage.local.set({
+          stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 },
+          lifetime: { total: 0 },
+          timeSaved: 0,
+        });
         try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
         sendResponse({ ok: true });
         break;
@@ -2331,14 +2602,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'SET_SETTINGS': {
         if (!msg.settings || typeof msg.settings !== 'object') { sendResponse({ ok: false }); break; }
-        const merged = { ...(await getSettings()), ...msg.settings };
+        const merged = {
+          ...(await getSettings()), ...msg.settings,
+          youtube: false, amazon: false,
+          twitch: false, spotify: false, hulu: false, kick: false,
+        };
         await chrome.storage.local.set({ settings: merged });
         invalidateSettingsCache(); // must invalidate AFTER write, BEFORE any getSettings() calls below
         await applySettingsSideEffects(merged, { syncFilters: 'general' in msg.settings && merged.general });
         if (msg.settings.safeBrowsing === true && _safeBrowsingDomains.size === 0) fetchSafeBrowsingLists().catch(() => {});
-        // Auto-push updated settings to chrome.storage.sync (fire-and-forget)
-        pushToCloud().catch(() => {});
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, settings: merged });
         break;
       }
 
@@ -2391,6 +2664,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const warn = (name, detail) => checks.push({ name, status: 'warn', detail });
         const fail = (name, detail) => checks.push({ name, status: 'fail', detail });
 
+        const healthRepair = await repairFilterHealthForCheck();
+
         // 1. Dynamic filter rules loaded
         try {
           const dyn = await chrome.declarativeNetRequest.getDynamicRules();
@@ -2406,20 +2681,55 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else warn('Static rulesets', `Only ${enabled.length} rulesets enabled`);
         } catch (e) { warn('Static rulesets', e.message); }
 
-        // 3. Filter sync recency
+        // 3. Filter sync recency (never show "Infinityh" — invalid/missing ts is repaired above)
         try {
           const { filterSyncedAt, syncFailures = 0 } = await chrome.storage.local.get(['filterSyncedAt','syncFailures']);
-          const ageHours = filterSyncedAt ? (Date.now() - filterSyncedAt) / 3600000 : Infinity;
-          if (ageHours < 13) pass('Last sync', `${ageHours < 1 ? '<1h' : Math.round(ageHours)+'h'} ago${syncFailures > 0 ? ` (${syncFailures} failures)` : ''}`);
-          else if (ageHours < 48) warn('Last sync', `${Math.round(ageHours)}h ago — consider force sync`);
-          else fail('Last sync', `${Math.round(ageHours)}h ago — stale filter lists`);
+          const dynFilterCount = (await chrome.declarativeNetRequest.getDynamicRules())
+            .filter(r => isFilterListRuleId(r.id)).length;
+          const ts = Number(filterSyncedAt);
+          const tsValid = Number.isFinite(ts) && ts > 1_000_000_000_000;
+
+          if (!tsValid) {
+            if (dynFilterCount > 100) {
+              if (healthRepair.syncQueued) {
+                warn('Last sync', `Sync in progress — ${dynFilterCount} network rules already active`);
+              } else {
+                warn('Last sync', `${dynFilterCount} rules active — click ↺ sync in Stats if lists look stale`);
+              }
+            } else {
+              fail('Last sync', 'Never synced — open Stats and click ↺ sync');
+            }
+          } else {
+            const ageHours = (Date.now() - ts) / 3600000;
+            if (ageHours < 0) {
+              warn('Last sync', 'Clock skew detected — run ↺ sync');
+            } else if (ageHours < 13) {
+              pass('Last sync', `${ageHours < 1 ? '<1h' : Math.round(ageHours) + 'h'} ago${syncFailures > 0 ? ` (${syncFailures} failures)` : ''}`);
+            } else if (ageHours < 48) {
+              warn('Last sync', `${Math.round(ageHours)}h ago — consider force sync`);
+            } else {
+              warn('Last sync', `${Math.round(ageHours)}h ago — run ↺ sync in Stats`);
+            }
+          }
         } catch (e) { warn('Last sync', e.message); }
 
         // 4. Cosmetics loaded
         try {
           const { cosmeticSelectors = [] } = await chrome.storage.local.get('cosmeticSelectors');
-          if (cosmeticSelectors.length > 500) pass('Cosmetics', `${cosmeticSelectors.length} selectors`);
-          else warn('Cosmetics', `${cosmeticSelectors.length} selectors — low, sync may be needed`);
+          const cosCount = cosmeticSelectors.length;
+          if (cosCount > 500) pass('Cosmetics', `${cosCount.toLocaleString()} selectors`);
+          else if (cosCount > 0) warn('Cosmetics', `${cosCount} selectors — run ↺ sync for full lists`);
+          else if (healthRepair.syncQueued) {
+            warn('Cosmetics', 'Syncing filter lists now — re-run health check in ~1 min');
+          } else {
+            const dynFilterCount = (await chrome.declarativeNetRequest.getDynamicRules())
+              .filter(r => isFilterListRuleId(r.id)).length;
+            if (dynFilterCount > 100) {
+              warn('Cosmetics', '0 cosmetic selectors — network blocking OK; run ↺ sync in Stats');
+            } else {
+              fail('Cosmetics', 'No cosmetics — run ↺ sync in Stats');
+            }
+          }
         } catch (e) { warn('Cosmetics', e.message); }
 
         // 5. Safe browsing domains loaded
@@ -2465,6 +2775,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
         } catch (e) { warn('Storage', e.message); }
 
+        // 11. Safe-browsing false-positive guard (GitHub, Drive, GA dashboard)
+        const fpHosts = ['github.com', 'drive.google.com', 'analytics.google.com'];
+        const fpBlocked = fpHosts.filter(h => _safeBrowsingDomains.has(h));
+        if (fpBlocked.length) fail('Trusted sites', `SB block list contains: ${fpBlocked.join(', ')} — reload extension`);
+        else pass('Trusted sites', 'GitHub, Drive, and GA not in malware domain cache');
+
+        // 12. Sync failure streak
+        try {
+          const { syncFailures = 0 } = await chrome.storage.local.get('syncFailures');
+          if (syncFailures === 0) pass('List sync errors', 'No recent list failures');
+          else if (syncFailures < 4) warn('List sync errors', `${syncFailures} list(s) failed last sync — check Log tab`);
+          else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
+        } catch (e) { warn('List sync errors', e.message); }
+
+        // 13. Extension version
+        pass('Version', chrome.runtime.getManifest().version);
+
         const summary = checks.every(c => c.status === 'pass') ? 'healthy'
                       : checks.some(c => c.status === 'fail')  ? 'degraded'
                       : 'warning';
@@ -2472,6 +2799,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
 
+      case 'GET_FILTER_INFO': {
+        sendResponse({
+          builtInCount: FILTER_LISTS.length,
+          builtInNames: FILTER_LISTS.map(l => l.name),
+          maxBudget: MAX_FILTER_RULES,
+        });
+        break;
+      }
       case 'GET_FILTER_STATUS': {
         const d = await chrome.storage.local.get(['filterSyncedAt','filterRuleCount','syncFailures','syncDuration','syncListStatus','staticRuleCount']);
         const dynamic = await chrome.declarativeNetRequest.getDynamicRules();
@@ -2601,8 +2936,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(pushResult);
         break;
       }
+      case 'ENABLE_CLOUD_SYNC': {
+        await chrome.storage.local.set({ sbCloudSyncEnabled: true });
+        const pushResult = await pushToCloud();
+        sendResponse({ ok: true, pushed: pushResult?.ok ?? false });
+        break;
+      }
+      case 'DISABLE_CLOUD_SYNC': {
+        await chrome.storage.local.set({ sbCloudSyncEnabled: false });
+        try {
+          await chrome.storage.sync.remove(['settings', 'whitelist', 'userFilterText', 'customFilterLists']);
+        } catch (_) {}
+        sendResponse({ ok: true });
+        break;
+      }
       case 'RESTORE_FROM_CLOUD': {
         try {
+          if (!(await isCloudSyncEnabled())) {
+            sendResponse({ ok: false, error: 'Cloud sync is off — enable it first if you want restore' });
+            break;
+          }
           const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
           if (!Object.keys(synced).length) { sendResponse({ ok: false, error: 'Nothing saved in cloud' }); break; }
           if (synced.settings && typeof synced.settings === 'object') {
@@ -2633,8 +2986,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await chrome.storage.local.set({ whitelist: wl });
         await applyWhitelistRules();
         await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
-        // Auto-push whitelist changes to cloud (fire-and-forget)
-        pushToCloud().catch(() => {});
         sendResponse({ ok: true });
         break;
       }
@@ -3051,7 +3402,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await chrome.storage.local.set({ whitelist: wl });
     await applyWhitelistRules();
     await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
-    pushToCloud().catch(() => {}); // keep cloud in sync (fire-and-forget)
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
@@ -3103,36 +3453,17 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
     applyWhitelistRules(),
+    applyAmazonShoppingAllowRules(),
     restoreGlobalPauseRule(),
   ]);
+  await refreshAllowRuleIds();
   await restoreGlobalPauseIfActive();
 
   // Show welcome page on fresh install
   if (reason === 'install') {
-    // Check cloud sync for existing settings from another device BEFORE showing welcome
-    // so the user's preferences are already applied when the welcome page opens.
-    try {
-      const synced = await chrome.storage.sync.get(['settings','whitelist','userFilterText','customFilterLists']);
-      if (Object.keys(synced).length > 0) {
-        // Validate types before writing (mirrors RESTORE_FROM_CLOUD checks)
-        if (synced.settings && typeof synced.settings === 'object') {
-          const validated = {};
-          for (const [k, v] of Object.entries(synced.settings)) {
-            if (k in DEFAULT_SETTINGS && typeof v === typeof DEFAULT_SETTINGS[k]) validated[k] = v;
-          }
-          synced.settings = validated;
-        }
-        if ('whitelist' in synced && !Array.isArray(synced.whitelist)) delete synced.whitelist;
-        if ('userFilterText' in synced && typeof synced.userFilterText !== 'string') delete synced.userFilterText;
-        if ('customFilterLists' in synced && !Array.isArray(synced.customFilterLists)) delete synced.customFilterLists;
-        await chrome.storage.local.set(synced);
-        invalidateSettingsCache();
-        if (typeof synced.userFilterText === 'string') await parseAndStoreUserFilterText(synced.userFilterText);
-        logEvent('system', 'info', `Restored ${Object.keys(synced).join(', ')} from cloud sync`);
-      }
-    } catch (e) {
-      logEvent('system', 'warn', `Cloud restore on install failed: ${e.message}`);
-    }
+    // Local-only by default — do not auto-pull chrome.storage.sync on install (managed
+    // Chrome profiles can inject synced policy-like settings and confuse users).
+    await chrome.storage.local.set({ sbCloudSyncEnabled: false });
     chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html'), active: true });
   }
 
@@ -3157,11 +3488,28 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     if (!existingWl)       toWrite.whitelist = [];
     await chrome.storage.local.set(toWrite);
   } else if (reason === 'update' && existingSettings) {
-    // Extension update — merge new default keys into existing settings so new
-    // toggles are available to existing users without resetting their preferences
     const merged = { ...DEFAULT_SETTINGS, ...existingSettings };
     await chrome.storage.local.set({ settings: merged });
   }
+
+  const { sbCloudSyncEnabled } = await chrome.storage.local.get('sbCloudSyncEnabled');
+  if (sbCloudSyncEnabled === undefined) {
+    await chrome.storage.local.set({ sbCloudSyncEnabled: false });
+  }
+
+  try {
+    await runStabilityMaintenanceIfNeeded();
+    const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
+    if (sbRulesVersion !== '2.14.0') {
+      const all = await chrome.storage.local.get(null);
+      const stale = Object.keys(all).filter(k =>
+        k.startsWith('fr_') || k.startsWith('fm_') || k.startsWith('fc_') ||
+        k.startsWith('fd_') || k.startsWith('fs_') || k.startsWith('frp_') || k.startsWith('fe_'));
+      if (stale.length) await chrome.storage.local.remove(stale);
+      await rebuildAggregatedFilterCaches();
+      await chrome.storage.local.set({ sbRulesVersion: '2.14.0' });
+    }
+  } catch (_) {}
 
   await applySettingsSideEffects(await getSettings(), { syncFilters: false });
 
@@ -3184,7 +3532,6 @@ chrome.commands.onCommand.addListener(async (command) => {
     await chrome.storage.local.set({ whitelist: wl });
     await applyWhitelistRules();
     await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
-    pushToCloud().catch(() => {}); // sync whitelist change to cloud (fire-and-forget)
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
     if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId: tab.id });
@@ -3219,8 +3566,10 @@ chrome.runtime.onStartup.addListener(async () => {
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
     applyWhitelistRules(),
+    applyAmazonShoppingAllowRules(),
     restoreGlobalPauseRule(),
   ]);
+  await refreshAllowRuleIds();
   await restoreGlobalPauseIfActive();
 
   const existing = await chrome.alarms.get('filterSync');
@@ -3229,12 +3578,22 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== '2.10.1') {
+    if (sbRulesVersion !== '2.14.0') {
       const all = await chrome.storage.local.get(null);
-      const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
+      const stale = Object.keys(all).filter(k =>
+        k.startsWith('fr_') || k.startsWith('fm_') || k.startsWith('fc_') ||
+        k.startsWith('fd_') || k.startsWith('fs_') || k.startsWith('frp_') || k.startsWith('fe_'));
       if (stale.length) await chrome.storage.local.remove(stale);
-      await chrome.storage.local.set({ sbRulesVersion: '2.10.1' });
+      await rebuildAggregatedFilterCaches();
+      await chrome.storage.local.set({ sbRulesVersion: '2.14.0' });
+      logEvent('startup', 'info', 'Upgraded to v2.14.0 — expanded built-in filter lists');
+      setTimeout(() => syncFilterLists(true).catch(() => {}), 2000);
     }
+  } catch (_) {}
+
+  await repairFilterHealthForCheck();
+  try {
+    await runStabilityMaintenanceIfNeeded();
   } catch (_) {}
 
   setTimeout(() => {

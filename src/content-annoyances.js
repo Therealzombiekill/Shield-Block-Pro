@@ -57,7 +57,7 @@
     '.kustomer-app', '#kustomer-ui-sdk-iframe',
     '.gorgias-chat-container', '#gorgias-chat-container',
     '#beacon-container', '.BeaconFabButtonFrame',
-    '.fb_dialog', '.fb-customerchat', '.fb_customer_chat_bounce_in_v2',
+    '.fb-customerchat', '.fb_customer_chat_bounce_in_v2',  // Facebook Customer Chat plugin (3rd-party embed only)
     'jdiv', '.jivo-c', 'jdiv.button',          // JivoChat
     '#smartsupp-widget-container', '.smartsupp-widget',
     '#chatra', '#chatra__iframe',

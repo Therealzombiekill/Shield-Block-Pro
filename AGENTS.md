@@ -39,6 +39,7 @@ Useful DevTools entry points:
 | Lint | Not configured (no ESLint/Prettier in repo) |
 | Automated tests | None — manual browser testing only |
 | Build | None — edit source and reload the extension |
+| **Stability check** | **`node tools/verify.mjs`** — run after any change to `src/background.js`, `src/filter-parser.js`, or `rules/*.json`. Verifies JS syntax, JSON validity, **DNR ID-range disjointness across all rule pools**, static rule-ID uniqueness/range (1–9999), manifest file references, browser-compat ordering, and the DNR rule sanitizer. No dependencies. |
 | Structure validation | `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` |
 | JS syntax check | `node --check src/background.js` (ES modules; run per file) |
 

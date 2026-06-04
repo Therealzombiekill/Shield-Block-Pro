@@ -42,7 +42,8 @@
         "src/browser-compat.js",
         "src/content-privacy.js"
       ],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "type": "module"
     },
     {
       "matches": [

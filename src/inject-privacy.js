@@ -33,10 +33,12 @@
   // below self-gates on these flags, so they can be toggled at runtime.
   let _privacyEnabled = true;
   let _trackingEnabled = true;
+  let _skipUrlClean = false;
   window.addEventListener('message', (e) => {
     if (e.source !== window || e.data?.type !== 'SB_PRIVACY_CONFIG') return;
     _privacyEnabled = e.data.privacy !== false;
     _trackingEnabled = e.data.tracking !== false;
+    if (e.data.skipUrlClean !== undefined) _skipUrlClean = !!e.data.skipUrlClean;
   });
 
   let _privacyInstalled = false;
@@ -366,11 +368,9 @@
   ]);
 
   function cleanURL(urlStr) {
-    if (!_trackingEnabled) return null;
+    if (!_trackingEnabled || _skipUrlClean) return null;
     try {
       const url = new URL(urlStr);
-      const h = url.hostname.replace(/^www\./, '');
-      if (h === 'analytics.google.com' || h === 'tagmanager.google.com') return null;
       let changed = false;
 
       // Query string params

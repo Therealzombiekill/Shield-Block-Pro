@@ -209,7 +209,15 @@
         "*://*.paramountplus.com/*",
         "*://*.peacocktv.com/*",
         "*://*.pluto.tv/*",
-        "*://*.tubitv.com/*"
+        "*://*.tubitv.com/*",
+        "*://*.roku.com/*",
+        "*://*.sling.com/*",
+        "*://*.fubo.tv/*",
+        "*://*.crackle.com/*",
+        "*://*.discoveryplus.com/*",
+        "*://*.plex.tv/*",
+        "*://*.xumo.com/*",
+        "*://*.vudu.com/*"
       ],
       "js": [
         "src/browser-compat.js",

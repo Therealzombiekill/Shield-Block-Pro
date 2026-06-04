@@ -65,6 +65,15 @@
     '#chat-widget-container',                   // LiveChat Inc.
     '.embeddedServiceHelpButton',              // Salesforce
     '#genesys-messenger', '.genesys-mxg-frame',
+    '#userlike-buttonWrapper', '.userlike-iframe-wrapper',
+    '.purechat-button', '#purechatWidget',
+    '#snapengage-button', '.SnapABug_Button',
+    '#help-crunch-container', '.helpcrunch-iframe-wrapper',
+    '#trengo-web-widget', '.trengo-vue-iframe',
+    '.chaport-container', '#chaport-container',
+    '#front-chat-iframe', '.front-chat-holder',
+    '.birdeye-webchat', '#birdeye-webchat-container',
+    '#comm100-button', '[id^="comm100-float-button"]',
   ];
 
   // Web-push permission pre-prompts (the custom overlay shown before the native prompt)
@@ -79,6 +88,10 @@
     '.webpushr-prompt', '#webpushr-prompt-wrapper',
     '.subscribers-prompt', '#aps-prompt',
     '.sendpulse-overlay', '[id^="sp_push"]',
+    '.truepush-prompt', '[id^="truepush"]',
+    '#nv_optin', '.nv-optin-wrapper',
+    '.aimtell-prompt-wrapper',
+    '.gravitec-prompt', '#perfecty-push-dialog',
   ];
 
   // Smart app-install / "open in app" banners
@@ -90,6 +103,9 @@
     '[class*="appBannerWrapper"]', '[data-testid*="app-banner"]',
     '.adn-banner-container',                    // AppsFlyer Smart Banner
     '.bnc-mobile-web-redirect', '.openInAppBanner', '.open-in-app',
+    '[class*="open-in-app" i]', '[class*="openInApp"]',
+    '#mobile-app-banner', '[class*="download-app-banner" i]',
+    '.gb-smart-banner', '.js-smart-banner',
   ];
 
   // Survey / feedback bubbles
@@ -104,6 +120,9 @@
     '#satismeter-container', '[id^="satismeter"]',
     '.feedbackify', '#feedbackify',
     '.medallia-feedback', '[id*="nebula_div_btn"]',
+    '#qualaroo', '[id^="qualaroo"]',
+    '.getsitecontrol', '.refiner-widget',
+    '[id^="sprig-"]', '.sprig-survey',
   ];
 
   // Sticky / floating social-share bars
@@ -115,6 +134,10 @@
     '.shareaholic-share-buttons-container.shareaholic-dock',
     '[class*="social-share"][class*="float"]', '[class*="floating-share"]',
     '[class*="share-bar"][class*="sticky"]', '[class*="sticky-share"]',
+    '.heateor_sss_sharing_container.heateor_sss_float',
+    '.swp_social_panel.swp_floating',
+    '.mashsb-box.mashsb-sticky',
+    '.dpsp-floating-sidebar',
   ];
 
   // Each group → its stat sub-label, joined into one selector for one query per tick

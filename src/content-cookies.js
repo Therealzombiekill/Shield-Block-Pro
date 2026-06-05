@@ -363,43 +363,36 @@
   }
 
   // ── Pre-emptive cookie/localStorage consent bypass ─────────────────────────
-  // Pre-set common CMP consent cookies and localStorage keys so the banner
-  // never appears on repeat visits. These are the keys CMPs check at init.
+  // Pre-set CMP keys so the banner doesn't re-prompt on repeat visits — but ONLY
+  // values that mean "dismissed" or "reject non-essential", NEVER full consent. A
+  // privacy/ad blocker must not auto-opt the user into tracking; the active
+  // "Reject All" click in handleBanners() is the primary path.
   function tryPreemptiveConsent() {
     try {
-      // Generic consent localStorage keys (many CMPs check these)
       const keys = {
-        'cookieconsent_status': 'dismiss',
-        'cookie_consent': 'accepted',
-        'consentStatus': 'accepted',
-        'gdprConsent': '1',
-        'privacyConsent': 'true',
-        'cookie-agreed': '2',
-        'cookie-agreed-version': '2',
-        'rcl_consent_given': 'true',
-        'cmplz_marketing': 'false',
-        'cmplz_statistics': 'false',
-        'cmplz_functional': 'true',
-        'cmplz_policy_id': '1',
+        'cookieconsent_status': 'dismiss',                 // Insites cookieconsent — just hides the bar
+        'cookie-agreed': '2', 'cookie-agreed-version': '2', // Drupal EU Cookie Compliance
+        'cmplz_marketing': 'false', 'cmplz_statistics': 'false', // Complianz — reject non-essential
+        'cmplz_functional': 'true', 'cmplz_policy_id': '1',
         'wp-wpml_current_language': document.documentElement.lang || 'en',
         'borlabs-cookie': JSON.stringify({version:'3.0',expiry:'+1year',uid:'sbpro',
           categories:{essential:true,marketing:false,statistics:false}}),
+        // Intentionally NOT set: cookie_consent=accepted, consentStatus=accepted,
+        // gdprConsent=1, privacyConsent=true, rcl_consent_given=true — these grant
+        // tracking consent, the opposite of this tool's purpose.
       };
       for (const [k, v] of Object.entries(keys)) {
         try { if (!localStorage.getItem(k)) localStorage.setItem(k, v); } catch(_) {}
       }
 
-      // Generic consent cookies
+      // Dismiss/neutral cookies only — never "consent granted".
       const expire = new Date(Date.now() + 365 * 864e5).toUTCString();
       const cookiePairs = [
         ['cookieconsent_status','dismiss'],
-        ['cookie_consent','accepted'],
-        ['CookieConsent','true'],
         ['cookie-agreed','2'],
-        ['gdpr','1'],
-        // NOTE: euconsent-v2 intentionally omitted — setting it to '' causes TCF-compliant
-        // CMPs (OneTrust, Cookiebot, etc.) to find the key, fail to parse the empty string
-        // as a valid consent string, and show the banner anyway.
+        // Intentionally NOT set: cookie_consent=accepted, CookieConsent=true, gdpr=1 —
+        // they read as full tracking consent. euconsent-v2 also omitted (an empty value
+        // makes TCF CMPs fail to parse and re-prompt anyway).
       ];
       for (const [n, v] of cookiePairs) {
         if (!document.cookie.includes(n + '=')) {

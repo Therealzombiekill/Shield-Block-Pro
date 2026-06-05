@@ -53,7 +53,7 @@
   // cleanText() strips all known variants before Set lookup.
   const SPONSORED_LABELS = new Set([
     // ── English ─────────────────────────────────────────────────────────
-    'Sponsored', 'Promoted', 'Advertisement', 'Ad', 'Paid', 'Suggested post',
+    'Sponsored', 'Promoted', 'Advertisement', 'Paid', 'Suggested post',
     // ── Western European ────────────────────────────────────────────────
     'Gesponsert', 'Werbung', 'Anzeige',                        // German
     'Sponsorisé', 'Sponsorisée', 'Publicité',                  // French
@@ -114,7 +114,7 @@
     'ໂຄສະນາ',                                                  // Lao
     'ကြော်ငြာ', 'ပံ့ပိုးသည်',                                   // Burmese
     // ── East Asia ───────────────────────────────────────────────────────
-    'スポンサー付き', 'スポンサー', '広告', 'PR',               // Japanese
+    'スポンサー付き', 'スポンサー', '広告',                       // Japanese (bare 'PR' removed — too many false positives)
     '광고', '스폰서',                                            // Korean
     '赞助内容', '推广', '广告',                                  // Chinese Simplified
     '贊助', '廣告', '推廣',                                      // Chinese Traditional
@@ -427,10 +427,17 @@
   clean();
 
   // Teardown
+  let _stopped = false;
   function stopSocialBlocking() {
+    if (_stopped) return;
+    _stopped = true;
     clearInterval(_interval);
     _observer.disconnect();
     clearTimeout(_debounce);
+    // Restore the history methods we patched and stop listening for SPA nav, so
+    // clean() can't keep removing posts after the feature is disabled/whitelisted/paused.
+    try { history.pushState = _origPush; history.replaceState = _origReplace; } catch (_) {}
+    window.removeEventListener('popstate', onUrlChange);
   }
 
   chrome.storage.onChanged.addListener((changes) => {
@@ -451,6 +458,7 @@
   // SPA navigation — patch both pushState AND replaceState
   let _lastUrl = location.href;
   function onUrlChange() {
+    if (_stopped) return;
     if (location.href !== _lastUrl) {
       _lastUrl = location.href;
       setTimeout(clean, 600);

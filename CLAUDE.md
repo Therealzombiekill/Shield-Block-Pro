@@ -137,7 +137,7 @@ CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom p
 
 ### Static bundled rules
 
-`rules/base.json` (369 rules), `rules/extended.json` (394 rules), `rules/hosts.json` (1278 rules), `rules/tracking.json` (2 rules) — these ship with the extension and are always active regardless of filter sync status. IDs 1–9999 are reserved for these files. When editing them, keep IDs sequential and within their file's assigned range.
+`rules/base.json` (261 rules), `rules/extended.json` (387 rules), `rules/hosts.json` (747 rules), `rules/tracking.json` (2 rules) — these ship with the extension and are always active regardless of filter sync status. IDs 1–9999 are reserved for these files (e.g. base.json's Google/DoubleClick redirect rules live at 190–199, not in the 10000–29999 dynamic band). When editing them, keep IDs within the 1–9999 static reserve.
 
 ### Alarms
 

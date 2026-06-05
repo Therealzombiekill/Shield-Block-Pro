@@ -102,6 +102,12 @@
       if ((p = extractProc(sel, 'has-text'))) {
         const re = toRe(p.arg); if (!re) return;
         document.querySelectorAll(p.base || '*').forEach(el => {
+          // :has-text matches if ANY descendant's text matches, so with no/weak base
+          // it also matches <html>/<body> and large wrappers. Never remove structural
+          // roots or big subtrees from a single text hit — a careless filter such as
+          // ##:has-text(Ad) would otherwise blank the whole page.
+          const tag = el.tagName;
+          if (tag === 'HTML' || tag === 'BODY' || tag === 'HEAD' || el.childElementCount > 60) return;
           if (re.test(el.textContent)) el.remove();
         });
         return;

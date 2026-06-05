@@ -65,11 +65,16 @@
     '[data-testid="ad-badge"]', '[data-testid="ad-countdown"]', '[data-testid="ad-overlay"]',
   ].join(',');
 
-  // Whole-label match only — anchored with $ so it matches "Ad", "Advertisement",
-  // "Ad 1 of 3", "Ad · 0:15", "Ad: 15s", "Ad break", but NOT "Ad-free",
-  // "Ad-supported", "Ad info", "AdChoices", "Ad feedback" (trailing words) nor a
-  // bare "0:15" timer. (content-kick.js / content-hulu.js use the same anchored style.)
-  const AD_TEXT_RE = /^\s*ad(vertisement)?(\s*[·:]?\s*(\d+(\s*of\s*\d+)?|\d+:\d{2}|\d+\s*s(ec)?|break))?\s*$/i;
+  // Whole-label match only — anchored with $ so it matches an ad indicator that is
+  // the ENTIRE label ("Ad", "Advertisement", "Ad 1 of 3", "Ad · 0:15", "Ad: 15s",
+  // "Ad break", plus the localized words below), but NOT "Ad-free", "Ad info",
+  // "AdChoices", "Ad feedback" (trailing words) nor a bare "0:15" timer. The
+  // localized terms are distinctive whole words, so anchoring keeps false positives
+  // near zero while covering non-English ad UIs on these global platforms.
+  const AD_WORDS = 'ad|advertisement|werbung|publicité|publicidad|anuncio|anúncio|' +
+    'pubblicità|reklama|reklam|реклама|広告|광고|广告|廣告|διαφήμιση|reclame|annons|annonce|mainos';
+  const AD_TEXT_RE = new RegExp(
+    `^\\s*(${AD_WORDS})(\\s*[·:]?\\s*(\\d+(\\s*of\\s*\\d+)?|\\d+:\\d{2}|\\d+\\s*s(ec)?|break))?\\s*$`, 'i');
 
   function isAdPlaying() {
     try { if (document.querySelector(AD_SEL)) return true; } catch (_) {}

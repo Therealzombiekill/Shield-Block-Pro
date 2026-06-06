@@ -291,6 +291,7 @@
 
   // ── Main handler ──────────────────────────────────────────────────────────
   function handleBanners() {
+    if (globalThis.__sbGlobalPause) return; // don't click banner buttons during a global pause
     let anyAction = false;
 
     for (const root of knownRoots) {

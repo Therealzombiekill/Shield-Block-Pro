@@ -310,7 +310,10 @@
     window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
   }
   function _enableNow() {
-    if (!settings?.youtube) return;
+    // _liveYtOff tracks the live YouTube toggle (settings is the stale init snapshot);
+    // without it, resuming a global pause would re-enable blocking even if the user
+    // turned the YouTube toggle off during the pause.
+    if (!settings?.youtube || _liveYtOff) return;
     if (_whitelisted || _liveWl || _livePaused) return;
     if (_playbackRecovery) return;
     try { if (sessionStorage.getItem('__sbYtRecovery') === '1') return; } catch (_) {}

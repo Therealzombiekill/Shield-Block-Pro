@@ -780,12 +780,10 @@ function logBlockedRequest(url, tabId) {
   } catch (_) {}
 }
 
-// Real-time log via declarativeNetRequestFeedback (dev mode + production with permission)
-try {
-  chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
-    logBlockedRequest(info.request.url, info.request.tabId);
-  });
-} catch (_) {}
+// NOTE: chrome.declarativeNetRequest.onRuleMatchedDebug is only available to UNPACKED
+// extensions, and where it fires it double-logs every block that countNetworkBlocks()
+// already records via getMatchedRules() — inflating GET_TOP_DOMAINS / GET_PAGE_LOG with
+// duplicate entries. countNetworkBlocks() is the single source of truth for the request log.
 
 async function countNetworkBlocks(tabId, url) {
   if (_navCounted.has(tabId) || _navCounting.has(tabId)) return;
@@ -2128,6 +2126,9 @@ async function injectCosmetics(tabId, tabUrl) {
         const chunkCss = chunk.join(',\n') + ' { display:none!important; }';
         try { await chrome.scripting.insertCSS({ target: { tabId }, css: chunkCss }); } catch (_) {}
       }
+      // Record the intended CSS so a repeat pass with identical selectors won't
+      // re-run the chunked insert and pile up duplicate stylesheets.
+      tabState.css = css;
     }
   }
   _tabCosmeticState.set(tabId, tabState);
@@ -2579,24 +2580,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!uboData) { sendResponse({ ok: false }); break; }
         try {
           const updates = {};
-          // Import user filters
+          const importedKeys = [];
+          // Import user filters — route through the same path the Filters panel uses so
+          // network (DNR) and $removeparam rules are stored AND applied, not just the
+          // cosmetic/scriptlet types. (The old path parsed with a 90000 base outside the
+          // USER_DNR range and discarded the network + removeparam rules entirely.)
           if (uboData.userFilters && typeof uboData.userFilters === 'string') {
-            updates.userFilterText = uboData.userFilters;
-            const { cosmetics, domainCosmetics, scriptletRules } =
-              parseFilterList(uboData.userFilters, 90000, 500);
-            updates.userCosmetics = cosmetics;
-            updates.userDomainCosmetics = domainCosmetics;
-            updates.userScriptletRules = scriptletRules;
+            await parseAndStoreUserFilterText(uboData.userFilters);
+            importedKeys.push('userFilters');
           }
           // Import whitelist
           if (uboData.whitelist && typeof uboData.whitelist === 'string') {
             const domains = uboData.whitelist.split('\n')
               .map(l => l.replace(/^@@\|\|/, '').replace(/\^.*/, '').trim())
               .filter(d => d && !d.startsWith('!') && d.includes('.'));
-            if (domains.length) updates.whitelist = domains;
+            if (domains.length) { updates.whitelist = domains; importedKeys.push('whitelist'); }
           }
           if (Object.keys(updates).length) await chrome.storage.local.set(updates);
-          sendResponse({ ok: true, imported: Object.keys(updates) });
+          sendResponse({ ok: true, imported: importedKeys });
         } catch (e) { sendResponse({ ok: false, error: e.message }); }
         break;
       }
@@ -2975,7 +2976,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 chrome.tabs.onRemoved.addListener((tabId) => { _tabCosmeticState.delete(tabId); });
 
 chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
-  if (frameId === 0) injectCosmetics(tabId, url);
+  if (frameId === 0) {
+    // The browser clears scripting.insertCSS on every committed navigation. Drop the
+    // cached injection state so injectCosmetics re-inserts the base + selector CSS for
+    // the new document (otherwise cosmetic filtering silently stops after in-tab nav).
+    _tabCosmeticState.delete(tabId);
+    injectCosmetics(tabId, url);
+  }
 });
 
 // ── Alarms ─────────────────────────────────────────────────────────────────

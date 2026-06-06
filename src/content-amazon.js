@@ -185,6 +185,15 @@ function _removeAmazonCss() {
     _removeAmazonCss(); // also remove injected CSS
   }
 
+  function startAmazonBlocking() {
+    if (!settings?.amazon) return;
+    if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+    _injectAmazonCss();
+    observer.disconnect();
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    clean();
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
     const wl = changes.whitelist?.newValue;
     const isWhitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
@@ -196,6 +205,9 @@ function _removeAmazonCss() {
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') {
       stopAmazonBlocking();
+    }
+    if (message?.type === 'GLOBAL_RESUME') {
+      startAmazonBlocking();
     }
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];

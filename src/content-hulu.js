@@ -129,7 +129,7 @@
   _huluObserver.observe(document.body || document.documentElement, {
     childList: true, subtree: true,
   });
-  const _huluInterval = setInterval(tick, 1000);
+  let _huluInterval = setInterval(tick, 1000);
 
   // Cleanup on page unload — prevents memory leak on SPA navigation
   window.addEventListener('beforeunload', () => {
@@ -145,6 +145,18 @@
     if (adActive) { restoreAfterAd(); adActive = false; }
   }
 
+  function startHuluBlocking() {
+    if (!settings?.hulu) return;
+    if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+    _huluObserver.disconnect();
+    _huluObserver.observe(document.body || document.documentElement, {
+      childList: true, subtree: true,
+    });
+    clearInterval(_huluInterval);
+    _huluInterval = setInterval(tick, 1000);
+    tick();
+  }
+
   // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
   chrome.storage.onChanged.addListener((changes) => {
     const wl = changes.whitelist?.newValue;
@@ -154,6 +166,7 @@
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') stopHuluBlocking();
+    if (message?.type === 'GLOBAL_RESUME') startHuluBlocking();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) stopHuluBlocking();

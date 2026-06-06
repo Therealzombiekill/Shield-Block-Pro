@@ -276,11 +276,30 @@
       const urlStr = String(url);
       if (WS_SAFE.test(urlStr)) return new _WS(url, protocols); // always allow
       if (_trackingEnabled && WS_AD_PATTERNS.some(p => p.test(urlStr))) {
-        // Return a no-op fake WebSocket
-        const fake = { send:()=>{}, close:()=>{}, addEventListener:()=>{},
-          removeEventListener:()=>{}, dispatchEvent:()=>false,
-          readyState: 3, CLOSED: 3, OPEN: 1, url };
-        return Object.assign(Object.create(_WS.prototype), fake);
+        // Return a fake WebSocket that behaves like a genuinely blocked/failed
+        // connection rather than silently hanging: it accepts handlers without
+        // throwing and settles listeners exactly once (error -> close 1006), so page
+        // code that awaits open/close doesn't wait forever. Keeps _WS.prototype so
+        // `instanceof WebSocket` still holds.
+        const _wsListeners = Object.create(null);
+        const fake = Object.assign(Object.create(_WS.prototype), {
+          url: urlStr, protocol: '', extensions: '', bufferedAmount: 0, binaryType: 'blob',
+          readyState: 0, CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3,
+          onopen: null, onmessage: null, onerror: null, onclose: null,
+          send() {}, close() {}, dispatchEvent() { return false; },
+          addEventListener(type, fn) { if (typeof fn === 'function') (_wsListeners[type] = _wsListeners[type] || []).push(fn); },
+          removeEventListener(type, fn) { const a = _wsListeners[type]; if (a) { const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1); } },
+        });
+        const _wsEmit = (type, ev) => {
+          try { fake['on' + type]?.(ev); } catch (_) {}
+          for (const fn of (_wsListeners[type] || [])) { try { fn.call(fake, ev); } catch (_) {} }
+        };
+        setTimeout(() => {
+          fake.readyState = 3;
+          _wsEmit('error', { type: 'error' });
+          _wsEmit('close', { type: 'close', code: 1006, reason: '', wasClean: false });
+        }, 0);
+        return fake;
       }
       return new _WS(url, protocols);
     };

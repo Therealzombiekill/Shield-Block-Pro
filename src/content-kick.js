@@ -47,17 +47,15 @@
     if (player) {
       const spans = player.querySelectorAll('span, div');
       for (const el of spans) {
-        if (el.children.length === 0 && /^\s*(ad\s+\d|\d+\s*s(ec)?)\s*$/i.test(el.textContent)) return true;
+        if (el.children.length === 0 && /^\s*(ad(\s+\d+(\s+of\s+\d+)?)?|\d+\s*s(ec)?)\s*$/i.test(el.textContent)) return true;
       }
     }
     return false;
   }
 
-  function removeAdUI() {
-    for (const sel of AD_SELECTORS) {
-      try { document.querySelectorAll(sel).forEach(el => el.remove()); } catch (_) {}
-    }
-  }
+  // NOTE: mute-only (like content-streaming.js). We must NOT remove AD_SELECTORS
+  // elements — isAdPlaying() detects the ad break from them, so removing them would
+  // make the next tick think the ad ended and unmute while the SSAI ad still plays.
 
   let adActive = false;
   let wasMuted = false;
@@ -66,7 +64,6 @@
   function tick() {
     if (globalThis.__sbGlobalPause) return;
     const hasAd = isAdPlaying();
-    removeAdUI();
 
     if (hasAd && !adActive) {
       adActive = true;

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.10.7",
+  "version": "2.18.0",
   "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
@@ -76,6 +76,17 @@
       "js": [
         "src/browser-compat.js",
         "src/content-cookies.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/browser-compat.js",
+        "src/content-annoyances.js"
       ],
       "run_at": "document_idle"
     },
@@ -187,6 +198,29 @@
       "js": [
         "src/browser-compat.js",
         "src/content-kick.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.max.com/*",
+        "*://*.disneyplus.com/*",
+        "*://*.paramountplus.com/*",
+        "*://*.peacocktv.com/*",
+        "*://*.pluto.tv/*",
+        "*://*.tubitv.com/*",
+        "*://*.roku.com/*",
+        "*://*.sling.com/*",
+        "*://*.fubo.tv/*",
+        "*://*.crackle.com/*",
+        "*://*.discoveryplus.com/*",
+        "*://*.plex.tv/*",
+        "*://*.xumo.com/*",
+        "*://*.vudu.com/*"
+      ],
+      "js": [
+        "src/browser-compat.js",
+        "src/content-streaming.js"
       ],
       "run_at": "document_idle"
     },
@@ -304,7 +338,8 @@
         "rules/extended.json",
         "rules/tracking.json",
         "rules/hosts.json",
-        "src/filter-catalog.json"
+        "src/filter-catalog.json",
+        "src/trusted-sites.js"
       ],
       "matches": [
         "<all_urls>"

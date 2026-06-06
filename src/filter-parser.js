@@ -8,6 +8,8 @@
  *   - Scriptlet rules (example.com##+js(name, arg))
  */
 
+import { isDomainProtected, SHARED_GOOGLE_API_EXCLUDED_INITIATORS } from './trusted-sites.js';
+
 const RESOURCE_TYPE_MAP = {
   'script':         'script',
   'image':          'image',
@@ -25,57 +27,6 @@ const RESOURCE_TYPE_MAP = {
 const DEFAULT_RESOURCE_TYPES = [
   'script', 'image', 'xmlhttprequest', 'sub_frame', 'media', 'font', 'stylesheet', 'other', 'ping',
 ];
-
-const PROTECTED_DOMAINS = new Set([
-  // YouTube — all domains needed for video playback
-  'youtube.com', 'youtu.be', 'youtube-nocookie.com',
-  'ytimg.com', 'yt3.ggpht.com', 'googlevideo.com',
-  'gvt1.com', 'gvt2.com', 'gvt3.com',
-  // Google APIs used by YouTube player
-  'googleapis.com', 'gstatic.com', 'ggpht.com',
-  // Twitch
-  'twitch.tv', 'twitchsvc.net', 'jtvnw.net', 'twitchapps.com',
-  // CDNs never blocked
-  'cloudflare.com', 'cloudfront.net', 'fastly.net',
-  'akamaihd.net', 'akamaized.net', 'edgecastcdn.net',
-  // Browser APIs
-  'ajax.googleapis.com', 'fonts.googleapis.com', 'fonts.gstatic.com',
-  // Common broken if blocked
-  'jquery.com', 'bootstrapcdn.com', 'jsdelivr.net', 'unpkg.com',
-  // GitHub — sign-in, assets, API
-  'github.com', 'githubassets.com', 'githubusercontent.com', 'ghcr.io',
-  'raw.githubusercontent.com', 'gist.github.com', 'github.io',
-  // Google Workspace / sign-in (apis.google.com, boq.google.com load from these)
-  'google.com', 'drive.google.com', 'docs.google.com', 'sheets.google.com',
-  'slides.google.com', 'mail.google.com', 'accounts.google.com',
-  'calendar.google.com', 'meet.google.com', 'classroom.google.com',
-  'drive.usercontent.google.com',
-  'youtubei.googleapis.com',
-  // Google Analytics / Tag Manager dashboards (first-party app, not third-party trackers)
-  'analytics.google.com', 'tagmanager.google.com',
-]);
-
-// When a filter blocks a shared Google endpoint, never apply from these initiators.
-const SHARED_GOOGLE_API_EXCLUDED_INITIATORS = [
-  'youtube.com', 'youtu.be', 'youtube-nocookie.com', 'music.youtube.com', 'tv.youtube.com',
-  'github.com', 'www.github.com', 'api.github.com', 'gist.github.com',
-  'githubassets.com', 'githubusercontent.com',
-  'google.com', 'www.google.com',
-  'drive.google.com', 'docs.google.com', 'sheets.google.com', 'slides.google.com',
-  'mail.google.com', 'accounts.google.com', 'calendar.google.com', 'meet.google.com',
-  'classroom.google.com', 'chat.google.com', 'keep.google.com', 'photos.google.com',
-  'analytics.google.com', 'tagmanager.google.com',
-];
-
-function isDomainProtected(filter) {
-  const bare = filter.replace(/^\|\|/, '').split(/[/?^]/)[0].toLowerCase();
-  if (PROTECTED_DOMAINS.has(bare)) return true;
-  const parts = bare.split('.');
-  for (let i = 1; i < parts.length; i++) {
-    if (PROTECTED_DOMAINS.has(parts.slice(i).join('.'))) return true;
-  }
-  return false;
-}
 
 // Cosmetic pseudo-classes that Chrome can't handle — skip these
 function hasUnsupportedPseudo(selector) {
@@ -205,8 +156,13 @@ function parseLine(line, idCounter) {
       }
       return { type: 'removeparam', param: paramName, initDomains, exclDomains };
     }
-    // Skip other unsupported option types that would change the action semantics
-    if (opts.includes('redirect') || opts.includes('csp') || opts.includes('replace')) return null;
+    // Skip other unsupported option types that would change the action semantics.
+    // Match option *names* (token before '='), not substrings — a naive includes()
+    // would drop legitimate block rules like "$image,domain=cspire.com" (contains "csp")
+    // or any domain= value containing "redirect"/"replace".
+    const _optNames = opts.split(',').map(o => o.trim().split('=')[0]);
+    if (_optNames.includes('redirect') || _optNames.includes('redirect-rule') ||
+        _optNames.includes('csp') || _optNames.includes('replace')) return null;
   }
 
   // Clean up the filter

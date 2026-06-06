@@ -181,6 +181,14 @@
     clearTimeout(_pwDeb);
   }
 
+  function startPaywallBypass() {
+    if (!settings?.paywall) return;
+    if (_wl.some(d => host === d || host.endsWith('.' + d))) return;
+    _pwObserver.disconnect();
+    _pwObserver.observe(document.documentElement, { childList: true, subtree: true });
+    unlockContent();
+  }
+
   // Cleanup on toggle-off, pause, or whitelist updates
   chrome.storage.onChanged.addListener((changes) => {
     const wl = changes.whitelist?.newValue;
@@ -190,6 +198,7 @@
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') stopPaywallBypass();
+    if (message?.type === 'GLOBAL_RESUME') startPaywallBypass();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => host === d || host.endsWith('.' + d))) stopPaywallBypass();

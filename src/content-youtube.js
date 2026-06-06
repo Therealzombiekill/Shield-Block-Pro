@@ -263,7 +263,7 @@
     if (_ytExtras) handleYouTubeExtras();
   }
 
-  const _tickInterval = setInterval(tick, 750);
+  let _tickInterval = setInterval(tick, 750);
   tick();
 
   let _lastSkipClick = 0;
@@ -278,13 +278,14 @@
   _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
 
   let _wasAd = false;
-  const _statInterval = setInterval(() => {
+  function _statTick() {
     const ad = isAdPlaying();
     if (ad && !_wasAd) {
       chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'youtube' }).catch(() => {});
     }
     _wasAd = ad;
-  }, 1000);
+  }
+  let _statInterval = setInterval(_statTick, 1000);
 
   function _cleanup() {
     clearInterval(_tickInterval);
@@ -307,6 +308,22 @@
     }
     try { localStorage.setItem('__sbYtOff', '1'); } catch (_) {}
     window.postMessage({ type: 'SB_YOUTUBE_DISABLE' }, '*');
+  }
+  function _enableNow() {
+    if (!settings?.youtube) return;
+    if (_whitelisted || _liveWl || _livePaused) return;
+    if (_playbackRecovery) return;
+    try { if (sessionStorage.getItem('__sbYtRecovery') === '1') return; } catch (_) {}
+    _stopped = false;
+    try { localStorage.setItem('__sbYtOff', '0'); } catch (_) {}
+    window.postMessage({ type: 'SB_YOUTUBE_ENABLE' }, '*');
+    _skipObserver.disconnect();
+    _skipObserver.observe(document.documentElement, { childList: true, subtree: true });
+    clearInterval(_tickInterval);
+    _tickInterval = setInterval(tick, 750);
+    clearInterval(_statInterval);
+    _statInterval = setInterval(_statTick, 1000);
+    tick();
   }
 
   window.addEventListener('beforeunload', _cleanup, { once: true });
@@ -337,6 +354,7 @@
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') _disableNow();
+    if (message?.type === 'GLOBAL_RESUME') _enableNow();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => _host === d || _host.endsWith('.' + d))) _disableNow();

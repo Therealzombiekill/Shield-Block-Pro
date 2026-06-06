@@ -423,7 +423,7 @@
     childList: true, subtree: true,
   });
 
-  const _interval = setInterval(clean, 3000);
+  let _interval = setInterval(clean, 3000);
   clean();
 
   // Teardown
@@ -440,6 +440,19 @@
     window.removeEventListener('popstate', onUrlChange);
   }
 
+  function startSocialBlocking() {
+    if (!settings?.social) return;
+    if (_wl.some(d => host === d || host.endsWith('.' + d))) return;
+    _stopped = false;
+    _observer.disconnect();
+    _observer.observe(document.body ?? document.documentElement, {
+      childList: true, subtree: true,
+    });
+    clearInterval(_interval);
+    _interval = setInterval(clean, 3000);
+    clean();
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
     const _nv = changes.settings?.newValue;
     const wl = changes.whitelist?.newValue;
@@ -449,6 +462,7 @@
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') stopSocialBlocking();
+    if (message?.type === 'GLOBAL_RESUME') startSocialBlocking();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => host === d || host.endsWith('.' + d))) stopSocialBlocking();

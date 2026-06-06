@@ -489,7 +489,13 @@
         try {
           const text = await res.clone().text();
           const patched = text.replace(bodyRe, repl);
-          return new Response(patched, { status: res.status, headers: res.headers });
+          // Drop content-length/content-encoding: the body changed length and is now
+          // decoded text, so the original (e.g. gzip) headers would make the consumer
+          // mis-read it. (Same fix as m3u-prune below.)
+          const h = new Headers(); res.headers.forEach((v, k) => {
+            if (!['content-length','content-encoding'].includes(k.toLowerCase())) h.set(k, v);
+          });
+          return new Response(patched, { status: res.status, headers: h });
         } catch (_) { return res; }
       };
     },

@@ -4,6 +4,7 @@
 
 import './browser-compat.js';
 import { parseFilterList } from './filter-parser.js';
+import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
 const MAX_DYNAMIC_RULES = 5000;
 const MAX_FILTER_RULES = 4300; // reserve dynamic-rule headroom for pause, whitelist, matrix, and privacy rules
@@ -20,8 +21,8 @@ const PAUSE_ALL_RULE_ID = 49999;
 // so they never collide with either.
 const REMOVEPARAM_BASE  = 30000; // 30000-30999: global + domain-scoped removeparam rules
 const MATRIX_BASE       = 31000; // 31000-31999: per-domain filtering matrix rules
-const USER_DNR_BASE     = 48000; // 48000-48499: user-typed network block rules
-const USER_DNR_END      = 48499;
+const USER_DNR_BASE     = 32000; // 32000-32499: user-typed network block rules (disjoint from whitelist 48000-48998)
+const USER_DNR_END      = 32499;
 const DNR_RESOURCE_TYPES = [
   'main_frame','sub_frame','script','image','stylesheet','object',
   'xmlhttprequest','ping','media','websocket','font','other',
@@ -96,6 +97,8 @@ const TIME_SAVED_SECONDS = {
   general:   5, // typical ad script load time
   social:    2, // skipped sponsored post
   cookies:   8, // time to find + click "reject all"
+  annoyances: 3, // dismissed nag / widget / banner
+  streaming: 30, // SSAI ad break (additional platforms)
 };
 
 // ── Browser detection ─────────────────────────────────────────────────────────
@@ -192,10 +195,17 @@ const FILTER_LISTS = [
   for (let i = 0; i < ranges.length; i++) {
     for (let j = i + 1; j < ranges.length; j++) {
       if (ranges[i][0] <= ranges[j][1] && ranges[j][0] <= ranges[i][1]) {
-        logEvent('system', 'error', `Rule ID range overlap: ${ranges[i][2]} overlaps ${ranges[j][2]}`);
+        // Runs at module-eval, before logEvent/_eventLog exist — must use console here.
+        // (Calling logEvent would hit a TDZ ReferenceError and abort SW startup — i.e.
+        // the self-check would crash exactly when it found the problem it guards against.)
+        console.error(`[SB] Rule ID range overlap: ${ranges[i][2]} overlaps ${ranges[j][2]}`);
       }
     }
   }
+  // Chrome hard-caps updateDynamicRules at 5,000 rules total — warn if the configured
+  // sum of per-list maxes ever drifts past it (the table comment is not self-enforcing).
+  const sumMax = FILTER_LISTS.reduce((a, l) => a + (l.max | 0), 0);
+  if (sumMax > 5000) console.warn(`[SB] FILTER_LISTS max sum ${sumMax} exceeds the 5000 dynamic-rule cap`);
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
@@ -210,6 +220,9 @@ const DEFAULT_SETTINGS = {
   hulu: true,
   kick: true,
   youtube: true,
+  youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
+  annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
+  streaming: true,      // SSAI ad-mute on additional streaming platforms (Max, Disney+, etc.)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
   paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
@@ -305,18 +318,7 @@ async function restoreGlobalPauseIfActive() {
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: [PAUSE_ALL_RULE_ID],
-      addRules: [{
-        id: PAUSE_ALL_RULE_ID,
-        priority: 10000,
-        action: { type: 'allow' },
-        condition: {
-          urlFilter: '*',
-          resourceTypes: [
-            'main_frame','sub_frame','script','image','stylesheet',
-            'object','xmlhttprequest','ping','media','websocket','other',
-          ],
-        },
-      }],
+      addRules: [_globalPauseRule()],
     });
   } catch (e) {
     logEvent('pause', 'warn', `Restore pause rule after sync failed: ${e.message}`);
@@ -330,9 +332,16 @@ async function applyUserFilterRules() {
     const removeIds = existing
       .filter(r => r.id >= USER_DNR_BASE && r.id <= USER_DNR_END)
       .map(r => r.id);
+    // Re-stamp IDs into the current USER_DNR range on every apply. Rules persisted by
+    // an older build may carry IDs from a previous range (e.g. the old 48000 base that
+    // overlapped the whitelist range); this guarantees they always land in
+    // [USER_DNR_BASE, USER_DNR_END] and can never collide with whitelist allow rules.
+    const addRules = userDnrRules
+      .slice(0, USER_DNR_END - USER_DNR_BASE + 1)
+      .map((r, i) => ({ ...r, id: USER_DNR_BASE + i }));
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: removeIds,
-      addRules: userDnrRules.slice(0, USER_DNR_END - USER_DNR_BASE + 1),
+      addRules,
     });
   } catch (e) {
     logEvent('user-filters', 'warn', `applyUserFilterRules failed: ${e.message}`);
@@ -460,8 +469,6 @@ function _flushStats() {
     } catch (_) {}
   });
 }
-
-let _statQueue = Promise.resolve();
 
 const _tabCosmeticState = new Map(); // tabId -> { baseCss, css }
 
@@ -742,9 +749,8 @@ function incrementStat(type, tabId) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
     ps.total = (ps.total | 0) + 1;
     ps.dom   = (ps.dom   | 0) + 1;
-    if (ps[type] !== undefined || ['amazon','general','social','cookies','spotify'].includes(type)) {
-      ps[type] = (ps[type] | 0) + 1;
-    }
+    // Record every stat type per-tab so the popup "This page" breakdown is complete
+    ps[type] = (ps[type] | 0) + 1;
     _pageStats.set(tabId, ps);
   }
   // Accumulate — flush to storage in a single write after 500ms idle
@@ -809,7 +815,10 @@ async function countNetworkBlocks(tabId, url) {
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
 
-    _statQueue = _statQueue.then(async () => {
+    // Chain onto the SAME queue as _flushStats() so DOM-block and network-block
+    // read-modify-writes of stats/lifetime are serialised against each other and
+    // never clobber one another's increments.
+    _flushQueue = _flushQueue.then(async () => {
       try {
         const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
         const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
@@ -1112,31 +1121,6 @@ const SB_ALLOW_TTL_MS = 10 * 60 * 1000;
 // (github.com/u/repo, drive.google.com/file/…) extracting the bare hostname
 // blocks the entire legitimate domain — a false positive. Never block these
 // shared-hosting platforms or top-reputation apexes (matched incl. subdomains).
-const SB_DOMAIN_ALLOWLIST = new Set([
-  // Shared hosting where the malicious part is the PATH, not the domain
-  'github.com','githubassets.com','githubusercontent.com','raw.githubusercontent.com','gist.github.com','github.io',
-  'drive.google.com','docs.google.com','drive.usercontent.google.com','storage.googleapis.com',
-  'dropbox.com','dropboxusercontent.com','mega.nz','mediafire.com',
-  'cdn.discordapp.com','media.discordapp.net','t.me',
-  // Top-reputation apexes (an apex entry in a feed is a false positive)
-  'google.com','gstatic.com','googleusercontent.com','youtube.com','youtu.be',
-  'analytics.google.com','tagmanager.google.com',
-  'microsoft.com','live.com','office.com','sharepoint.com','apple.com','icloud.com',
-  'amazon.com','cloudflare.com','facebook.com','instagram.com','x.com','twitter.com',
-  'linkedin.com','reddit.com','wikipedia.org','mozilla.org','anthropic.com','claude.ai',
-]);
-
-function isSafeBrowsingAllowlisted(host) {
-  if (!host) return false;
-  host = host.replace(/^www\./, '');
-  if (SB_DOMAIN_ALLOWLIST.has(host)) return true;
-  const parts = host.split('.');
-  for (let i = 1; i < parts.length - 1; i++) {
-    if (SB_DOMAIN_ALLOWLIST.has(parts.slice(i).join('.'))) return true;
-  }
-  return false;
-}
-
 // Malware feeds list URLs on shared platforms (github.com/foo) — never keep apex hosts.
 function sanitizeSbDomains(domains) {
   const out = [];
@@ -1543,12 +1527,14 @@ async function syncFilterLists(force = false) {
           } else {
             _syncListStatus[failKey] = { status: 'error', error: failMsg };
           }
-          // Queue for a single retry in 5 minutes — recovers from transient network blips
+          // Queue for a single retry in 5 minutes — recovers from transient network blips.
+          // NOTE: cached data + list status were already restored inline above
+          // (the if/else on `cached.length`). Do NOT also call _appendCachedListData
+          // here — doing so appended cached rules/removeparams a second time and
+          // overwrote the 'error' status of a genuinely-failed (uncached) list with
+          // a misleading 'cached'/ruleCount:0.
           if (failedEntry) {
             _retryQueue.push({ list: failedEntry.list, limit: failedEntry.limit });
-            _appendCachedListData(stored, failedEntry.list, failedEntry.limit, {
-              allRules, allCosmetics, allDomainCosmetics, allScriptletRules, allRemoveParams,
-            });
           }
           continue;
         }
@@ -2052,7 +2038,6 @@ async function injectCosmetics(tabId, tabUrl) {
     ]);
   if (globalPause && globalPause.until > Date.now()) return;
   if (!s?.cosmetic) return;
-  if (globalPause && globalPause.until > Date.now()) return;
 
   let domain;
   try {
@@ -2352,13 +2337,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           const ps = _pageStats.get(tab.id) ?? { total:0, network:0, dom:0 };
           sendResponse({
-            total:   ps.total   ?? 0,
-            network: ps.network ?? 0,
-            dom:     ps.dom     ?? 0,
-            amazon:  ps.amazon  ?? 0,
-            social:  ps.social  ?? 0,
-            cookies: ps.cookies ?? 0,
-            general: ps.general ?? 0,
+            total:      ps.total      ?? 0,
+            network:    ps.network    ?? 0,
+            dom:        ps.dom        ?? 0,
+            amazon:     ps.amazon     ?? 0,
+            social:     ps.social     ?? 0,
+            cookies:    ps.cookies    ?? 0,
+            general:    ps.general    ?? 0,
+            annoyances: ps.annoyances ?? 0,
+            streaming:  ps.streaming  ?? 0,
           });
         } catch (_) { sendResponse({ total:0, network:0, dom:0 }); }
         break;
@@ -2464,6 +2451,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             pass('Storage', 'quota API unavailable (Firefox)');
           }
         } catch (e) { warn('Storage', e.message); }
+
+        // 11. Safe-browsing false-positive guard (GitHub, Drive, GA dashboard)
+        const fpHosts = ['github.com', 'drive.google.com', 'analytics.google.com'];
+        const fpBlocked = fpHosts.filter(h => _safeBrowsingDomains.has(h));
+        if (fpBlocked.length) fail('Trusted sites', `SB block list contains: ${fpBlocked.join(', ')} — reload extension`);
+        else pass('Trusted sites', 'GitHub, Drive, and GA not in malware domain cache');
+
+        // 12. Sync failure streak
+        try {
+          const { syncFailures = 0 } = await chrome.storage.local.get('syncFailures');
+          if (syncFailures === 0) pass('List sync errors', 'No recent list failures');
+          else if (syncFailures < 4) warn('List sync errors', `${syncFailures} list(s) failed last sync — check Log tab`);
+          else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
+        } catch (e) { warn('List sync errors', e.message); }
+
+        // 13. Extension version
+        pass('Version', chrome.runtime.getManifest().version);
 
         const summary = checks.every(c => c.status === 'pass') ? 'healthy'
                       : checks.some(c => c.status === 'fail')  ? 'degraded'
@@ -3229,11 +3233,12 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== '2.10.1') {
+    if (sbRulesVersion !== '2.11.0') {
       const all = await chrome.storage.local.get(null);
       const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
       if (stale.length) await chrome.storage.local.remove(stale);
-      await chrome.storage.local.set({ sbRulesVersion: '2.10.1' });
+      await chrome.storage.local.set({ sbRulesVersion: '2.11.0' });
+      logEvent('startup', 'info', 'Upgraded to v2.11.0 — cleared stale filter cache for resync');
     }
   } catch (_) {}
 

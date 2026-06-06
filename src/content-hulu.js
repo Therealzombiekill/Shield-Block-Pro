@@ -88,14 +88,11 @@
   }
 
   function removeHuluAdUI() {
+    // IMPORTANT: never remove the elements isAdPlaying() relies on (the AD_SELECTORS
+    // above). Removing them makes the next tick believe the ad ended and unmute while
+    // the SSAI ad is still playing in the same stream (mute flaps on/off). Only strip
+    // standalone banner/sponsored units, which are NOT used for ad-break detection.
     const REMOVE_SELS = [
-      '[class*="AdExperience"]',
-      '[class*="ad-experience"]',
-      '[class*="ad-overlay"]',
-      '[class*="AdCountdown"]',
-      '[class*="ad-countdown"]',
-      '[data-automationid="ad-badge"]',
-      '[data-automationid="ad-info"]',
       '[class*="SponsoredContent"]',
       '[class*="AdBanner"]',
       '[data-automationid="hitch-unit"]',

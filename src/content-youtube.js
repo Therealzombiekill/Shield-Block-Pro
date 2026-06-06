@@ -31,7 +31,7 @@
   const _host = location.hostname.replace(/^www\./, '');
   const _whitelisted = _wl.some(d => _host === d || _host.endsWith('.' + d));
 
-  const _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
+  let _shouldDisable = !settings || !settings.youtube || !!settings.globalPause || _whitelisted;
 
   if (settings) {
     try {
@@ -50,6 +50,9 @@
   if (_shouldDisable) return;
 
   _sbLog('info', `Init — ${_host} [${SB_YT_BUILD}]`, { ytMusic: _host.includes('music.'), build: SB_YT_BUILD });
+
+  // YouTube Extras (opt-in) — hide Shorts + remove end-screen cards. settings.youtubeExtras
+  let _ytExtras = !!settings.youtubeExtras;
 
   window.addEventListener('message', e => {
     if (e.source !== window || e.data?.type !== 'SB_YT_LOG') return;
@@ -114,6 +117,7 @@
     '#masthead-ad',
     'ytd-display-ad-renderer',
     'ytd-banner-promo-renderer',
+    'ytd-mealbar-promo-renderer',
     'ytd-statement-banner-renderer',
     '.ytd-banner-promo-renderer',
     '.ytd-promoted-sparkles-web-renderer',
@@ -142,6 +146,30 @@
     if (removed > 0 && Date.now() - _overlayLogThrottle > 5000) {
       _overlayLogThrottle = Date.now();
       _sbLog('info', `Removed ${removed} ad overlay element(s)`);
+    }
+  }
+
+  // ── YouTube Extras (opt-in: settings.youtubeExtras) ─────────────────────────
+  // Page-level Shorts removal + end-screen card removal. Kept narrow: end-card
+  // selectors touch only YouTube's own end-screen promo overlay, never the video
+  // surface (broad player cosmetics can black-screen the player — see CLAUDE.md).
+  const SHORTS_SEL = [
+    'ytd-reel-shelf-renderer',
+    'ytd-rich-shelf-renderer[is-shorts]',
+    'ytd-rich-section-renderer:has(ytd-reel-shelf-renderer)',
+    'ytd-guide-entry-renderer:has(a[title="Shorts"])',
+    'ytd-mini-guide-entry-renderer[aria-label="Shorts"]',
+    'ytd-reel-item-renderer',
+  ].join(',');
+  const ENDCARD_SEL = ['.ytp-ce-element', '.ytp-cards-teaser', '.ytp-ce-covering-overlay'].join(',');
+  let _extrasLogThrottle = 0;
+  function handleYouTubeExtras() {
+    let n = 0;
+    try { document.querySelectorAll(SHORTS_SEL).forEach(el => { try { el.remove(); n++; } catch (_) {} }); } catch (_) {}
+    try { document.querySelectorAll(ENDCARD_SEL).forEach(el => { try { el.remove(); n++; } catch (_) {} }); } catch (_) {}
+    if (n > 0 && Date.now() - _extrasLogThrottle > 5000) {
+      _extrasLogThrottle = Date.now();
+      _sbLog('info', `Extras: removed ${n} Shorts/end-card element(s)`);
     }
   }
 
@@ -232,6 +260,7 @@
     if (hasPlayerError282()) { enterPlaybackRecovery(); return; }
     if (_playbackRecovery) return;
     handleAd(); removeOverlays(); handleYTMusicAd(); dismissAdblockPopup();
+    if (_ytExtras) handleYouTubeExtras();
   }
 
   const _tickInterval = setInterval(tick, 750);
@@ -285,7 +314,7 @@
   let _liveYtOff = false, _livePaused = false, _liveWl = false;
   chrome.storage.onChanged.addListener((changes) => {
     let relevant = false;
-    if (changes.settings)    { _liveYtOff = !changes.settings.newValue?.youtube; relevant = true; }
+    if (changes.settings)    { _liveYtOff = !changes.settings.newValue?.youtube; _ytExtras = !!changes.settings.newValue?.youtubeExtras; relevant = true; }
     if (changes.globalPause) {
       const gp = changes.globalPause.newValue;
       _livePaused = !!(gp && gp.until > Date.now());

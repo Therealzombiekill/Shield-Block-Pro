@@ -207,5 +207,6 @@ function _removeAmazonCss() {
 
   clean();
   window.addEventListener('load', clean);
+  window.addEventListener('beforeunload', stopAmazonBlocking, { once: true });
 
 })().catch(e => console.warn('[SB:amazon] script error:', e?.message ?? e));

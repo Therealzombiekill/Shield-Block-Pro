@@ -29,6 +29,7 @@ async function refreshStatsPanel() {
 }
 document.querySelectorAll('.nb').forEach(btn => {
   btn.addEventListener('click', () => {
+    moveNavGlider(btn);
     document.querySelectorAll('.nb').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
@@ -87,6 +88,45 @@ const fmt = n => {
   return String(n);
 };
 
+const _reducedMotion = () =>
+  typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function animateCount(el, target, duration = 650) {
+  if (!el) return;
+  target = target || 0;
+  if (_reducedMotion()) {
+    el.textContent = fmt(target);
+    el.dataset.count = String(target);
+    return;
+  }
+  const start = parseInt(el.dataset.count || '0', 10);
+  if (start === target) {
+    el.textContent = fmt(target);
+    return;
+  }
+  const t0 = performance.now();
+  const tick = now => {
+    const p = Math.min(1, (now - t0) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(Math.round(start + (target - start) * eased));
+    if (p < 1) requestAnimationFrame(tick);
+    else {
+      el.dataset.count = String(target);
+      el.textContent = fmt(target);
+    }
+  };
+  requestAnimationFrame(tick);
+}
+
+function moveNavGlider(btn) {
+  const glider = $('nav-glider');
+  if (!glider || !btn) return;
+  requestAnimationFrame(() => {
+    glider.style.width = `${btn.offsetWidth}px`;
+    glider.style.transform = `translateX(${btn.offsetLeft}px)`;
+  });
+}
+
 // ── Stats ─────────────────────────────────────────────────────────────
 let _lastTotal = 0;
 
@@ -102,7 +142,7 @@ async function refreshStats() {
 
     const total = stats.total || 0;
     const el = $('stat-total');
-    el.textContent = fmt(total);
+    animateCount(el, total, el.dataset.count ? 500 : 750);
 
     // Flash accent color when count increases
     if (total > _lastTotal && _lastTotal > 0) {
@@ -120,6 +160,8 @@ async function refreshStats() {
     $('s-sc').textContent = fmt(stats.social   || 0);
     $('s-ck').textContent = fmt(stats.cookies  || 0);
     $('s-wb').textContent = fmt(stats.general  || 0);
+    if ($('s-an')) $('s-an').textContent = fmt(stats.annoyances || 0);
+    if ($('s-st')) $('s-st').textContent = fmt(stats.streaming  || 0);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 
@@ -146,6 +188,8 @@ async function refreshStats() {
       if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
       if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);
       if (page.general > 0) parts.push(`${fmt(page.general)} web`);
+      if (page.annoyances > 0) parts.push(`${fmt(page.annoyances)} nags`);
+      if (page.streaming  > 0) parts.push(`${fmt(page.streaming)} stream`);
       $('stat-page').textContent = parts.length
         ? fmt(n) + ' · ' + parts.join(' · ')
         : fmt(n) + ' blocked';
@@ -340,6 +384,10 @@ function updateStatusPill(domain, whitelist) {
   el.textContent = '';
   const _d = document.createElement('span'); _d.className = 'dot'; el.appendChild(_d);
   el.appendChild(document.createTextNode(wl ? 'PAUSED' : 'ACTIVE'));
+  el.classList.remove('pill-pop');
+  void el.offsetWidth;
+  el.classList.add('pill-pop');
+  setTimeout(() => el.classList.remove('pill-pop'), 450);
 }
 
 function renderWhitelistItems(whitelist, currentDomain) {
@@ -423,8 +471,20 @@ const _intervals = [];
 async function boot() {
   _intervals.forEach(clearInterval);
   _intervals.length = 0;
+  // Populate the displayed version from the manifest so it can never drift out of sync.
+  try {
+    const _v = chrome.runtime.getManifest().version;
+    document.querySelectorAll('.app-ver').forEach(el => { el.textContent = _v; });
+  } catch (_) {}
   await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules()]);
+  moveNavGlider(document.querySelector('.nb.active'));
   $('app').classList.add('ready');
+  document.body.classList.add('sb-ready');
+  const loader = $('sb-loader');
+  if (loader) {
+    loader.classList.add('hide');
+    setTimeout(() => loader.remove(), 450);
+  }
   _intervals.push(setInterval(refreshStats, 3000));
   _intervals.push(setInterval(refreshFilterStatus, 8000));
 
@@ -562,26 +622,24 @@ $('run-health-check')?.addEventListener('click', async () => {
 
     checks.textContent = '';
     const frag = document.createDocumentFragment();
-    for (const c of result.checks) {
+    result.checks.forEach((c, i) => {
       const row  = document.createElement('div');
-      row.style.cssText = 'display:flex;gap:5px;padding:1px 0';
+      row.className = 'health-row';
+      row.style.animationDelay = `${i * 0.045}s`;
       const icon = document.createElement('span');
+      icon.className = 'health-icon';
       icon.style.color = colors[c.status];
-      icon.style.flexShrink = '0';
       icon.textContent = icons[c.status];
       const name = document.createElement('span');
-      name.style.color = 'var(--text)';
-      name.style.minWidth = '110px';
+      name.className = 'health-name';
       name.textContent = c.name;
       const detail = document.createElement('span');
-      detail.style.color = 'var(--muted)';
-      detail.style.overflow = 'hidden';
-      detail.style.textOverflow = 'ellipsis';
+      detail.className = 'health-detail';
       detail.style.whiteSpace = 'nowrap';
       detail.textContent = c.detail;
       row.appendChild(icon); row.appendChild(name); row.appendChild(detail);
       frag.appendChild(row);
-    }
+    });
     checks.appendChild(frag);
   } catch (e) {
     summary.style.color = 'var(--red,#f87171)';
@@ -1276,7 +1334,8 @@ $('ubo-import-btn')?.addEventListener('change', async (e) => {
 // ── Badge toggle ───────────────────────────────────────────────────────────────
 $('t-badge')?.addEventListener('change', async (e) => {
   const enabled = e.target.checked;
-  await msg('SET_SETTINGS', { settings: { badgeEnabled: enabled } });
+  // badgeEnabled is already persisted by the generic [data-s] change handler above;
+  // here we only run the immediate badge-clear side effect (avoids a duplicate SET_SETTINGS).
   if (!enabled) {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id) chrome.action.setBadgeText({ text: '', tabId: tab.id });

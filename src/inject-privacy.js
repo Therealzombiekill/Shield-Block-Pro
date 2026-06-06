@@ -33,10 +33,12 @@
   // below self-gates on these flags, so they can be toggled at runtime.
   let _privacyEnabled = true;
   let _trackingEnabled = true;
+  let _skipUrlClean = false;
   window.addEventListener('message', (e) => {
     if (e.source !== window || e.data?.type !== 'SB_PRIVACY_CONFIG') return;
     _privacyEnabled = e.data.privacy !== false;
     _trackingEnabled = e.data.tracking !== false;
+    if (e.data.skipUrlClean !== undefined) _skipUrlClean = !!e.data.skipUrlClean;
   });
 
   let _privacyInstalled = false;
@@ -72,8 +74,14 @@
         if (idx === -1) return r;
         const off = idx + 7 + Math.floor(stableNoise(SESSION_SEED + this.width + this.height) * 20) + 10;
         if (off >= r.length) return r;
-        const c = r.charCodeAt(off);
-        return r.slice(0, off) + String.fromCharCode(c === 122 ? 121 : c + 1) + r.slice(off + 1);
+        // Swap to a different but still-valid base64 char so the exported Data URL
+        // stays decodable. A bare `c + 1` can produce '[', ':', ',' etc. — characters
+        // outside the base64 alphabet — which corrupts the image for any site that
+        // actually consumes the canvas export (upload, re-decode), not just fingerprinters.
+        const ch = r[off];
+        if (ch === '=') return r;            // never perturb padding
+        const swap = ch === 'A' ? 'B' : 'A'; // always a real change, always valid base64
+        return r.slice(0, off) + swap + r.slice(off + 1);
       } catch (_) {}
       return r;
     };
@@ -129,7 +137,15 @@
         if (!_privacyEnabled) return _gp.apply(this, arguments);
         if (p === 37446) return SPOOFED_RENDERER; // UNMASKED_RENDERER_WEBGL
         if (p === 37445) return SPOOFED_VENDOR;   // UNMASKED_VENDOR_WEBGL
-        if (GL_PARAM_OVERRIDES.has(p)) return GL_PARAM_OVERRIDES.get(p);
+        if (GL_PARAM_OVERRIDES.has(p)) {
+          // Clamp to the real value, never above it: over-reporting a capability
+          // (e.g. MAX_TEXTURE_SIZE) makes apps on low-end GPUs allocate resources the
+          // device can't create -> WebGL errors / black canvas. Normalizing DOWN is
+          // safe and still defeats the fingerprint in the common (real > cap) case.
+          const _real = _gp.apply(this, arguments);
+          const _cap  = GL_PARAM_OVERRIDES.get(p);
+          return (typeof _real === 'number' && _real > 0) ? Math.min(_real, _cap) : _cap;
+        }
         return _gp.apply(this, arguments);
       };
     } catch (_) {}
@@ -366,11 +382,9 @@
   ]);
 
   function cleanURL(urlStr) {
-    if (!_trackingEnabled) return null;
+    if (!_trackingEnabled || _skipUrlClean) return null;
     try {
       const url = new URL(urlStr);
-      const h = url.hostname.replace(/^www\./, '');
-      if (h === 'analytics.google.com' || h === 'tagmanager.google.com') return null;
       let changed = false;
 
       // Query string params

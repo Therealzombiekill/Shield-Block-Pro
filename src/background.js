@@ -1688,6 +1688,23 @@ async function syncFilterLists(force = false) {
       }).slice(0, 50); // max 50 scriptlets per domain
     }
 
+    // Checkpoint: persist the core synced state NOW — immediately after the DNR swap
+    // and BEFORE the network-bound custom-list block below — so the recorded sync state
+    // always matches the applied DNR rules. Without this, if the SW is killed (or a
+    // custom list hangs) before the final write, the user is left with active dynamic
+    // rules but filterSyncedAt unset and 0 cosmetics (the "Infinityh ago / 0 selectors"
+    // health-check state). The final write at the end overwrites this with the built-in
+    // + custom cosmetics merged.
+    try {
+      await chrome.storage.local.set({
+        cosmeticSelectors: cosmeticsDeduped,
+        domainCosmetics:   domainCosmeticsFinal,
+        scriptletRules:    scriptletRulesFinal,
+        filterSyncedAt:    Date.now(),
+        filterRuleCount:   deduped.length,
+      });
+    } catch (_) {}
+
     // ── Custom filter list subscriptions (cosmetics + scriptlets only) ──────────
     // Network-level (DNR) rules are skipped — the 5000-rule pool is fully used by
     // the built-in lists. Custom lists contribute CSS selectors and scriptlets.
@@ -2397,10 +2414,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // 3. Filter sync recency
         try {
           const { filterSyncedAt, syncFailures = 0 } = await chrome.storage.local.get(['filterSyncedAt','syncFailures']);
-          const ageHours = filterSyncedAt ? (Date.now() - filterSyncedAt) / 3600000 : Infinity;
-          if (ageHours < 13) pass('Last sync', `${ageHours < 1 ? '<1h' : Math.round(ageHours)+'h'} ago${syncFailures > 0 ? ` (${syncFailures} failures)` : ''}`);
-          else if (ageHours < 48) warn('Last sync', `${Math.round(ageHours)}h ago — consider force sync`);
-          else fail('Last sync', `${Math.round(ageHours)}h ago — stale filter lists`);
+          if (!filterSyncedAt) {
+            // No completed sync yet (fresh install, or a sync interrupted after applying
+            // DNR rules but before recording the timestamp). Show an actionable warning
+            // instead of a scary "Infinityh ago — stale filter lists".
+            warn('Last sync', 'no completed sync yet — open the popup and tap Force Sync to download filter lists');
+          } else {
+            const ageHours = (Date.now() - filterSyncedAt) / 3600000;
+            if (ageHours < 13) pass('Last sync', `${ageHours < 1 ? '<1h' : Math.round(ageHours)+'h'} ago${syncFailures > 0 ? ` (${syncFailures} failures)` : ''}`);
+            else if (ageHours < 48) warn('Last sync', `${Math.round(ageHours)}h ago — consider force sync`);
+            else fail('Last sync', `${Math.round(ageHours)}h ago — stale filter lists`);
+          }
         } catch (e) { warn('Last sync', e.message); }
 
         // 4. Cosmetics loaded

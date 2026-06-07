@@ -3293,3 +3293,23 @@ chrome.runtime.onStartup.addListener(async () => {
     } catch (_) {}
   } catch (_) {}
 });
+
+// ── Catch-up sync on plain service-worker wake ──────────────────────────────
+// onInstalled/onStartup fire only on install/update and browser launch — NOT when
+// Chrome wakes an idle service worker for a navigation, an incoming message, or a
+// non-filterSync alarm. So if a fresh install's initial sync was interrupted (SW
+// killed before the checkpoint wrote filterSyncedAt), the extension would otherwise
+// sit at "no completed sync yet" + 0 cosmetics until a browser restart or the 12h
+// alarm. This top-level trigger runs on every SW evaluation and force-syncs only when
+// no sync has ever completed. _syncLock (set at the top of syncFilterLists) makes it a
+// no-op if onInstalled/onStartup already started a sync this wake, so it can't double-run.
+(async () => {
+  try {
+    const { filterSyncedAt } = await chrome.storage.local.get('filterSyncedAt');
+    if (!filterSyncedAt) {
+      // Defer a few seconds so an onInstalled (1s) / onStartup (0.5s) sync wins the
+      // lock first on the wakes where those events ARE firing.
+      setTimeout(() => syncFilterLists(true).catch(() => {}), 3000);
+    }
+  } catch (_) {}
+})();

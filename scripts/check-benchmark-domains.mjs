@@ -24,6 +24,13 @@ const BENCHMARK_DOMAINS = {
     'advertising-api-eu.amazon.com', 'advertising-api.amazon.com',
     'advertising-api-fe.amazon.com', 'amazon-adsystem.com', 'aax.amazon.com',
   ],
+  analytics: [
+    'cloudflareinsights.com', 'cdn.rudderlabs.com',
+  ],
+  trackers: [
+    'analytics.x.com', 'qevents.quora.com', 'mcs-va.tiktokv.com',
+    'advertising.apple.com', 'prd.jwpltx.com',
+  ],
 };
 
 const rules = [];

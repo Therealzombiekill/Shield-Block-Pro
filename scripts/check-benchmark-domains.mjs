@@ -20,6 +20,10 @@ const BENCHMARK_DOMAINS = {
     'advertising.twitter.com', 'widgets.pinterest.com', 'ads-dev.pinterest.com',
     'rereddit.com', 'analytics.facebook.com', 'ads.facebook.com',
   ],
+  amazon: [
+    'advertising-api-eu.amazon.com', 'advertising-api.amazon.com',
+    'advertising-api-fe.amazon.com', 'amazon-adsystem.com', 'aax.amazon.com',
+  ],
 };
 
 const rules = [];

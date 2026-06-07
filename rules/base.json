@@ -5532,5 +5532,27 @@
         "websocket"
       ]
     }
+  },
+  {
+    "id": 401,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||redditstatic.com/ads/",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
   }
 ]

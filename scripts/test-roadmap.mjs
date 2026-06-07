@@ -118,6 +118,15 @@ assert('Background: cosmetic cache invalidation on parser upgrade', bgSrc.includ
 assert('Background: incremental writeCosmeticProgress during sync', bgSrc.includes('writeCosmeticProgress'));
 assert('Background: GET_PROCEDURAL_COUNT message', bgSrc.includes('GET_PROCEDURAL_COUNT'));
 
+// ── 9. Benchmark gap domains (getblockify / adblock-test categories) ─────────
+import { execSync } from 'child_process';
+try {
+  execSync('node scripts/check-benchmark-domains.mjs', { cwd: root, stdio: 'pipe' });
+  assert('Benchmark gap domains blocked', true);
+} catch (e) {
+  assert('Benchmark gap domains blocked', false, e.stdout?.toString() || e.message);
+}
+
 console.log('\n── Summary ──');
 console.log(`Passed: ${facts.filter(f => f.ok).length}/${facts.length + failed} checks`);
 if (failed) {

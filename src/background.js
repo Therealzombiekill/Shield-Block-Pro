@@ -6,8 +6,15 @@ import './browser-compat.js';
 import { parseFilterList } from './filter-parser.js';
 import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
-const MAX_DYNAMIC_RULES = 5000;
-const MAX_FILTER_RULES = 4300; // reserve dynamic-rule headroom for pause, whitelist, matrix, and privacy rules
+// Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
+// (plain block/allow — which is all our filter lists emit). Detect the platform limit
+// and use it; fall back to 5,000 on older browsers or where the constant is missing.
+const MAX_DYNAMIC_RULES = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest
+  && chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES) || 5000;
+// Filter-list budget: leave ~700 rules of headroom for the feature ranges (removeparam,
+// matrix, user, whitelist, privacy, pause) and never spill past the filter ID band
+// (10000-29999). Stays 4300 on the old 5k cap; grows to 19800 on Chrome 121+.
+const MAX_FILTER_RULES = Math.min(MAX_DYNAMIC_RULES - 700, 19800);
 // Dynamic DNR ID ranges. Keep these disjoint from static bundled rules and
 // from each other; Chrome rejects duplicate IDs across active rule pools.
 const FILTER_DYNAMIC_START = 10000;
@@ -189,6 +196,22 @@ const FILTER_LISTS = [
   { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20alternate%20versions/NordicFiltersABP-Inclusion.txt', key: 'nordic', max: 25, start: 22245 },
 ];
 
+// The per-list `start` values above are placeholders — they're reassigned here, and each
+// list's baseline `max` is scaled to fill the available filter budget. On the old 5,000-
+// rule cap the scale is 1 (counts unchanged); on Chrome 121+'s larger cap it grows so we
+// ship several times more network-blocking rules. Deriving `start` from a running cursor
+// makes ID-range overlaps structurally impossible regardless of the scale.
+(function _allocateFilterRanges() {
+  const baseSum = FILTER_LISTS.reduce((a, l) => a + l.max, 0);
+  const scale = Math.max(1, Math.min(3, Math.floor(MAX_FILTER_RULES / baseSum)));
+  let cursor = FILTER_DYNAMIC_START;
+  for (const l of FILTER_LISTS) {
+    l.max *= scale;
+    l.start = cursor;
+    cursor += l.max;
+  }
+})();
+
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
 (function _checkRanges() {
   const ranges = FILTER_LISTS.map(l => [l.start, l.start + l.max - 1, l.name]);
@@ -202,10 +225,13 @@ const FILTER_LISTS = [
       }
     }
   }
-  // Chrome hard-caps updateDynamicRules at 5,000 rules total — warn if the configured
-  // sum of per-list maxes ever drifts past it (the table comment is not self-enforcing).
+  // Warn if the scaled per-list maxes drift past the platform dynamic-rule cap, and
+  // verify the highest assigned ID stays inside the filter band (10000-29999) so it can
+  // never collide with the removeparam/matrix/user/whitelist/pause ranges above 30000.
   const sumMax = FILTER_LISTS.reduce((a, l) => a + (l.max | 0), 0);
-  if (sumMax > 5000) console.warn(`[SB] FILTER_LISTS max sum ${sumMax} exceeds the 5000 dynamic-rule cap`);
+  if (sumMax > MAX_DYNAMIC_RULES) console.warn(`[SB] FILTER_LISTS max sum ${sumMax} exceeds the dynamic-rule cap ${MAX_DYNAMIC_RULES}`);
+  const lastEnd = Math.max(...FILTER_LISTS.map(l => l.start + l.max - 1));
+  if (lastEnd > FILTER_DYNAMIC_END) console.error(`[SB] filter ranges end at ${lastEnd}, past FILTER_DYNAMIC_END ${FILTER_DYNAMIC_END}`);
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
@@ -3264,12 +3290,16 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== '2.11.0') {
+    if (sbRulesVersion !== 'ranges-2.18') {
+      // The filter-rule ID layout changed (per-list ranges are now computed + scaled to
+      // the larger Chrome 121+ dynamic cap). Drop the cached per-list rules/metadata so the
+      // next sync re-fetches and re-stamps every rule with its new ID — avoids any chance of
+      // a stale cached ID colliding with a different list's new range.
       const all = await chrome.storage.local.get(null);
       const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
       if (stale.length) await chrome.storage.local.remove(stale);
-      await chrome.storage.local.set({ sbRulesVersion: '2.11.0' });
-      logEvent('startup', 'info', 'Upgraded to v2.11.0 — cleared stale filter cache for resync');
+      await chrome.storage.local.set({ sbRulesVersion: 'ranges-2.18' });
+      logEvent('startup', 'info', 'Filter rule ID layout changed — cleared stale rule cache for a clean resync');
     }
   } catch (_) {}
 

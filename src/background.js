@@ -203,7 +203,10 @@ const FILTER_LISTS = [
 // makes ID-range overlaps structurally impossible regardless of the scale.
 (function _allocateFilterRanges() {
   const baseSum = FILTER_LISTS.reduce((a, l) => a + l.max, 0);
-  const scale = Math.max(1, Math.min(3, Math.floor(MAX_FILTER_RULES / baseSum)));
+  // Fill the filter ID band as fully as the budget allows. The cap of 4 keeps the
+  // highest assigned ID inside 10000-29999 (4 * baseSum stays under the 20k band);
+  // going higher would require relocating the feature ranges above 30000.
+  const scale = Math.max(1, Math.min(4, Math.floor(MAX_FILTER_RULES / baseSum)));
   let cursor = FILTER_DYNAMIC_START;
   for (const l of FILTER_LISTS) {
     l.max *= scale;

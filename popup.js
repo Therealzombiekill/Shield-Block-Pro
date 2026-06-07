@@ -154,7 +154,6 @@ async function refreshStats() {
     $('s-yt').textContent = fmt(stats.youtube  || 0);
     $('s-tw').textContent = fmt(stats.twitch   || 0);
     $('s-sp').textContent = fmt(stats.spotify  || 0);
-    $('s-az').textContent = fmt(stats.amazon   || 0);
     $('s-hl').textContent = fmt(stats.hulu     || 0);
     $('s-kk').textContent = fmt(stats.kick     || 0);
     $('s-sc').textContent = fmt(stats.social   || 0);
@@ -184,7 +183,6 @@ async function refreshStats() {
     const n = page.total ?? 0;
     if (n > 0) {
       const parts = [];
-      if (page.amazon  > 0) parts.push(`${fmt(page.amazon)} amz`);
       if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
       if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);
       if (page.general > 0) parts.push(`${fmt(page.general)} web`);
@@ -685,7 +683,6 @@ $('export-stats-csv')?.addEventListener('click', async () => {
       ['Spotify',     stats.spotify  ?? 0],
       ['Hulu',        stats.hulu     ?? 0],
       ['Kick',        stats.kick     ?? 0],
-      ['Amazon',      stats.amazon   ?? 0],
       ['Social',      stats.social   ?? 0],
       ['Cookies',     stats.cookies  ?? 0],
       ['General',     stats.general  ?? 0],

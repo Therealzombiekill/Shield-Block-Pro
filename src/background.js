@@ -3,7 +3,7 @@
  */
 
 import './browser-compat.js';
-import { parseFilterList } from './filter-parser.js';
+import { parseFilterList, isProceduralCosmetic } from './filter-parser.js';
 import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
 // Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
@@ -2150,9 +2150,10 @@ async function injectCosmetics(tabId, tabUrl) {
        .flatMap(([, v]) => v),
   ];
   const allSelectors = [...(cosmeticSelectors || []), ...userCosmetics, ...domainSpecific];
-  if (!allSelectors.length) return;
+  const plainSelectors = allSelectors.filter(sel => !isProceduralCosmetic(sel));
+  if (!plainSelectors.length) return;
 
-  const safe = allSelectors
+  const safe = plainSelectors
     .slice(0, 5000)
     .filter(sel => sel && typeof sel === 'string' && sel.length < 200 &&
                    !sel.includes('{') && !sel.includes('}') &&
@@ -2463,6 +2464,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else warn('Cosmetics', `${cosmeticSelectors.length} selectors — low, sync may be needed`);
         } catch (e) { warn('Cosmetics', e.message); }
 
+        // 4b. Procedural cosmetic rules (content-procedural.js feed)
+        try {
+          const { domainCosmetics = {} } = await chrome.storage.local.get('domainCosmetics');
+          let procCount = 0;
+          for (const sels of Object.values(domainCosmetics)) {
+            if (!Array.isArray(sels)) continue;
+            procCount += sels.filter(isProceduralCosmetic).length;
+          }
+          if (procCount > 50) pass('Procedural cosmetics', `${procCount} :has-text/:upward/:xpath rules`);
+          else if (procCount > 0) warn('Procedural cosmetics', `${procCount} rules — re-sync after parser update`);
+          else warn('Procedural cosmetics', '0 rules — force sync filter lists to populate :has-text() feed');
+        } catch (e) { warn('Procedural cosmetics', e.message); }
+
         // 5. Safe browsing domains loaded
         if (_safeBrowsingDomains.size > 0)
           pass('Safe browsing', `${_safeBrowsingDomains.size} threat domains in memory`);
@@ -2520,7 +2534,51 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
         } catch (e) { warn('List sync errors', e.message); }
 
-        // 13. Extension version
+        // 13. YouTube / streaming scripts registered
+        try {
+          const cs = chrome.runtime.getManifest().content_scripts ?? [];
+          const yt = cs.filter(e => e.matches?.some(m => /youtube/.test(m)));
+          const hasInject = yt.some(e => e.js?.includes('src/inject-youtube.js') && e.world === 'MAIN');
+          const hasContent = yt.some(e => e.js?.includes('src/content-youtube.js'));
+          const hasTwitch = cs.some(e => e.js?.includes('src/content-twitch.js'));
+          if (hasInject && hasContent && hasTwitch) {
+            pass('Streaming scripts', 'YouTube MAIN+ISOLATED + Twitch layers registered');
+          } else {
+            const missing = [];
+            if (!hasInject) missing.push('inject-youtube');
+            if (!hasContent) missing.push('content-youtube');
+            if (!hasTwitch) missing.push('content-twitch');
+            fail('Streaming scripts', `Missing: ${missing.join(', ')}`);
+          }
+        } catch (e) { warn('Streaming scripts', e.message); }
+
+        // 14. Privacy + procedural engine in manifest
+        try {
+          const cs = chrome.runtime.getManifest().content_scripts ?? [];
+          const hasPrivacyMain = cs.some(e => e.js?.includes('src/inject-privacy.js') && e.world === 'MAIN');
+          const hasPrivacyIso = cs.some(e => e.js?.includes('src/content-privacy.js'));
+          const hasProcedural = cs.some(e => e.js?.includes('src/content-procedural.js'));
+          if (hasPrivacyMain && hasPrivacyIso && hasProcedural) {
+            pass('Privacy layer', 'Fingerprint scripts + procedural cosmetic engine + element picker');
+          } else {
+            const miss = [];
+            if (!hasPrivacyMain) miss.push('inject-privacy');
+            if (!hasPrivacyIso) miss.push('content-privacy');
+            if (!hasProcedural) miss.push('content-procedural');
+            warn('Privacy layer', `Missing: ${miss.join(', ')}`);
+          }
+        } catch (e) { warn('Privacy layer', e.message); }
+
+        // 15. Benchmark baseline recorded
+        try {
+          const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
+          const recorded = ['d3ward', 'adblockTester', 'eff'].filter(k => benchmarkScores[k]?.score != null);
+          if (recorded.length === 3) pass('Benchmarks', `Scores on file: ${recorded.join(', ')}`);
+          else if (recorded.length > 0) warn('Benchmarks', `${recorded.length}/3 sites scored — finish in Support → Benchmarks`);
+          else warn('Benchmarks', 'No scores yet — open benchmark pages in Support tab');
+        } catch (e) { warn('Benchmarks', e.message); }
+
+        // 16. Extension version
         pass('Version', chrome.runtime.getManifest().version);
 
         const summary = checks.every(c => c.status === 'pass') ? 'healthy'
@@ -2895,6 +2953,43 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const { globalPause = false } = await chrome.storage.local.get('globalPause');
         const active = globalPause && globalPause.until > Date.now();
         sendResponse({ active, until: active ? globalPause.until : null });
+        break;
+      }
+      case 'GET_BENCHMARK_SCORES': {
+        const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
+        sendResponse({ scores: benchmarkScores });
+        break;
+      }
+      case 'SET_BENCHMARK_SCORES': {
+        const incoming = msg.scores ?? {};
+        const { benchmarkScores: prev = {} } = await chrome.storage.local.get('benchmarkScores');
+        const merged = { ...prev };
+        for (const [key, val] of Object.entries(incoming)) {
+          if (val?.score == null || val.score === '') continue;
+          merged[key] = {
+            score: String(val.score).trim(),
+            notes: val.notes ? String(val.notes).trim() : '',
+            date: Date.now(),
+          };
+        }
+        await chrome.storage.local.set({ benchmarkScores: merged });
+        sendResponse({ ok: true, scores: merged });
+        break;
+      }
+      case 'OPEN_BENCHMARK_PAGES': {
+        const BENCHMARK_URLS = [
+          { id: 'd3ward',          url: 'https://d3ward.github.io/toolz/adblock.html', title: 'd3ward adblock test' },
+          { id: 'adblockTester',   url: 'https://adblock-tester.com/',                 title: 'AdBlock Tester' },
+          { id: 'eff',             url: 'https://coveryourtracks.eff.org/',            title: 'EFF Cover Your Tracks' },
+        ];
+        const opened = [];
+        for (const b of BENCHMARK_URLS) {
+          try {
+            const tab = await chrome.tabs.create({ url: b.url, active: opened.length === 0 });
+            opened.push({ id: b.id, tabId: tab.id });
+          } catch (e) { opened.push({ id: b.id, error: e.message }); }
+        }
+        sendResponse({ ok: true, opened });
         break;
       }
       case 'EXPORT_DIAGNOSTIC': {

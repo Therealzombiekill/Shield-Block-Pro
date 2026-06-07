@@ -41,9 +41,11 @@
 
   // ── Collect all selectors for this domain ─────────────────────────────────
   const applicable = [
+  // Global procedural rules (##:has-text(...) without domain prefix)
+    ...(domainCosmetics['*'] || []),
     ...(domainCosmetics[host] || []),
     ...Object.entries(domainCosmetics)
-       .filter(([d]) => d !== host && host.endsWith('.' + d))
+       .filter(([d]) => d !== '*' && d !== host && host.endsWith('.' + d))
        .flatMap(([, v]) => v),
     ...customHideRules,
   ].filter(Boolean);

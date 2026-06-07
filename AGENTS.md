@@ -39,8 +39,10 @@ Useful DevTools entry points:
 | Lint | Not configured (no ESLint/Prettier in repo) |
 | Automated tests | None — manual browser testing only |
 | Build | None — edit source and reload the extension |
-| Structure validation | `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` |
-| JS syntax check | `node --check src/background.js` (ES modules; run per file) |
+| Structure validation | `node scripts/validate-extension.mjs` |
+| JS syntax check | Included in `validate-extension.mjs` |
+| Static rules compile | `node scripts/compile-static-rules.mjs easylist.txt --out rules/generated.json` (release-time only) |
+| Benchmark baseline | Support tab → Blocking Benchmarks; see `docs/benchmarks.md` |
 
 ### Hello-world verification
 

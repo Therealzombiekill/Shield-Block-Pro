@@ -474,7 +474,7 @@ async function boot() {
     const _v = chrome.runtime.getManifest().version;
     document.querySelectorAll('.app-ver').forEach(el => { el.textContent = _v; });
   } catch (_) {}
-  await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules()]);
+  await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules(), refreshBenchmarkScores()]);
   moveNavGlider(document.querySelector('.nb.active'));
   $('app').classList.add('ready');
   document.body.classList.add('sb-ready');
@@ -645,6 +645,62 @@ $('run-health-check')?.addEventListener('click', async () => {
   } finally {
     btn.textContent = 'Run check';
     btn.disabled    = false;
+  }
+});
+
+// ── Benchmark baseline ───────────────────────────────────────────────────────
+async function refreshBenchmarkScores() {
+  try {
+    const { scores = {} } = await msg('GET_BENCHMARK_SCORES') ?? {};
+    const set = (id, key) => {
+      const el = $(id);
+      if (el && scores[key]?.score) el.value = scores[key].score;
+    };
+    set('bench-d3ward', 'd3ward');
+    set('bench-adblock', 'adblockTester');
+    set('bench-eff', 'eff');
+    const st = $('benchmark-status');
+    if (st) {
+      const dates = ['d3ward', 'adblockTester', 'eff']
+        .filter(k => scores[k]?.date)
+        .map(k => `${k}: ${new Date(scores[k].date).toLocaleDateString()}`);
+      st.textContent = dates.length ? `Last saved — ${dates.join(' · ')}` : '';
+    }
+  } catch (_) {}
+}
+
+$('open-benchmarks')?.addEventListener('click', async () => {
+  const btn = $('open-benchmarks');
+  if (btn) { btn.textContent = 'Opening…'; btn.disabled = true; }
+  try {
+    await msg('OPEN_BENCHMARK_PAGES');
+    const st = $('benchmark-status');
+    if (st) st.textContent = 'Benchmark tabs opened — score each site, then Save scores.';
+  } catch (e) {
+    const st = $('benchmark-status');
+    if (st) { st.style.color = 'var(--red,#f87171)'; st.textContent = 'Failed: ' + e.message; }
+  } finally {
+    if (btn) { btn.textContent = 'Open tests'; btn.disabled = false; }
+  }
+});
+
+$('save-benchmarks')?.addEventListener('click', async () => {
+  const btn = $('save-benchmarks');
+  const st  = $('benchmark-status');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+  try {
+    const scores = {
+      d3ward:        { score: $('bench-d3ward')?.value ?? '' },
+      adblockTester: { score: $('bench-adblock')?.value ?? '' },
+      eff:           { score: $('bench-eff')?.value ?? '' },
+    };
+    await msg('SET_BENCHMARK_SCORES', { scores });
+    if (st) { st.style.color = 'var(--green)'; st.textContent = 'Scores saved.'; }
+    await refreshBenchmarkScores();
+  } catch (e) {
+    if (st) { st.style.color = 'var(--red,#f87171)'; st.textContent = 'Save failed: ' + e.message; }
+  } finally {
+    if (btn) { btn.textContent = 'Save scores'; btn.disabled = false; }
   }
 });
 

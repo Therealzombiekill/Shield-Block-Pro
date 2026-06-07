@@ -36,28 +36,33 @@
   const _wl   = settings?.whitelist ?? [];
   if (_wl.some(d => host === d || host.endsWith('.' + d))) return;
 
-  const domainCosmetics  = stored.domainCosmetics  ?? {};
-  const customHideRules  = stored.customHideRules   ?? [];
-
-  // ── Collect all selectors for this domain ─────────────────────────────────
-  const applicable = [
-  // Global procedural rules (##:has-text(...) without domain prefix)
-    ...(domainCosmetics['*'] || []),
-    ...(domainCosmetics[host] || []),
-    ...Object.entries(domainCosmetics)
-       .filter(([d]) => d !== '*' && d !== host && host.endsWith('.' + d))
-       .flatMap(([, v]) => v),
-    ...customHideRules,
-  ].filter(Boolean);
+  let domainCosmetics  = stored.domainCosmetics  ?? {};
+  let customHideRules  = stored.customHideRules   ?? [];
 
   const PROCEDURAL_MARKERS = [':has-text(', ':matches-css(', ':upward(', ':xpath('];
-  const procedural = applicable.filter(s => PROCEDURAL_MARKERS.some(m => s.includes(m)));
-  const plain      = applicable.filter(s => !procedural.includes(s));
+  let procedural = [];
+  let plain      = [];
 
-  // ── Plain domain-scoped rules — inject via <style> ────────────────────────
-  // NOTE: content scripts cannot call chrome.scripting.insertCSS.
-  // We inject a <style> element directly — same effect, works everywhere.
-  if (plain.length > 0) {
+  function collectApplicable(dc, chr) {
+    return [
+      ...(dc['*'] || []),
+      ...(dc[host] || []),
+      ...Object.entries(dc)
+         .filter(([d]) => d !== '*' && d !== host && host.endsWith('.' + d))
+         .flatMap(([, v]) => v),
+      ...(chr || []),
+    ].filter(Boolean);
+  }
+
+  function rebuildSelectorLists(dc, chr) {
+    const applicable = collectApplicable(dc, chr);
+    procedural = applicable.filter(s => PROCEDURAL_MARKERS.some(m => s.includes(m)));
+    plain      = applicable.filter(s => !procedural.includes(s));
+  }
+
+  function applyPlainStyles() {
+    document.getElementById('_sb_domain_cosmetic')?.remove();
+    if (!plain.length) return;
     try {
       const css = [...new Set(plain)].join(',\n') + ' { display:none!important; }';
       const style = document.createElement('style');
@@ -66,6 +71,9 @@
       (document.head || document.documentElement).appendChild(style);
     } catch (_e) { console.warn('[SB:procedural]', _e?.message ?? _e); }
   }
+
+  rebuildSelectorLists(domainCosmetics, customHideRules);
+  applyPlainStyles();
 
   // ── Procedural filter engine ──────────────────────────────────────────────
   function toRe(s) {
@@ -156,7 +164,12 @@
 
   let _procDeb = null;
   let _procObserver = null;
-  if (procedural.length > 0) {
+
+  function startProceduralObserver() {
+    _procObserver?.disconnect();
+    _procObserver = null;
+    clearTimeout(_procDeb);
+    if (!procedural.length) return;
     runProcedural();
     _procObserver = new MutationObserver((muts) => {
       if (muts.every(m => m.type === 'characterData')) return;
@@ -165,13 +178,22 @@
     _procObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
   }
 
+  startProceduralObserver();
+
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.settings?.newValue?.cosmetic === false) {
       _procObserver?.disconnect();
       _procObserver = null;
       clearTimeout(_procDeb);
-      // Remove injected style block
       document.getElementById('_sb_domain_cosmetic')?.remove();
+      return;
+    }
+    if (changes.domainCosmetics?.newValue) domainCosmetics = changes.domainCosmetics.newValue;
+    if (changes.customHideRules?.newValue) customHideRules = changes.customHideRules.newValue;
+    if (changes.domainCosmetics || changes.customHideRules) {
+      rebuildSelectorLists(domainCosmetics, customHideRules);
+      applyPlainStyles();
+      startProceduralObserver();
     }
   });
 

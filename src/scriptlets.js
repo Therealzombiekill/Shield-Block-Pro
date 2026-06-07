@@ -51,6 +51,43 @@
     return s;
   }
 
+  // Unified XHR proxy — multiple scriptlets can register block/mutate hooks without clobbering each other
+  function ensureXhrProxy() {
+    if (globalThis.__sbXhrInstalled) return;
+    globalThis.__sbXhrInstalled = true;
+    globalThis.__sbXhrBlockRes   = globalThis.__sbXhrBlockRes   || [];
+    globalThis.__sbXhrMutators   = globalThis.__sbXhrMutators   || [];
+    const NativeXHR = window.XMLHttpRequest;
+    function SBXHR() {
+      const xhr = new NativeXHR();
+      let _url = '';
+      const _open = xhr.open;
+      xhr.open = function (method, url, ...rest) {
+        _url = String(url ?? '');
+        return _open.apply(this, [method, url, ...rest]);
+      };
+      const _send = xhr.send;
+      xhr.send = function (...args) {
+        for (const re of globalThis.__sbXhrBlockRes) {
+          if (re && re.test(_url)) return;
+        }
+        return _send.apply(this, args);
+      };
+      xhr.addEventListener('readystatechange', function () {
+        if (xhr.readyState !== 4) return;
+        for (const re of globalThis.__sbXhrBlockRes) {
+          if (re && re.test(_url)) return;
+        }
+        for (const mut of globalThis.__sbXhrMutators) {
+          try { mut(xhr, _url); } catch (_) {}
+        }
+      });
+      return xhr;
+    }
+    try { SBXHR.prototype = NativeXHR.prototype; } catch (_) {}
+    window.XMLHttpRequest = SBXHR;
+  }
+
   // ── Scriptlet implementations ─────────────────────────────────────────────────
 
   const IMPL = {
@@ -587,24 +624,9 @@
     // no-xhr-if / prevent-xhr — block XMLHttpRequest to matching URLs
     'prevent-xhr': ([urlPattern]) => {
       const re = toRe(urlPattern);
-      const NativeXHR = window.XMLHttpRequest;
-      function SBXHR() {
-        const xhr = new NativeXHR();
-        let _url = '';
-        const _open = xhr.open;
-        xhr.open = function (method, url, ...rest) {
-          _url = String(url ?? '');
-          return _open.apply(this, [method, url, ...rest]);
-        };
-        const _send = xhr.send;
-        xhr.send = function (...args) {
-          if (re && re.test(_url)) return;
-          return _send.apply(this, args);
-        };
-        return xhr;
-      }
-      try { SBXHR.prototype = NativeXHR.prototype; } catch (_) {}
-      window.XMLHttpRequest = SBXHR;
+      if (!re) return;
+      ensureXhrProxy();
+      globalThis.__sbXhrBlockRes.push(re);
     },
 
     // noeval — neutralize eval / Function constructor
@@ -704,36 +726,25 @@
       if (!urlPattern || !propsToRemove) return;
       const urlRe = toRe(urlPattern);
       const paths = propsToRemove.split(/\s+/).filter(Boolean);
-      const NativeXHR = window.XMLHttpRequest;
-      function SBXHR() {
-        const xhr = new NativeXHR();
-        let _url = '';
-        xhr.open = new Proxy(xhr.open, {
-          apply(target, thisArg, args) {
-            _url = String(args[1] ?? '');
-            return Reflect.apply(target, thisArg, args);
-          },
-        });
-        xhr.addEventListener('readystatechange', function () {
-          if (xhr.readyState !== 4 || !urlRe?.test(_url)) return;
-          try {
-            const data = JSON.parse(xhr.responseText);
-            paths.forEach(p => {
-              const parts = p.split('.');
-              let node = data;
-              for (let i = 0; i < parts.length - 1; i++) {
-                if (node == null || typeof node !== 'object') return;
-                node = node[parts[i]];
-              }
-              if (node != null && typeof node === 'object') delete node[parts[parts.length - 1]];
-            });
-            Object.defineProperty(xhr, 'responseText', { value: JSON.stringify(data) });
-            Object.defineProperty(xhr, 'response', { value: xhr.responseText });
-          } catch (_) {}
-        });
-        return xhr;
-      }
-      window.XMLHttpRequest = SBXHR;
+      ensureXhrProxy();
+      globalThis.__sbXhrMutators.push((xhr, url) => {
+        if (!urlRe?.test(url)) return;
+        try {
+          const data = JSON.parse(xhr.responseText);
+          paths.forEach(p => {
+            const parts = p.split('.');
+            let node = data;
+            for (let i = 0; i < parts.length - 1; i++) {
+              if (node == null || typeof node !== 'object') return;
+              node = node[parts[i]];
+            }
+            if (node != null && typeof node === 'object') delete node[parts[parts.length - 1]];
+          });
+          const out = JSON.stringify(data);
+          Object.defineProperty(xhr, 'responseText', { value: out, configurable: true });
+          Object.defineProperty(xhr, 'response', { value: out, configurable: true });
+        } catch (_) {}
+      });
     },
 
     // trusted-replace-xhr-response
@@ -742,27 +753,15 @@
       const urlRe = toRe(urlPattern);
       const bodyRe = toRe(pattern);
       const repl = replacement ?? '';
-      const NativeXHR = window.XMLHttpRequest;
-      function SBXHR() {
-        const xhr = new NativeXHR();
-        let _url = '';
-        xhr.open = new Proxy(xhr.open, {
-          apply(target, thisArg, args) {
-            _url = String(args[1] ?? '');
-            return Reflect.apply(target, thisArg, args);
-          },
-        });
-        xhr.addEventListener('readystatechange', function () {
-          if (xhr.readyState !== 4 || !urlRe?.test(_url) || !bodyRe) return;
-          try {
-            const patched = String(xhr.responseText).replace(bodyRe, repl);
-            Object.defineProperty(xhr, 'responseText', { value: patched });
-            Object.defineProperty(xhr, 'response', { value: patched });
-          } catch (_) {}
-        });
-        return xhr;
-      }
-      window.XMLHttpRequest = SBXHR;
+      ensureXhrProxy();
+      globalThis.__sbXhrMutators.push((xhr, url) => {
+        if (!urlRe?.test(url) || !bodyRe) return;
+        try {
+          const patched = String(xhr.responseText).replace(bodyRe, repl);
+          Object.defineProperty(xhr, 'responseText', { value: patched, configurable: true });
+          Object.defineProperty(xhr, 'response', { value: patched, configurable: true });
+        } catch (_) {}
+      });
     },
 
     // popads-dummy — stub PopAds globals
@@ -810,10 +809,12 @@
   // Called by background.js via chrome.scripting.executeScript after domain lookup
   globalThis.__sbRunScriptlets = function (scriptlets) {
     if (!Array.isArray(scriptlets)) return;
+    const _missing = globalThis.__sbMissingScriptlets || (globalThis.__sbMissingScriptlets = new Set());
     for (const { name, args } of scriptlets) {
       try {
         const fn = IMPL[name];
-        if (typeof fn === 'function') fn(args || []);
+        if (typeof fn !== 'function') { _missing.add(name); continue; }
+        fn(args || []);
       } catch (_) {}
     }
   };

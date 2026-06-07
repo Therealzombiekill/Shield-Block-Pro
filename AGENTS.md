@@ -40,6 +40,7 @@ Useful DevTools entry points:
 | Automated tests | None — manual browser testing only |
 | Build | None — edit source and reload the extension |
 | Structure validation | `node scripts/validate-extension.mjs` |
+| Roadmap verification | `node scripts/test-roadmap.mjs` (45 factual checks) |
 | JS syntax check | Included in `validate-extension.mjs` |
 | Static rules compile | `node scripts/compile-static-rules.mjs easylist.txt --out rules/generated.json` (release-time only) |
 | Benchmark baseline | Support tab → Blocking Benchmarks; see `docs/benchmarks.md` |

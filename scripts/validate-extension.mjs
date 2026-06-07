@@ -39,9 +39,10 @@ for (const f of [join(root, 'popup.js'), ...walkJs(join(root, 'src'))]) {
   }
 }
 
-// Procedural cosmetic parse smoke test
+// Procedural cosmetic + cosmetic-utils smoke tests
 try {
   const { parseFilterList, isProceduralCosmetic } = await import(join(root, 'src/filter-parser.js'));
+  const { finalizeDomainCosmetics, countProceduralInDomainCosmetics } = await import(join(root, 'src/cosmetic-utils.js'));
   const sample = parseFilterList([
     'sport1.de##strong:has-text(/anzeige/i)',
     '##p:has-text(Ad)',
@@ -58,9 +59,12 @@ try {
   if (!sample.domainCosmetics['example.com']?.includes('.banner')) {
     throw new Error('plain domain cosmetic missing');
   }
-  console.log('filter-parser procedural smoke test: OK');
+  const capped = finalizeDomainCosmetics({ '*': ['a:has-text(Ad)', ...Array.from({length:100},(_,i)=>`.z-${i}`)] }, { globalMax: 10 });
+  if (!capped['*'].some(isProceduralCosmetic)) throw new Error('finalize dropped procedural under cap');
+  if (countProceduralInDomainCosmetics(sample.domainCosmetics) !== 2) throw new Error('countProcedural mismatch');
+  console.log('filter-parser + cosmetic-utils smoke test: OK');
 } catch (e) {
-  console.error('filter-parser procedural smoke test: FAIL', e.message);
+  console.error('filter-parser smoke test: FAIL', e.message);
   failed++;
 }
 

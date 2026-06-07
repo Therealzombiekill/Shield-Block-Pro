@@ -4,6 +4,7 @@
 
 import './browser-compat.js';
 import { parseFilterList, isProceduralCosmetic } from './filter-parser.js';
+import { finalizeDomainCosmetics, countProceduralInDomainCosmetics } from './cosmetic-utils.js';
 import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
 // Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
@@ -1700,11 +1701,8 @@ async function syncFilterLists(force = false) {
 
     const cosmeticsDeduped = [...new Set(allCosmetics)];
 
-    // Deduplicate domain cosmetics selectors per domain
-    const domainCosmeticsFinal = {};
-    for (const [dom, sels] of Object.entries(allDomainCosmetics)) {
-      domainCosmeticsFinal[dom] = [...new Set(sels)].slice(0, 200); // max 200 per domain
-    }
+    // Deduplicate domain cosmetics — procedural selectors prioritized (see cosmetic-utils.js)
+    let domainCosmeticsFinal = finalizeDomainCosmetics(allDomainCosmetics);
 
     // Deduplicate scriptlet rules per domain
     const scriptletRulesFinal = {};
@@ -1832,6 +1830,9 @@ async function syncFilterLists(force = false) {
         }
       }
     } catch (_) {}
+
+    // Re-cap after custom-list merge (procedural rules prioritized)
+    domainCosmeticsFinal = finalizeDomainCosmetics(domainCosmeticsFinal);
 
     // Persist accumulated removeparam data then apply DNR rules
     await chrome.storage.local.set({
@@ -2466,15 +2467,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         // 4b. Procedural cosmetic rules (content-procedural.js feed)
         try {
-          const { domainCosmetics = {} } = await chrome.storage.local.get('domainCosmetics');
-          let procCount = 0;
-          for (const sels of Object.values(domainCosmetics)) {
-            if (!Array.isArray(sels)) continue;
-            procCount += sels.filter(isProceduralCosmetic).length;
-          }
-          if (procCount > 50) pass('Procedural cosmetics', `${procCount} :has-text/:upward/:xpath rules`);
-          else if (procCount > 0) warn('Procedural cosmetics', `${procCount} rules — re-sync after parser update`);
-          else warn('Procedural cosmetics', '0 rules — force sync filter lists to populate :has-text() feed');
+          const { domainCosmetics = {}, filterSyncedAt } = await chrome.storage.local.get(['domainCosmetics', 'filterSyncedAt']);
+          const procCount = countProceduralInDomainCosmetics(domainCosmetics);
+          if (procCount > 50) pass('Procedural cosmetics', `${procCount} :has-text/:upward/:xpath rules active`);
+          else if (procCount > 0) warn('Procedural cosmetics', `${procCount} rules — low; force sync for full uBO feed`);
+          else if (!filterSyncedAt) warn('Procedural cosmetics', '0 rules — complete a filter sync first');
+          else fail('Procedural cosmetics', '0 after sync — check Log tab for list failures');
         } catch (e) { warn('Procedural cosmetics', e.message); }
 
         // 5. Safe browsing domains loaded

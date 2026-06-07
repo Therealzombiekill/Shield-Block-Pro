@@ -3,11 +3,19 @@
  */
 
 import './browser-compat.js';
-import { parseFilterList } from './filter-parser.js';
+import { parseFilterList, isProceduralCosmetic } from './filter-parser.js';
+import { finalizeDomainCosmetics, countProceduralInDomainCosmetics, finalizeScriptletRules } from './cosmetic-utils.js';
 import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
-const MAX_DYNAMIC_RULES = 5000;
-const MAX_FILTER_RULES = 4300; // reserve dynamic-rule headroom for pause, whitelist, matrix, and privacy rules
+// Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
+// (plain block/allow — which is all our filter lists emit). Detect the platform limit
+// and use it; fall back to 5,000 on older browsers or where the constant is missing.
+const MAX_DYNAMIC_RULES = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest
+  && chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES) || 5000;
+// Filter-list budget: leave ~700 rules of headroom for the feature ranges (removeparam,
+// matrix, user, whitelist, privacy, pause) and never spill past the filter ID band
+// (10000-29999). Stays 4300 on the old 5k cap; grows to 19800 on Chrome 121+.
+const MAX_FILTER_RULES = Math.min(MAX_DYNAMIC_RULES - 700, 19800);
 // Dynamic DNR ID ranges. Keep these disjoint from static bundled rules and
 // from each other; Chrome rejects duplicate IDs across active rule pools.
 const FILTER_DYNAMIC_START = 10000;
@@ -21,8 +29,8 @@ const PAUSE_ALL_RULE_ID = 49999;
 // so they never collide with either.
 const REMOVEPARAM_BASE  = 30000; // 30000-30999: global + domain-scoped removeparam rules
 const MATRIX_BASE       = 31000; // 31000-31999: per-domain filtering matrix rules
-const USER_DNR_BASE     = 48000; // 48000-48499: user-typed network block rules
-const USER_DNR_END      = 48499;
+const USER_DNR_BASE     = 32000; // 32000-32499: user-typed network block rules (disjoint from whitelist 48000-48998)
+const USER_DNR_END      = 32499;
 const DNR_RESOURCE_TYPES = [
   'main_frame','sub_frame','script','image','stylesheet','object',
   'xmlhttprequest','ping','media','websocket','font','other',
@@ -189,6 +197,25 @@ const FILTER_LISTS = [
   { name: 'Nordic List',            url: 'https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20alternate%20versions/NordicFiltersABP-Inclusion.txt', key: 'nordic', max: 25, start: 22245 },
 ];
 
+// The per-list `start` values above are placeholders — they're reassigned here, and each
+// list's baseline `max` is scaled to fill the available filter budget. On the old 5,000-
+// rule cap the scale is 1 (counts unchanged); on Chrome 121+'s larger cap it grows so we
+// ship several times more network-blocking rules. Deriving `start` from a running cursor
+// makes ID-range overlaps structurally impossible regardless of the scale.
+(function _allocateFilterRanges() {
+  const baseSum = FILTER_LISTS.reduce((a, l) => a + l.max, 0);
+  // Fill the filter ID band as fully as the budget allows. The cap of 4 keeps the
+  // highest assigned ID inside 10000-29999 (4 * baseSum stays under the 20k band);
+  // going higher would require relocating the feature ranges above 30000.
+  const scale = Math.max(1, Math.min(4, Math.floor(MAX_FILTER_RULES / baseSum)));
+  let cursor = FILTER_DYNAMIC_START;
+  for (const l of FILTER_LISTS) {
+    l.max *= scale;
+    l.start = cursor;
+    cursor += l.max;
+  }
+})();
+
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
 (function _checkRanges() {
   const ranges = FILTER_LISTS.map(l => [l.start, l.start + l.max - 1, l.name]);
@@ -202,10 +229,13 @@ const FILTER_LISTS = [
       }
     }
   }
-  // Chrome hard-caps updateDynamicRules at 5,000 rules total — warn if the configured
-  // sum of per-list maxes ever drifts past it (the table comment is not self-enforcing).
+  // Warn if the scaled per-list maxes drift past the platform dynamic-rule cap, and
+  // verify the highest assigned ID stays inside the filter band (10000-29999) so it can
+  // never collide with the removeparam/matrix/user/whitelist/pause ranges above 30000.
   const sumMax = FILTER_LISTS.reduce((a, l) => a + (l.max | 0), 0);
-  if (sumMax > 5000) console.warn(`[SB] FILTER_LISTS max sum ${sumMax} exceeds the 5000 dynamic-rule cap`);
+  if (sumMax > MAX_DYNAMIC_RULES) console.warn(`[SB] FILTER_LISTS max sum ${sumMax} exceeds the dynamic-rule cap ${MAX_DYNAMIC_RULES}`);
+  const lastEnd = Math.max(...FILTER_LISTS.map(l => l.start + l.max - 1));
+  if (lastEnd > FILTER_DYNAMIC_END) console.error(`[SB] filter ranges end at ${lastEnd}, past FILTER_DYNAMIC_END ${FILTER_DYNAMIC_END}`);
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
@@ -213,7 +243,7 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 // ── Settings ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
-  twitch: true, amazon: true, general: true,
+  twitch: true, general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
   spotify: true,
@@ -318,18 +348,7 @@ async function restoreGlobalPauseIfActive() {
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: [PAUSE_ALL_RULE_ID],
-      addRules: [{
-        id: PAUSE_ALL_RULE_ID,
-        priority: 10000,
-        action: { type: 'allow' },
-        condition: {
-          urlFilter: '*',
-          resourceTypes: [
-            'main_frame','sub_frame','script','image','stylesheet',
-            'object','xmlhttprequest','ping','media','websocket','other',
-          ],
-        },
-      }],
+      addRules: [_globalPauseRule()],
     });
   } catch (e) {
     logEvent('pause', 'warn', `Restore pause rule after sync failed: ${e.message}`);
@@ -343,9 +362,16 @@ async function applyUserFilterRules() {
     const removeIds = existing
       .filter(r => r.id >= USER_DNR_BASE && r.id <= USER_DNR_END)
       .map(r => r.id);
+    // Re-stamp IDs into the current USER_DNR range on every apply. Rules persisted by
+    // an older build may carry IDs from a previous range (e.g. the old 48000 base that
+    // overlapped the whitelist range); this guarantees they always land in
+    // [USER_DNR_BASE, USER_DNR_END] and can never collide with whitelist allow rules.
+    const addRules = userDnrRules
+      .slice(0, USER_DNR_END - USER_DNR_BASE + 1)
+      .map((r, i) => ({ ...r, id: USER_DNR_BASE + i }));
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: removeIds,
-      addRules: userDnrRules.slice(0, USER_DNR_END - USER_DNR_BASE + 1),
+      addRules,
     });
   } catch (e) {
     logEvent('user-filters', 'warn', `applyUserFilterRules failed: ${e.message}`);
@@ -473,8 +499,6 @@ function _flushStats() {
     } catch (_) {}
   });
 }
-
-let _statQueue = Promise.resolve();
 
 const _tabCosmeticState = new Map(); // tabId -> { baseCss, css }
 
@@ -786,12 +810,10 @@ function logBlockedRequest(url, tabId) {
   } catch (_) {}
 }
 
-// Real-time log via declarativeNetRequestFeedback (dev mode + production with permission)
-try {
-  chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
-    logBlockedRequest(info.request.url, info.request.tabId);
-  });
-} catch (_) {}
+// NOTE: chrome.declarativeNetRequest.onRuleMatchedDebug is only available to UNPACKED
+// extensions, and where it fires it double-logs every block that countNetworkBlocks()
+// already records via getMatchedRules() — inflating GET_TOP_DOMAINS / GET_PAGE_LOG with
+// duplicate entries. countNetworkBlocks() is the single source of truth for the request log.
 
 async function countNetworkBlocks(tabId, url) {
   if (_navCounted.has(tabId) || _navCounting.has(tabId)) return;
@@ -821,7 +843,10 @@ async function countNetworkBlocks(tabId, url) {
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
 
-    _statQueue = _statQueue.then(async () => {
+    // Chain onto the SAME queue as _flushStats() so DOM-block and network-block
+    // read-modify-writes of stats/lifetime are serialised against each other and
+    // never clobber one another's increments.
+    _flushQueue = _flushQueue.then(async () => {
       try {
         const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
         const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
@@ -883,6 +908,32 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // ── Filter Sync ────────────────────────────────────────────────────────────
 
 let _syncLock = false;
+const COSMETIC_PARSER_VERSION = 'procedural-v1';
+
+/** Clear per-list cosmetic caches when the parser gains procedural support (forces re-parse). */
+async function _invalidateCosmeticCacheIfNeeded() {
+  try {
+    const { sbCosmeticParserVersion } = await chrome.storage.local.get('sbCosmeticParserVersion');
+    if (sbCosmeticParserVersion === COSMETIC_PARSER_VERSION) return;
+    const all = await chrome.storage.local.get(null);
+    const stale = Object.keys(all).filter(k =>
+      k.startsWith('fd_') || k.startsWith('fc_') || k.startsWith('fs_') ||
+      k.startsWith('cfdc_') || k.startsWith('cfc_') || k.startsWith('cfsc_'));
+    if (stale.length) await chrome.storage.local.remove(stale);
+    await chrome.storage.local.set({
+      sbCosmeticParserVersion: COSMETIC_PARSER_VERSION,
+      domainCosmetics: {}, cosmeticSelectors: [], scriptletRules: {},
+    });
+    logEvent('filter-sync', 'info', 'Cosmetic parser upgraded — cleared stale cosmetic caches for re-sync');
+  } catch (_) {}
+}
+
+async function _waitForSyncUnlock(maxMs = 120000) {
+  const start = Date.now();
+  while (_syncLock && Date.now() - start < maxMs) {
+    await new Promise(r => setTimeout(r, 400));
+  }
+}
 let _lastSyncError = null;
 let _syncListStatus = {}; // { [key]: { status:'ok'|'error'|'cached'|'304', ruleCount, error? } }
 
@@ -1397,8 +1448,23 @@ function _appendCachedListData(stored, list, limit, buckets) {
   logEvent('filter-sync', 'warn', `${list.name}: fetch failed — ${cached.length} cached rules reused`);
 }
 
+/** Persist cosmetics/scriptlets during sync so a SW kill mid-fetch still leaves procedural rules. */
+async function writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules) {
+  try {
+    await chrome.storage.local.set({
+      cosmeticSelectors: [...new Set(allCosmetics)],
+      domainCosmetics:   finalizeDomainCosmetics(allDomainCosmetics),
+      scriptletRules:    finalizeScriptletRules(allScriptletRules),
+    });
+  } catch (_) {}
+}
+
 async function syncFilterLists(force = false) {
-  if (_syncLock) return;
+  if (_syncLock) {
+    if (force) await _waitForSyncUnlock();
+    else return;
+    if (_syncLock) return;
+  }
   _syncLock = true;
   const _syncStart = Date.now();
   let syncFailureCount = 0;
@@ -1470,6 +1536,7 @@ async function syncFilterLists(force = false) {
           for (const p of cachedRp.global ?? []) allRemoveParams.global.add(p);
           allRemoveParams.domain.push(...(cachedRp.domain ?? []));
         }
+        await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
       } else {
         staleLists.push({ list, limit, etag: stored[`fe_${list.key}`] ?? null });
       }
@@ -1527,6 +1594,7 @@ async function syncFilterLists(force = false) {
               allRemoveParams.domain.push(...(cachedRp.domain ?? []));
             }
             _syncListStatus[failKey] = { status: 'cached', ruleCount: cached.length, error: failMsg };
+            await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
           } else {
             _syncListStatus[failKey] = { status: 'error', error: failMsg };
           }
@@ -1571,6 +1639,7 @@ async function syncFilterLists(force = false) {
           });
           logEvent('filter-sync', 'info', `${val.list.name}: unchanged (304) — ${cached.length} rules reused`);
           _syncListStatus[val.list.key] = { status: '304', ruleCount: cached.length };
+          await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
           continue;
         }
 
@@ -1603,6 +1672,7 @@ async function syncFilterLists(force = false) {
           };
           if (val.etag) updates[`fe_${val.list.key}`] = val.etag;
           await chrome.storage.local.set(updates);
+          await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
           logEvent('filter-sync', 'info', `${val.list.name}: fetched ${rules.length} rules`);
           _syncListStatus[val.list.key] = { status: 'ok', ruleCount: rules.length };
         } catch (e) {
@@ -1676,22 +1746,27 @@ async function syncFilterLists(force = false) {
 
     const cosmeticsDeduped = [...new Set(allCosmetics)];
 
-    // Deduplicate domain cosmetics selectors per domain
-    const domainCosmeticsFinal = {};
-    for (const [dom, sels] of Object.entries(allDomainCosmetics)) {
-      domainCosmeticsFinal[dom] = [...new Set(sels)].slice(0, 200); // max 200 per domain
-    }
+    // Deduplicate domain cosmetics — procedural selectors prioritized (see cosmetic-utils.js)
+    let domainCosmeticsFinal = finalizeDomainCosmetics(allDomainCosmetics);
 
-    // Deduplicate scriptlet rules per domain
-    const scriptletRulesFinal = {};
-    for (const [dom, rules] of Object.entries(allScriptletRules)) {
-      const seen = new Set();
-      scriptletRulesFinal[dom] = rules.filter(r => {
-        const k = r.name + JSON.stringify(r.args);
-        if (seen.has(k)) return false;
-        seen.add(k); return true;
-      }).slice(0, 50); // max 50 scriptlets per domain
-    }
+    const scriptletRulesFinal = finalizeScriptletRules(allScriptletRules);
+
+    // Checkpoint: persist the core synced state NOW — immediately after the DNR swap
+    // and BEFORE the network-bound custom-list block below — so the recorded sync state
+    // always matches the applied DNR rules. Without this, if the SW is killed (or a
+    // custom list hangs) before the final write, the user is left with active dynamic
+    // rules but filterSyncedAt unset and 0 cosmetics (the "Infinityh ago / 0 selectors"
+    // health-check state). The final write at the end overwrites this with the built-in
+    // + custom cosmetics merged.
+    try {
+      await chrome.storage.local.set({
+        cosmeticSelectors: cosmeticsDeduped,
+        domainCosmetics:   domainCosmeticsFinal,
+        scriptletRules:    scriptletRulesFinal,
+        filterSyncedAt:    Date.now(),
+        filterRuleCount:   deduped.length,
+      });
+    } catch (_) {}
 
     // ── Custom filter list subscriptions (cosmetics + scriptlets only) ──────────
     // Network-level (DNR) rules are skipped — the 5000-rule pool is fully used by
@@ -1791,6 +1866,9 @@ async function syncFilterLists(force = false) {
         }
       }
     } catch (_) {}
+
+    // Re-cap after custom-list merge (procedural rules prioritized)
+    domainCosmeticsFinal = finalizeDomainCosmetics(domainCosmeticsFinal);
 
     // Persist accumulated removeparam data then apply DNR rules
     await chrome.storage.local.set({
@@ -2109,9 +2187,10 @@ async function injectCosmetics(tabId, tabUrl) {
        .flatMap(([, v]) => v),
   ];
   const allSelectors = [...(cosmeticSelectors || []), ...userCosmetics, ...domainSpecific];
-  if (!allSelectors.length) return;
+  const plainSelectors = allSelectors.filter(sel => !isProceduralCosmetic(sel));
+  if (!plainSelectors.length) return;
 
-  const safe = allSelectors
+  const safe = plainSelectors
     .slice(0, 5000)
     .filter(sel => sel && typeof sel === 'string' && sel.length < 200 &&
                    !sel.includes('{') && !sel.includes('}') &&
@@ -2131,6 +2210,9 @@ async function injectCosmetics(tabId, tabUrl) {
         const chunkCss = chunk.join(',\n') + ' { display:none!important; }';
         try { await chrome.scripting.insertCSS({ target: { tabId }, css: chunkCss }); } catch (_) {}
       }
+      // Record the intended CSS so a repeat pass with identical selectors won't
+      // re-run the chunked insert and pile up duplicate stylesheets.
+      tabState.css = css;
     }
   }
   _tabCosmeticState.set(tabId, tabState);
@@ -2340,13 +2422,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           const ps = _pageStats.get(tab.id) ?? { total:0, network:0, dom:0 };
           sendResponse({
-            total:   ps.total   ?? 0,
-            network: ps.network ?? 0,
-            dom:     ps.dom     ?? 0,
-            amazon:  ps.amazon  ?? 0,
-            social:  ps.social  ?? 0,
-            cookies: ps.cookies ?? 0,
-            general: ps.general ?? 0,
+            total:      ps.total      ?? 0,
+            network:    ps.network    ?? 0,
+            dom:        ps.dom        ?? 0,
+            amazon:     ps.amazon     ?? 0,
+            social:     ps.social     ?? 0,
+            cookies:    ps.cookies    ?? 0,
+            general:    ps.general    ?? 0,
+            annoyances: ps.annoyances ?? 0,
+            streaming:  ps.streaming  ?? 0,
           });
         } catch (_) { sendResponse({ total:0, network:0, dom:0 }); }
         break;
@@ -2397,10 +2481,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // 3. Filter sync recency
         try {
           const { filterSyncedAt, syncFailures = 0 } = await chrome.storage.local.get(['filterSyncedAt','syncFailures']);
-          const ageHours = filterSyncedAt ? (Date.now() - filterSyncedAt) / 3600000 : Infinity;
-          if (ageHours < 13) pass('Last sync', `${ageHours < 1 ? '<1h' : Math.round(ageHours)+'h'} ago${syncFailures > 0 ? ` (${syncFailures} failures)` : ''}`);
-          else if (ageHours < 48) warn('Last sync', `${Math.round(ageHours)}h ago — consider force sync`);
-          else fail('Last sync', `${Math.round(ageHours)}h ago — stale filter lists`);
+          if (!filterSyncedAt) {
+            // No completed sync yet (fresh install, or a sync interrupted after applying
+            // DNR rules but before recording the timestamp). Show an actionable warning
+            // instead of a scary "Infinityh ago — stale filter lists".
+            warn('Last sync', 'no completed sync yet — open the popup and tap Force Sync to download filter lists');
+          } else {
+            const ageHours = (Date.now() - filterSyncedAt) / 3600000;
+            if (ageHours < 13) pass('Last sync', `${ageHours < 1 ? '<1h' : Math.round(ageHours)+'h'} ago${syncFailures > 0 ? ` (${syncFailures} failures)` : ''}`);
+            else if (ageHours < 48) warn('Last sync', `${Math.round(ageHours)}h ago — consider force sync`);
+            else fail('Last sync', `${Math.round(ageHours)}h ago — stale filter lists`);
+          }
         } catch (e) { warn('Last sync', e.message); }
 
         // 4. Cosmetics loaded
@@ -2409,6 +2500,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (cosmeticSelectors.length > 500) pass('Cosmetics', `${cosmeticSelectors.length} selectors`);
           else warn('Cosmetics', `${cosmeticSelectors.length} selectors — low, sync may be needed`);
         } catch (e) { warn('Cosmetics', e.message); }
+
+        // 4b. Procedural cosmetic rules (content-procedural.js feed)
+        try {
+          const { domainCosmetics = {}, filterSyncedAt } = await chrome.storage.local.get(['domainCosmetics', 'filterSyncedAt']);
+          const procCount = countProceduralInDomainCosmetics(domainCosmetics);
+          if (procCount > 50) pass('Procedural cosmetics', `${procCount} :has-text/:upward/:xpath rules active`);
+          else if (procCount > 0) warn('Procedural cosmetics', `${procCount} rules — low; force sync for full uBO feed`);
+          else if (!filterSyncedAt) warn('Procedural cosmetics', '0 rules — complete a filter sync first');
+          else fail('Procedural cosmetics', '0 after sync — check Log tab for list failures');
+        } catch (e) { warn('Procedural cosmetics', e.message); }
 
         // 5. Safe browsing domains loaded
         if (_safeBrowsingDomains.size > 0)
@@ -2467,7 +2568,51 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
         } catch (e) { warn('List sync errors', e.message); }
 
-        // 13. Extension version
+        // 13. YouTube / streaming scripts registered
+        try {
+          const cs = chrome.runtime.getManifest().content_scripts ?? [];
+          const yt = cs.filter(e => e.matches?.some(m => /youtube/.test(m)));
+          const hasInject = yt.some(e => e.js?.includes('src/inject-youtube.js') && e.world === 'MAIN');
+          const hasContent = yt.some(e => e.js?.includes('src/content-youtube.js'));
+          const hasTwitch = cs.some(e => e.js?.includes('src/content-twitch.js'));
+          if (hasInject && hasContent && hasTwitch) {
+            pass('Streaming scripts', 'YouTube MAIN+ISOLATED + Twitch layers registered');
+          } else {
+            const missing = [];
+            if (!hasInject) missing.push('inject-youtube');
+            if (!hasContent) missing.push('content-youtube');
+            if (!hasTwitch) missing.push('content-twitch');
+            fail('Streaming scripts', `Missing: ${missing.join(', ')}`);
+          }
+        } catch (e) { warn('Streaming scripts', e.message); }
+
+        // 14. Privacy + procedural engine in manifest
+        try {
+          const cs = chrome.runtime.getManifest().content_scripts ?? [];
+          const hasPrivacyMain = cs.some(e => e.js?.includes('src/inject-privacy.js') && e.world === 'MAIN');
+          const hasPrivacyIso = cs.some(e => e.js?.includes('src/content-privacy.js'));
+          const hasProcedural = cs.some(e => e.js?.includes('src/content-procedural.js'));
+          if (hasPrivacyMain && hasPrivacyIso && hasProcedural) {
+            pass('Privacy layer', 'Fingerprint scripts + procedural cosmetic engine + element picker');
+          } else {
+            const miss = [];
+            if (!hasPrivacyMain) miss.push('inject-privacy');
+            if (!hasPrivacyIso) miss.push('content-privacy');
+            if (!hasProcedural) miss.push('content-procedural');
+            warn('Privacy layer', `Missing: ${miss.join(', ')}`);
+          }
+        } catch (e) { warn('Privacy layer', e.message); }
+
+        // 15. Benchmark baseline recorded
+        try {
+          const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
+          const recorded = ['d3ward', 'adblockTester', 'eff'].filter(k => benchmarkScores[k]?.score != null);
+          if (recorded.length === 3) pass('Benchmarks', `Scores on file: ${recorded.join(', ')}`);
+          else if (recorded.length > 0) warn('Benchmarks', `${recorded.length}/3 sites scored — finish in Support → Benchmarks`);
+          else warn('Benchmarks', 'No scores yet — open benchmark pages in Support tab');
+        } catch (e) { warn('Benchmarks', e.message); }
+
+        // 16. Extension version
         pass('Version', chrome.runtime.getManifest().version);
 
         const summary = checks.every(c => c.status === 'pass') ? 'healthy'
@@ -2580,24 +2725,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!uboData) { sendResponse({ ok: false }); break; }
         try {
           const updates = {};
-          // Import user filters
+          const importedKeys = [];
+          // Import user filters — route through the same path the Filters panel uses so
+          // network (DNR) and $removeparam rules are stored AND applied, not just the
+          // cosmetic/scriptlet types. (The old path parsed with a 90000 base outside the
+          // USER_DNR range and discarded the network + removeparam rules entirely.)
           if (uboData.userFilters && typeof uboData.userFilters === 'string') {
-            updates.userFilterText = uboData.userFilters;
-            const { cosmetics, domainCosmetics, scriptletRules } =
-              parseFilterList(uboData.userFilters, 90000, 500);
-            updates.userCosmetics = cosmetics;
-            updates.userDomainCosmetics = domainCosmetics;
-            updates.userScriptletRules = scriptletRules;
+            await parseAndStoreUserFilterText(uboData.userFilters);
+            importedKeys.push('userFilters');
           }
           // Import whitelist
           if (uboData.whitelist && typeof uboData.whitelist === 'string') {
             const domains = uboData.whitelist.split('\n')
               .map(l => l.replace(/^@@\|\|/, '').replace(/\^.*/, '').trim())
               .filter(d => d && !d.startsWith('!') && d.includes('.'));
-            if (domains.length) updates.whitelist = domains;
+            if (domains.length) { updates.whitelist = domains; importedKeys.push('whitelist'); }
           }
           if (Object.keys(updates).length) await chrome.storage.local.set(updates);
-          sendResponse({ ok: true, imported: Object.keys(updates) });
+          sendResponse({ ok: true, imported: importedKeys });
         } catch (e) { sendResponse({ ok: false, error: e.message }); }
         break;
       }
@@ -2844,6 +2989,53 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ active, until: active ? globalPause.until : null });
         break;
       }
+      case 'GET_PROCEDURAL_COUNT': {
+        const { domainCosmetics = {}, filterSyncedAt = null } =
+          await chrome.storage.local.get(['domainCosmetics', 'filterSyncedAt']);
+        sendResponse({
+          count: countProceduralInDomainCosmetics(domainCosmetics),
+          filterSyncedAt,
+          syncInProgress: _syncLock,
+        });
+        break;
+      }
+      case 'GET_BENCHMARK_SCORES': {
+        const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
+        sendResponse({ scores: benchmarkScores });
+        break;
+      }
+      case 'SET_BENCHMARK_SCORES': {
+        const incoming = msg.scores ?? {};
+        const { benchmarkScores: prev = {} } = await chrome.storage.local.get('benchmarkScores');
+        const merged = { ...prev };
+        for (const [key, val] of Object.entries(incoming)) {
+          if (val?.score == null || val.score === '') continue;
+          merged[key] = {
+            score: String(val.score).trim(),
+            notes: val.notes ? String(val.notes).trim() : '',
+            date: Date.now(),
+          };
+        }
+        await chrome.storage.local.set({ benchmarkScores: merged });
+        sendResponse({ ok: true, scores: merged });
+        break;
+      }
+      case 'OPEN_BENCHMARK_PAGES': {
+        const BENCHMARK_URLS = [
+          { id: 'd3ward',          url: 'https://d3ward.github.io/toolz/adblock.html', title: 'd3ward adblock test' },
+          { id: 'adblockTester',   url: 'https://adblock-tester.com/',                 title: 'AdBlock Tester' },
+          { id: 'eff',             url: 'https://coveryourtracks.eff.org/',            title: 'EFF Cover Your Tracks' },
+        ];
+        const opened = [];
+        for (const b of BENCHMARK_URLS) {
+          try {
+            const tab = await chrome.tabs.create({ url: b.url, active: opened.length === 0 });
+            opened.push({ id: b.id, tabId: tab.id });
+          } catch (e) { opened.push({ id: b.id, error: e.message }); }
+        }
+        sendResponse({ ok: true, opened });
+        break;
+      }
       case 'EXPORT_DIAGNOSTIC': {
         // Full diagnostic snapshot: settings, stats, filter status, log, list status
         try {
@@ -2976,7 +3168,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 chrome.tabs.onRemoved.addListener((tabId) => { _tabCosmeticState.delete(tabId); });
 
 chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
-  if (frameId === 0) injectCosmetics(tabId, url);
+  if (frameId === 0) {
+    // The browser clears scripting.insertCSS on every committed navigation. Drop the
+    // cached injection state so injectCosmetics re-inserts the base + selector CSS for
+    // the new document (otherwise cosmetic filtering silently stops after in-tab nav).
+    _tabCosmeticState.delete(tabId);
+    injectCosmetics(tabId, url);
+  }
 });
 
 // ── Alarms ─────────────────────────────────────────────────────────────────
@@ -3169,6 +3367,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   }
 
   await applySettingsSideEffects(await getSettings(), { syncFilters: false });
+  await _invalidateCosmeticCacheIfNeeded();
 
   // Fetch filter lists immediately — without this, a fresh install or update
   // has NO dynamic rules until the next browser restart triggers onStartup.
@@ -3232,14 +3431,19 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!existing) chrome.alarms.create('filterSync', { periodInMinutes: 720 });
   const sbAlarm = await chrome.alarms.get('safeBrowsingRefresh');
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
+  await _invalidateCosmeticCacheIfNeeded();
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== '2.11.0') {
+    if (sbRulesVersion !== 'ranges-2.18') {
+      // The filter-rule ID layout changed (per-list ranges are now computed + scaled to
+      // the larger Chrome 121+ dynamic cap). Drop the cached per-list rules/metadata so the
+      // next sync re-fetches and re-stamps every rule with its new ID — avoids any chance of
+      // a stale cached ID colliding with a different list's new range.
       const all = await chrome.storage.local.get(null);
       const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
       if (stale.length) await chrome.storage.local.remove(stale);
-      await chrome.storage.local.set({ sbRulesVersion: '2.11.0' });
-      logEvent('startup', 'info', 'Upgraded to v2.11.0 — cleared stale filter cache for resync');
+      await chrome.storage.local.set({ sbRulesVersion: 'ranges-2.18' });
+      logEvent('startup', 'info', 'Filter rule ID layout changed — cleared stale rule cache for a clean resync');
     }
   } catch (_) {}
 
@@ -3263,3 +3467,23 @@ chrome.runtime.onStartup.addListener(async () => {
     } catch (_) {}
   } catch (_) {}
 });
+
+// ── Catch-up sync on plain service-worker wake ──────────────────────────────
+// onInstalled/onStartup fire only on install/update and browser launch — NOT when
+// Chrome wakes an idle service worker for a navigation, an incoming message, or a
+// non-filterSync alarm. So if a fresh install's initial sync was interrupted (SW
+// killed before the checkpoint wrote filterSyncedAt), the extension would otherwise
+// sit at "no completed sync yet" + 0 cosmetics until a browser restart or the 12h
+// alarm. This top-level trigger runs on every SW evaluation and force-syncs only when
+// no sync has ever completed. _syncLock (set at the top of syncFilterLists) makes it a
+// no-op if onInstalled/onStartup already started a sync this wake, so it can't double-run.
+(async () => {
+  try {
+    const { filterSyncedAt } = await chrome.storage.local.get('filterSyncedAt');
+    if (!filterSyncedAt) {
+      // Defer a few seconds so an onInstalled (1s) / onStartup (0.5s) sync wins the
+      // lock first on the wakes where those events ARE firing.
+      setTimeout(() => syncFilterLists(true).catch(() => {}), 3000);
+    }
+  } catch (_) {}
+})();

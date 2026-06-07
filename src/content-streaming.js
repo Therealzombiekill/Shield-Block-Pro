@@ -126,13 +126,23 @@
   let _deb = null;
   const _obs = new MutationObserver(() => { clearTimeout(_deb); _deb = setTimeout(tick, 300); });
   _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
-  const _int = setInterval(tick, 1000);
+  let _int = setInterval(tick, 1000);
 
   function stopStreamingBlocking() {
     _obs.disconnect();
     clearInterval(_int);
     clearTimeout(_deb);
     if (adActive) { _restore(); adActive = false; }
+  }
+
+  function startStreamingBlocking() {
+    if (!settings?.streaming) return;
+    if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
+    _obs.disconnect();
+    _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+    clearInterval(_int);
+    _int = setInterval(tick, 1000);
+    tick();
   }
 
   window.addEventListener('beforeunload', stopStreamingBlocking, { once: true });
@@ -145,6 +155,7 @@
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') stopStreamingBlocking();
+    if (message?.type === 'GLOBAL_RESUME') startStreamingBlocking();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => _host === d || _host.endsWith('.' + d))) stopStreamingBlocking();

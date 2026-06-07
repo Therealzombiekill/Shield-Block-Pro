@@ -190,14 +190,15 @@
   }
 
   // ── Safety timeout: force-recover if muted for > 90s ─────────────────────────
-  const safetyInterval = setInterval(() => {
+  function _safetyTick() {
     if (adActive && Date.now() - adStartTime > 90000) {
       adActive = false;
       unmuteVideo();
       hideToast();
       _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
     }
-  }, 5000);
+  }
+  let safetyInterval = setInterval(_safetyTick, 5000);
 
   // ── Buffering monitor ─────────────────────────────────────────────────────────
   let _lastPos     = -1;
@@ -206,7 +207,7 @@
   let _lastFixAt   = 0;
   const _FIX_COOLDOWN = 5000;
 
-  const bufferInterval = setInterval(() => {
+  function _bufferTick() {
     if (adActive) { _frozenTicks = 0; return; }
     const video = document.querySelector('video');
     if (!video || video.paused || document.hidden) { _frozenTicks = 0; _lastPos = -1; _lastBuf = -1; return; }
@@ -229,7 +230,8 @@
       _lastBuf     = buf;
       _frozenTicks = 0;
     }
-  }, 500);
+  }
+  let bufferInterval = setInterval(_bufferTick, 500);
 
   // ── Observer + polling ────────────────────────────────────────────────────────
   let debounce = null;
@@ -238,7 +240,7 @@
     debounce = setTimeout(domTick, 300);
   });
   observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
-  const interval = setInterval(domTick, 1000);
+  let interval = setInterval(domTick, 1000);
 
   let stopped = false;
   function stopTwitchBlocking() {
@@ -256,6 +258,22 @@
     window.postMessage({ type: 'SB_TWITCH_DISABLE' }, '*');
   }
 
+  function startTwitchBlocking() {
+    if (!settings?.twitch) return;
+    if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+    stopped = false;
+    observer.disconnect();
+    observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
+    clearInterval(interval);
+    interval = setInterval(domTick, 1000);
+    clearInterval(safetyInterval);
+    safetyInterval = setInterval(_safetyTick, 5000);
+    clearInterval(bufferInterval);
+    bufferInterval = setInterval(_bufferTick, 500);
+    window.postMessage({ type: 'SB_TWITCH_ENABLE' }, '*');
+    domTick();
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
     const wl = changes.whitelist?.newValue;
     const isWhitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
@@ -266,6 +284,7 @@
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') stopTwitchBlocking();
+    if (message?.type === 'GLOBAL_RESUME') startTwitchBlocking();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) stopTwitchBlocking();

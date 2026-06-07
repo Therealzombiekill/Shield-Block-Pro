@@ -192,13 +192,23 @@
     _deb = setTimeout(tick, 400);
   });
   if (_target) { _obs.observe(_target, { childList: true, subtree: true }); }
-  const _int = setInterval(tick, 1500);
+  let _int = setInterval(tick, 1500);
   tick();
 
   function stopAnnoyanceBlocking() {
     _obs.disconnect();
     clearInterval(_int);
     clearTimeout(_deb);
+  }
+
+  function startAnnoyanceBlocking() {
+    if (!settings?.annoyances) return;
+    if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
+    _obs.disconnect();
+    if (_target) { _obs.observe(_target, { childList: true, subtree: true }); }
+    clearInterval(_int);
+    _int = setInterval(tick, 1500);
+    tick();
   }
 
   window.addEventListener('beforeunload', stopAnnoyanceBlocking, { once: true });
@@ -211,6 +221,7 @@
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') stopAnnoyanceBlocking();
+    if (message?.type === 'GLOBAL_RESUME') startAnnoyanceBlocking();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => _host === d || _host.endsWith('.' + d))) stopAnnoyanceBlocking();

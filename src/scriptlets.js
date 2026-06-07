@@ -51,6 +51,43 @@
     return s;
   }
 
+  // Unified XHR proxy — multiple scriptlets can register block/mutate hooks without clobbering each other
+  function ensureXhrProxy() {
+    if (globalThis.__sbXhrInstalled) return;
+    globalThis.__sbXhrInstalled = true;
+    globalThis.__sbXhrBlockRes   = globalThis.__sbXhrBlockRes   || [];
+    globalThis.__sbXhrMutators   = globalThis.__sbXhrMutators   || [];
+    const NativeXHR = window.XMLHttpRequest;
+    function SBXHR() {
+      const xhr = new NativeXHR();
+      let _url = '';
+      const _open = xhr.open;
+      xhr.open = function (method, url, ...rest) {
+        _url = String(url ?? '');
+        return _open.apply(this, [method, url, ...rest]);
+      };
+      const _send = xhr.send;
+      xhr.send = function (...args) {
+        for (const re of globalThis.__sbXhrBlockRes) {
+          if (re && re.test(_url)) return;
+        }
+        return _send.apply(this, args);
+      };
+      xhr.addEventListener('readystatechange', function () {
+        if (xhr.readyState !== 4) return;
+        for (const re of globalThis.__sbXhrBlockRes) {
+          if (re && re.test(_url)) return;
+        }
+        for (const mut of globalThis.__sbXhrMutators) {
+          try { mut(xhr, _url); } catch (_) {}
+        }
+      });
+      return xhr;
+    }
+    try { SBXHR.prototype = NativeXHR.prototype; } catch (_) {}
+    window.XMLHttpRequest = SBXHR;
+  }
+
   // ── Scriptlet implementations ─────────────────────────────────────────────────
 
   const IMPL = {
@@ -584,23 +621,200 @@
       } catch(_) {}
     },
 
+    // no-xhr-if / prevent-xhr — block XMLHttpRequest to matching URLs
+    'prevent-xhr': ([urlPattern]) => {
+      const re = toRe(urlPattern);
+      if (!re) return;
+      ensureXhrProxy();
+      globalThis.__sbXhrBlockRes.push(re);
+    },
+
+    // noeval — neutralize eval / Function constructor
+    'noeval': () => {
+      try {
+        window.eval = function () {};
+        window.Function = function () { return function () {}; };
+      } catch (_) {}
+    },
+
+    // remove-attr (ra) — strip attributes from matching elements
+    'remove-attr': ([attr, selector]) => {
+      if (!attr) return;
+      const sel = selector || '*';
+      const apply = () => {
+        try {
+          document.querySelectorAll(sel).forEach(el => el.removeAttribute(attr));
+        } catch (_) {}
+      };
+      apply();
+      new MutationObserver(apply).observe(document.documentElement,
+        { attributes: true, childList: true, subtree: true });
+    },
+
+    // remove-node-text (rmnt) — remove text nodes matching a pattern
+    'remove-node-text': ([nodeName, pattern]) => {
+      if (!nodeName || !pattern) return;
+      const re = toRe(pattern);
+      if (!re) return;
+      const walk = (root) => {
+        const iter = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const remove = [];
+        let n = iter.nextNode();
+        while (n) {
+          if (n.parentElement?.nodeName.toLowerCase() === nodeName.toLowerCase() && re.test(n.nodeValue)) {
+            remove.push(n);
+          }
+          n = iter.nextNode();
+        }
+        remove.forEach(node => node.parentElement?.removeChild(node));
+      };
+      if (document.body) walk(document.body);
+      new MutationObserver(muts => {
+        muts.forEach(m => m.addedNodes.forEach(node => { if (node.nodeType === 1) walk(node); }));
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    },
+
+    // adjust-setTimeout (aost) — delay matching setTimeout callbacks
+    'adjust-setTimeout': ([pattern, delayMs]) => {
+      const re = toRe(pattern);
+      const bump = Number(delayMs) || 0;
+      const _st = window.setTimeout;
+      window.setTimeout = function (fn, d, ...rest) {
+        const s = typeof fn === 'function' ? fn.toString() : String(fn ?? '');
+        if (re && re.test(s)) return _st.call(this, fn, bump, ...rest);
+        return _st.call(this, fn, d, ...rest);
+      };
+    },
+
+    // nano-stb / nano-sib — uBO shorthand for setTimeout/setInterval pattern blocking
+    'nano-stb': (args) => IMPL['prevent-setTimeout'](args),
+    'nano-sib': (args) => IMPL['prevent-setInterval'](args),
+
+    // json-prune-fetch-response — prune JSON keys from fetch responses
+    'json-prune-fetch-response': ([urlPattern, propsToRemove]) => {
+      if (!urlPattern || !propsToRemove) return;
+      const urlRe = toRe(urlPattern);
+      const paths = propsToRemove.split(/\s+/).filter(Boolean);
+      const _fetch = window.fetch;
+      window.fetch = async function (resource, init) {
+        const url = typeof resource === 'string' ? resource : (resource?.url ?? '');
+        const res = await _fetch.apply(this, arguments);
+        if (!urlRe?.test(url)) return res;
+        try {
+          const text = await res.clone().text();
+          const data = JSON.parse(text);
+          paths.forEach(p => {
+            const parts = p.split('.');
+            let node = data;
+            for (let i = 0; i < parts.length - 1; i++) {
+              if (node == null || typeof node !== 'object') return;
+              node = node[parts[i]];
+            }
+            if (node != null && typeof node === 'object') delete node[parts[parts.length - 1]];
+          });
+          const h = new Headers();
+          res.headers.forEach((v, k) => {
+            if (!['content-length', 'content-encoding'].includes(k.toLowerCase())) h.set(k, v);
+          });
+          return new Response(JSON.stringify(data), { status: res.status, headers: h });
+        } catch (_) { return res; }
+      };
+    },
+
+    // json-prune-xhr-response — prune JSON keys from XHR responses
+    'json-prune-xhr-response': ([urlPattern, propsToRemove]) => {
+      if (!urlPattern || !propsToRemove) return;
+      const urlRe = toRe(urlPattern);
+      const paths = propsToRemove.split(/\s+/).filter(Boolean);
+      ensureXhrProxy();
+      globalThis.__sbXhrMutators.push((xhr, url) => {
+        if (!urlRe?.test(url)) return;
+        try {
+          const data = JSON.parse(xhr.responseText);
+          paths.forEach(p => {
+            const parts = p.split('.');
+            let node = data;
+            for (let i = 0; i < parts.length - 1; i++) {
+              if (node == null || typeof node !== 'object') return;
+              node = node[parts[i]];
+            }
+            if (node != null && typeof node === 'object') delete node[parts[parts.length - 1]];
+          });
+          const out = JSON.stringify(data);
+          Object.defineProperty(xhr, 'responseText', { value: out, configurable: true });
+          Object.defineProperty(xhr, 'response', { value: out, configurable: true });
+        } catch (_) {}
+      });
+    },
+
+    // trusted-replace-xhr-response
+    'trusted-replace-xhr-response': ([urlPattern, pattern, replacement]) => {
+      if (!urlPattern || !pattern) return;
+      const urlRe = toRe(urlPattern);
+      const bodyRe = toRe(pattern);
+      const repl = replacement ?? '';
+      ensureXhrProxy();
+      globalThis.__sbXhrMutators.push((xhr, url) => {
+        if (!urlRe?.test(url) || !bodyRe) return;
+        try {
+          const patched = String(xhr.responseText).replace(bodyRe, repl);
+          Object.defineProperty(xhr, 'responseText', { value: patched, configurable: true });
+          Object.defineProperty(xhr, 'response', { value: patched, configurable: true });
+        } catch (_) {}
+      });
+    },
+
+    // popads-dummy — stub PopAds globals
+    'popads-dummy': () => IMPL['prevent-popads-net'](),
+
+    // nobab — neutralize BAB (BlockAdBlock) detector
+    'nobab': () => {
+      try {
+        IMPL['set-constant'](['bab', 'undefined']);
+        IMPL['set-constant'](['blockAdBlock', 'noopFunc']);
+        IMPL['prevent-setTimeout'](['/bab|blockadblock/i']);
+      } catch (_) {}
+    },
+
+    // nofab — FuckAdBlock neutralizer
+    'nofab': () => {
+      try {
+        IMPL['set-constant'](['fuckAdBlock', 'noopFunc']);
+        IMPL['set-constant'](['FuckAdBlock', 'noopFunc']);
+      } catch (_) {}
+    },
+
   };
 
-  // Aliases
-  IMPL['prevent-fetch'] = IMPL['no-fetch-if']; // uBO uses 'prevent-fetch'; we implement it as no-fetch-if
+  // Aliases (uBO short names)
+  IMPL['prevent-fetch'] = IMPL['no-fetch-if'];
   IMPL['aopr'] = IMPL['abort-on-property-read'];
   IMPL['aopw'] = IMPL['abort-on-property-write'];
   IMPL['sc']   = IMPL['set-constant'];
+  IMPL['set']  = IMPL['set-constant'];
   IMPL['acis'] = IMPL['abort-current-inline-script'];
+  IMPL['acs']  = (args) => IMPL['abort-current-inline-script'](args);
+  IMPL['nostif'] = (args) => IMPL['prevent-setTimeout'](args);
+  IMPL['nowoif'] = (args) => IMPL['prevent-window-open'](args);
+  IMPL['nosiif'] = (args) => IMPL['prevent-setInterval'](args);
+  IMPL['no-xhr-if'] = (args) => IMPL['prevent-xhr'](args);
+  IMPL['rpnt'] = (args) => IMPL['replace-node-text'](args);
+  IMPL['ra']   = (args) => IMPL['remove-attr'](args);
+  IMPL['rmnt'] = (args) => IMPL['remove-node-text'](args);
+  IMPL['aost'] = (args) => IMPL['adjust-setTimeout'](args);
+  IMPL['aeld'] = (args) => IMPL['addEventListener-defuser'](args);
+  IMPL['popads'] = () => IMPL['prevent-popads-net']();
 
   // ── Public API ────────────────────────────────────────────────────────────────
   // Called by background.js via chrome.scripting.executeScript after domain lookup
   globalThis.__sbRunScriptlets = function (scriptlets) {
     if (!Array.isArray(scriptlets)) return;
+    const _missing = globalThis.__sbMissingScriptlets || (globalThis.__sbMissingScriptlets = new Set());
     for (const { name, args } of scriptlets) {
       try {
         const fn = IMPL[name];
-        if (typeof fn === 'function') fn(args || []);
+        if (typeof fn !== 'function') { _missing.add(name); continue; }
+        fn(args || []);
       } catch (_) {}
     }
   };

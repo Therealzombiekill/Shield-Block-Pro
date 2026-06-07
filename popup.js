@@ -154,7 +154,6 @@ async function refreshStats() {
     $('s-yt').textContent = fmt(stats.youtube  || 0);
     $('s-tw').textContent = fmt(stats.twitch   || 0);
     $('s-sp').textContent = fmt(stats.spotify  || 0);
-    $('s-az').textContent = fmt(stats.amazon   || 0);
     $('s-hl').textContent = fmt(stats.hulu     || 0);
     $('s-kk').textContent = fmt(stats.kick     || 0);
     $('s-sc').textContent = fmt(stats.social   || 0);
@@ -184,7 +183,6 @@ async function refreshStats() {
     const n = page.total ?? 0;
     if (n > 0) {
       const parts = [];
-      if (page.amazon  > 0) parts.push(`${fmt(page.amazon)} amz`);
       if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
       if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);
       if (page.general > 0) parts.push(`${fmt(page.general)} web`);
@@ -336,11 +334,17 @@ $('sync-btn')?.addEventListener('click', async () => {
   let tries = 0;
   const poll = setInterval(async () => {
     await refreshFilterStatus();
-    const s = await msg('GET_FILTER_STATUS');
-    if (s && !s.syncInProgress || ++tries > 20) {
+    const [s, proc] = await Promise.all([msg('GET_FILTER_STATUS'), msg('GET_PROCEDURAL_COUNT')]);
+    const done = s && !s.syncInProgress;
+    if (proc?.count > 0 && $('ftext')) {
+      const strong = $('ftext').querySelector('strong');
+      if (strong) strong.textContent = `${(s?.activeRules ?? 0).toLocaleString()} rules · ${proc.count} procedural`;
+    }
+    if (done || ++tries > 90) {
       clearInterval(poll);
       $('sync-btn').textContent = '↺ sync';
       _syncing = false;
+      if ($('fdot')) $('fdot').className = 'fdot';
     }
   }, 1000);
 });
@@ -471,7 +475,12 @@ const _intervals = [];
 async function boot() {
   _intervals.forEach(clearInterval);
   _intervals.length = 0;
-  await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules()]);
+  // Populate the displayed version from the manifest so it can never drift out of sync.
+  try {
+    const _v = chrome.runtime.getManifest().version;
+    document.querySelectorAll('.app-ver').forEach(el => { el.textContent = _v; });
+  } catch (_) {}
+  await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules(), refreshBenchmarkScores()]);
   moveNavGlider(document.querySelector('.nb.active'));
   $('app').classList.add('ready');
   document.body.classList.add('sb-ready');
@@ -591,6 +600,32 @@ $('download-log-txt')?.addEventListener('click', async () => {
 
 // ── Diagnostic export (full JSON snapshot with logs + filter status) ─────────
 // ── Extension health self-test ─────────────────────────────────────────────────
+async function triggerForceSync(statusEl) {
+  if (_syncing) return;
+  if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Syncing filter lists… (up to 90s)'; }
+  $('sync-btn')?.click();
+  let tries = 0;
+  while (tries++ < 90) {
+    await new Promise(r => setTimeout(r, 1000));
+    const proc = await msg('GET_PROCEDURAL_COUNT');
+    if (proc && !proc.syncInProgress) {
+      if (statusEl) {
+        statusEl.style.color = proc.count > 0 ? 'var(--green)' : '#f59e0b';
+        statusEl.textContent = proc.count > 0
+          ? `Sync done — ${proc.count} procedural rules loaded`
+          : 'Sync finished but 0 procedural rules — check Log tab';
+      }
+      return proc;
+    }
+  }
+  if (statusEl) { statusEl.style.color = '#f59e0b'; statusEl.textContent = 'Sync still running — wait and Run check again'; }
+  return null;
+}
+
+$('support-force-sync')?.addEventListener('click', () => {
+  triggerForceSync($('health-summary'));
+});
+
 $('run-health-check')?.addEventListener('click', async () => {
   const btn     = $('run-health-check');
   const summary = $('health-summary');
@@ -645,6 +680,62 @@ $('run-health-check')?.addEventListener('click', async () => {
   }
 });
 
+// ── Benchmark baseline ───────────────────────────────────────────────────────
+async function refreshBenchmarkScores() {
+  try {
+    const { scores = {} } = await msg('GET_BENCHMARK_SCORES') ?? {};
+    const set = (id, key) => {
+      const el = $(id);
+      if (el && scores[key]?.score) el.value = scores[key].score;
+    };
+    set('bench-d3ward', 'd3ward');
+    set('bench-adblock', 'adblockTester');
+    set('bench-eff', 'eff');
+    const st = $('benchmark-status');
+    if (st) {
+      const dates = ['d3ward', 'adblockTester', 'eff']
+        .filter(k => scores[k]?.date)
+        .map(k => `${k}: ${new Date(scores[k].date).toLocaleDateString()}`);
+      st.textContent = dates.length ? `Last saved — ${dates.join(' · ')}` : '';
+    }
+  } catch (_) {}
+}
+
+$('open-benchmarks')?.addEventListener('click', async () => {
+  const btn = $('open-benchmarks');
+  if (btn) { btn.textContent = 'Opening…'; btn.disabled = true; }
+  try {
+    await msg('OPEN_BENCHMARK_PAGES');
+    const st = $('benchmark-status');
+    if (st) st.textContent = 'Benchmark tabs opened — score each site, then Save scores.';
+  } catch (e) {
+    const st = $('benchmark-status');
+    if (st) { st.style.color = 'var(--red,#f87171)'; st.textContent = 'Failed: ' + e.message; }
+  } finally {
+    if (btn) { btn.textContent = 'Open tests'; btn.disabled = false; }
+  }
+});
+
+$('save-benchmarks')?.addEventListener('click', async () => {
+  const btn = $('save-benchmarks');
+  const st  = $('benchmark-status');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+  try {
+    const scores = {
+      d3ward:        { score: $('bench-d3ward')?.value ?? '' },
+      adblockTester: { score: $('bench-adblock')?.value ?? '' },
+      eff:           { score: $('bench-eff')?.value ?? '' },
+    };
+    await msg('SET_BENCHMARK_SCORES', { scores });
+    if (st) { st.style.color = 'var(--green)'; st.textContent = 'Scores saved.'; }
+    await refreshBenchmarkScores();
+  } catch (e) {
+    if (st) { st.style.color = 'var(--red,#f87171)'; st.textContent = 'Save failed: ' + e.message; }
+  } finally {
+    if (btn) { btn.textContent = 'Save scores'; btn.disabled = false; }
+  }
+});
+
 $('export-diagnostic')?.addEventListener('click', async () => {
   try {
     const result = await msg('EXPORT_DIAGNOSTIC');
@@ -680,7 +771,6 @@ $('export-stats-csv')?.addEventListener('click', async () => {
       ['Spotify',     stats.spotify  ?? 0],
       ['Hulu',        stats.hulu     ?? 0],
       ['Kick',        stats.kick     ?? 0],
-      ['Amazon',      stats.amazon   ?? 0],
       ['Social',      stats.social   ?? 0],
       ['Cookies',     stats.cookies  ?? 0],
       ['General',     stats.general  ?? 0],
@@ -1329,7 +1419,8 @@ $('ubo-import-btn')?.addEventListener('change', async (e) => {
 // ── Badge toggle ───────────────────────────────────────────────────────────────
 $('t-badge')?.addEventListener('change', async (e) => {
   const enabled = e.target.checked;
-  await msg('SET_SETTINGS', { settings: { badgeEnabled: enabled } });
+  // badgeEnabled is already persisted by the generic [data-s] change handler above;
+  // here we only run the immediate badge-clear side effect (avoids a duplicate SET_SETTINGS).
   if (!enabled) {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id) chrome.action.setBadgeText({ text: '', tabId: tab.id });

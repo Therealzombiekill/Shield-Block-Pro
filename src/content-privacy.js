@@ -10,6 +10,19 @@ import { shouldSkipPrivacyUrlClean } from './trusted-sites.js';
 (async () => {
   if (!location.href.startsWith('http://') && !location.href.startsWith('https://')) return;
 
+  // trusted-sites.js is an ES module shared with the service worker. Static manifest
+  // content scripts are classic scripts and cannot use a top-level `import`, so we
+  // load it via dynamic import() of its web-accessible URL (it is listed in
+  // web_accessible_resources for exactly this reason). Fall back to a no-op
+  // (never skip) if it can't be loaded for any reason.
+  let shouldSkipPrivacyUrlClean = () => false;
+  try {
+    const mod = await import(chrome.runtime.getURL('src/trusted-sites.js'));
+    if (typeof mod?.shouldSkipPrivacyUrlClean === 'function') {
+      shouldSkipPrivacyUrlClean = mod.shouldSkipPrivacyUrlClean;
+    }
+  } catch (_) { /* keep no-op fallback */ }
+
   const host = location.hostname.replace(/^www\./, '');
   let settings = null;
   let whitelist = [];

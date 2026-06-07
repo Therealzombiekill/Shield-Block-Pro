@@ -28,15 +28,18 @@ const DEFAULT_RESOURCE_TYPES = [
   'script', 'image', 'xmlhttprequest', 'sub_frame', 'media', 'font', 'stylesheet', 'other', 'ping',
 ];
 
-// Cosmetic pseudo-classes that Chrome can't handle — skip these
+// Procedural pseudo-classes handled by content-procedural.js (not insertCSS)
+const PROCEDURAL_MARKERS = [':has-text(', ':matches-css(', ':upward(', ':xpath('];
+
+export function isProceduralCosmetic(selector) {
+  return typeof selector === 'string' && PROCEDURAL_MARKERS.some(m => selector.includes(m));
+}
+
+// Truly unsupported — not yet implemented anywhere
 function hasUnsupportedPseudo(selector) {
   return (
-    selector.includes(':matches-css') ||
-    selector.includes(':upward(') ||
-    selector.includes(':xpath(') ||
     selector.includes(':nth-ancestor(') ||
     selector.includes(':watch-attr(') ||
-    selector.includes(':has-text(') ||
     selector.includes('{ ')
   );
 }
@@ -90,6 +93,10 @@ function parseLine(line, idCounter) {
     // ── Global cosmetic: ##.selector ──────────────────────────────────────
     if (rawAfter.length < 2 || rawAfter.length > 512) return null;
     if (hasUnsupportedPseudo(rawAfter)) return null;
+    // Global procedural rules → domainCosmetics['*'] for content-procedural.js
+    if (isProceduralCosmetic(rawAfter)) {
+      return { type: 'domain-cosmetic', domain: '*', selector: rawAfter };
+    }
     return { type: 'cosmetic', selector: rawAfter };
   }
 
@@ -156,8 +163,13 @@ function parseLine(line, idCounter) {
       }
       return { type: 'removeparam', param: paramName, initDomains, exclDomains };
     }
-    // Skip other unsupported option types that would change the action semantics
-    if (opts.includes('redirect') || opts.includes('csp') || opts.includes('replace')) return null;
+    // Skip other unsupported option types that would change the action semantics.
+    // Match option *names* (token before '='), not substrings — a naive includes()
+    // would drop legitimate block rules like "$image,domain=cspire.com" (contains "csp")
+    // or any domain= value containing "redirect"/"replace".
+    const _optNames = opts.split(',').map(o => o.trim().split('=')[0]);
+    if (_optNames.includes('redirect') || _optNames.includes('redirect-rule') ||
+        _optNames.includes('csp') || _optNames.includes('replace')) return null;
   }
 
   // Clean up the filter

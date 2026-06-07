@@ -209,8 +209,10 @@ body.sb-ready .sc:nth-child(9){animation-delay:.28s}
 
 /* Filter bar */
 .fbar{
+  position:sticky;bottom:0;z-index:5;margin-top:8px;
   display:flex;flex-direction:column;align-items:stretch;
-  border-top:1px solid var(--border);background:var(--s1);
+  border-top:1px solid var(--border);
+  background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
 }
 .fbar-top{
   display:flex;align-items:center;justify-content:space-between;
@@ -577,6 +579,12 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 .fil-divider-lg{padding-bottom:12px}
 .sup-card .sup-p-note{font-size:11px;color:var(--muted);margin-top:4px}
 .sup-card .sup-p-desc{font-size:11px;color:var(--muted);margin-bottom:8px}
+.bench-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:4px}
+.bench-row{display:flex;align-items:center;gap:8px}
+.bench-name{font-size:10px;color:var(--muted);min-width:96px;font-family:var(--mono)}
+.bench-input{flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:10px;padding:5px 8px;outline:none}
+.mt6{margin-top:6px}
+#benchmark-status{font-family:var(--mono);font-size:10px;color:var(--green);min-height:12px}
 .wl-hd-mt{margin-top:12px}
 </style>
 </head>
@@ -644,10 +652,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div class="sc sp">
           <span class="sc-n" id="s-sp">0</span>
           <span class="sc-l">Spotify</span>
-        </div>
-        <div class="sc az">
-          <span class="sc-n" id="s-az">0</span>
-          <span class="sc-l">Amazon</span>
         </div>
         <div class="sc hl">
           <span class="sc-n" id="s-hl">0</span>
@@ -758,16 +762,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <div class="blockers">
 
       <div class="sec-hd">Network & Web</div>
-
-      <label class="tr" for="t-az">
-        <div class="tr-info">
-          <div class="ti ti-az">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0a500"><path d="M.045 18c.072-.116.187-.124.348-.022 3.636 2.11 7.594 3.17 11.87 3.17 2.852 0 5.668-.534 8.447-1.595.315-.14.39-.1.494.124.102.167.066.334-.12.496-2.7 1.861-5.937 2.797-9.713 2.797-2.997 0-5.805-.668-8.426-2.003z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Amazon</strong><span>Sponsored products removed</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-az" data-s="amazon" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
 
       <label class="tr" for="t-wb">
         <div class="tr-info">
@@ -991,10 +985,37 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       <div class="sup-card sup-card-sm">
         <div class="sup-hd">
           <div class="sup-label">Extension Health</div>
-          <button class="ghost sup-ghost-sm" id="run-health-check">Run check</button>
+          <div class="sup-btn-row" style="gap:4px;margin:0">
+            <button class="ghost sup-ghost-sm" id="support-force-sync">↺ Sync</button>
+            <button class="ghost sup-ghost-sm" id="run-health-check">Run check</button>
+          </div>
         </div>
         <div id="health-summary">Click 'Run check' to test all subsystems</div>
         <div id="health-checks"></div>
+      </div>
+
+      <!-- ── Benchmark baseline ───────────────────────────────────────── -->
+      <div class="sup-card sup-card-sm">
+        <div class="sup-hd">
+          <div class="sup-label">Blocking Benchmarks</div>
+          <button class="ghost sup-ghost-sm" id="open-benchmarks">Open tests</button>
+        </div>
+        <p class="sup-p-desc">Score against d3ward, AdBlock Tester, and EFF Cover Your Tracks. Record results to track progress vs AdGuard/uBOL.</p>
+        <div class="bench-grid">
+          <label class="bench-row"><span class="bench-name">d3ward toolz</span>
+            <input type="text" id="bench-d3ward" class="bench-input" placeholder="e.g. 95/100" maxlength="32">
+          </label>
+          <label class="bench-row"><span class="bench-name">AdBlock Tester</span>
+            <input type="text" id="bench-adblock" class="bench-input" placeholder="e.g. 45/50" maxlength="32">
+          </label>
+          <label class="bench-row"><span class="bench-name">EFF CYT</span>
+            <input type="text" id="bench-eff" class="bench-input" placeholder="e.g. unique / protected" maxlength="64">
+          </label>
+        </div>
+        <div class="sup-btn-row mt6">
+          <button class="ghost ghost-bd sup-ghost-full" id="save-benchmarks">Save scores</button>
+        </div>
+        <div id="benchmark-status" class="sup-p-desc"></div>
       </div>
 
       <div class="sup-card">
@@ -1066,8 +1087,8 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
       <div class="sup-card sup-card-sm">
         <div class="sup-info">
-          Built by <span style="color:var(--text)">Bronson Bissell</span> · v2.11.1<br>
-          <a href="https://astonishing-swan-da7249.netlify.app" target="_blank" rel="noopener"
+          Built by <span style="color:var(--text)">Bronson Bissell</span> · v<span class="app-ver">2.18.0</span><br>
+          <a href="https://shieldblock.pro/" target="_blank" rel="noopener"
              style="color:var(--accent2);text-decoration:none;font-size:10px">Privacy Policy ↗</a>
         </div>
       </div>
@@ -1158,7 +1179,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <button class="log-ftag" data-src="general">web</button>
         <button class="log-ftag" data-src="cookies">🍪</button>
         <button class="log-ftag" data-src="social">📱</button>
-        <button class="log-ftag" data-src="amazon">📦</button>
         <button class="log-ftag" data-src="picker">🎯</button>
       </div>
       <div class="log-hdr-btns">
@@ -1173,7 +1193,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <div class="ftr">
     <div class="ftr-l">
       <span class="ftr-badge">FREE</span>
-      <span class="ver">ShieldBlock v2.11.1</span>
+      <span class="ver">ShieldBlock v<span class="app-ver">2.18.0</span></span>
     </div>
     <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
        class="ghost" style="text-decoration:none">tip ❤</a>

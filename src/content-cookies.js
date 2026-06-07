@@ -291,6 +291,7 @@
 
   // ── Main handler ──────────────────────────────────────────────────────────
   function handleBanners() {
+    if (globalThis.__sbGlobalPause) return; // don't click banner buttons during a global pause
     let anyAction = false;
 
     for (const root of knownRoots) {
@@ -445,6 +446,14 @@
     clearTimeout(_debounce);
   }
 
+  function startCookieBlocking() {
+    if (!settings?.cookies) return;
+    if (_ckWl.some(d => _host === d || _host.endsWith('.' + d))) return;
+    observer.disconnect();
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    handleBanners();
+  }
+
   chrome.storage.onChanged.addListener((changes) => {
     const wl = changes.whitelist?.newValue;
     const isWhitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
@@ -456,6 +465,9 @@
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') {
       stopCookieBlocking();
+    }
+    if (message?.type === 'GLOBAL_RESUME') {
+      startCookieBlocking();
     }
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];

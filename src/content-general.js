@@ -207,7 +207,7 @@
     // Only call getComputedStyle() if the inline prefilter passes — this avoids
     // triggering style recalculation for every child of <body>.
     if (!document.body) return;
-    for (const el of document.body.children) {
+    for (const el of [...document.body.children]) {
       // Fast prefilter: inline style must mention fixed/absolute/z-index
       const inlineStyle = el.getAttribute('style') || '';
       if (!inlineStyle.includes('fixed') && !inlineStyle.includes('absolute') &&
@@ -232,7 +232,7 @@
   // ── Interstitial / high-z-index ad removal ───────────────────────────────────
   function cleanInterstitials() {
     if (!document.body) return;
-    for (const el of document.body.children) {
+    for (const el of [...document.body.children]) {
       // Fast prefilter: inline style must indicate fixed + high z-index
       const inlineStyle = el.getAttribute('style') || '';
       if (!inlineStyle.includes('fixed') && !inlineStyle.includes('z-index')) continue;

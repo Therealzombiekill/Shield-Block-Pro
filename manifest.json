@@ -47,31 +47,6 @@
     },
     {
       "matches": [
-        "*://*.amazon.com/*",
-        "*://*.amazon.co.uk/*",
-        "*://*.amazon.de/*",
-        "*://*.amazon.ca/*",
-        "*://*.amazon.com.au/*",
-        "*://*.amazon.co.jp/*",
-        "*://*.amazon.in/*",
-        "*://*.amazon.fr/*",
-        "*://*.amazon.es/*",
-        "*://*.amazon.it/*",
-        "*://*.amazon.com.mx/*",
-        "*://*.amazon.com.br/*",
-        "*://*.amazon.nl/*",
-        "*://*.amazon.pl/*",
-        "*://*.amazon.se/*",
-        "*://*.amazon.sg/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-amazon.js"
-      ],
-      "run_at": "document_start"
-    },
-    {
-      "matches": [
         "<all_urls>"
       ],
       "js": [
@@ -322,7 +297,7 @@
       "description": "Activate element picker"
     }
   },
-  "homepage_url": "https://astonishing-swan-da7249.netlify.app/",
+  "homepage_url": "https://shieldblock.pro/",
   "browser_specific_settings": {
     "gecko": {
       "id": "shieldblock-pro@shieldblock.ext",

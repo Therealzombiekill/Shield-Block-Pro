@@ -47,17 +47,15 @@
     if (player) {
       const spans = player.querySelectorAll('span, div');
       for (const el of spans) {
-        if (el.children.length === 0 && /^\s*(ad\s+\d|\d+\s*s(ec)?)\s*$/i.test(el.textContent)) return true;
+        if (el.children.length === 0 && /^\s*(ad(\s+\d+(\s+of\s+\d+)?)?|\d+\s*s(ec)?)\s*$/i.test(el.textContent)) return true;
       }
     }
     return false;
   }
 
-  function removeAdUI() {
-    for (const sel of AD_SELECTORS) {
-      try { document.querySelectorAll(sel).forEach(el => el.remove()); } catch (_) {}
-    }
-  }
+  // NOTE: mute-only (like content-streaming.js). We must NOT remove AD_SELECTORS
+  // elements — isAdPlaying() detects the ad break from them, so removing them would
+  // make the next tick think the ad ended and unmute while the SSAI ad still plays.
 
   let adActive = false;
   let wasMuted = false;
@@ -66,7 +64,6 @@
   function tick() {
     if (globalThis.__sbGlobalPause) return;
     const hasAd = isAdPlaying();
-    removeAdUI();
 
     if (hasAd && !adActive) {
       adActive = true;
@@ -87,7 +84,7 @@
   let _deb = null;
   const _obs = new MutationObserver(() => { clearTimeout(_deb); _deb = setTimeout(tick, 300); });
   _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
-  const _int = setInterval(tick, 1000);
+  let _int = setInterval(tick, 1000);
 
   window.addEventListener('beforeunload', () => {
     _obs.disconnect(); clearInterval(_int); clearTimeout(_deb);
@@ -104,6 +101,16 @@
     }
   }
 
+  function startKickBlocking() {
+    if (!settings?.kick) return;
+    if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
+    _obs.disconnect();
+    _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+    clearInterval(_int);
+    _int = setInterval(tick, 1000);
+    tick();
+  }
+
   // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
   chrome.storage.onChanged.addListener((changes) => {
     const wl = changes.whitelist?.newValue;
@@ -113,6 +120,7 @@
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') stopKickBlocking();
+    if (message?.type === 'GLOBAL_RESUME') startKickBlocking();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => _host === d || _host.endsWith('.' + d))) stopKickBlocking();

@@ -43,23 +43,28 @@ DevTools: service worker console on the extension card; popup via right-click to
 
 | Task | Command / workflow |
 |------|-------------------|
-| Lint | Not configured |
-| Automated tests | None — manual browser testing |
-| Build | None |
-| Structure validation | `node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"` |
-| JS syntax check | `node --check src/background.js` |
+| Lint | Not configured (no ESLint/Prettier in repo) |
+| Automated tests | None — manual browser testing only |
+| Build | None — edit source and reload the extension |
+| Structure validation | `node scripts/validate-extension.mjs` |
+| Roadmap verification | `node scripts/test-roadmap.mjs` (49 factual checks) |
+| Benchmark domains | `node scripts/check-benchmark-domains.mjs` |
+| JS syntax check | Included in `validate-extension.mjs` |
+| Static rules compile | `node scripts/compile-static-rules.mjs easylist.txt --out rules/generated.json` (release-time only) |
+| Benchmark baseline | Support tab → Blocking Benchmarks; see `docs/benchmarks.md` |
 
 ### Hello-world verification
 
-1. Extension enabled on `chrome://extensions` (v2.11.0+).
-2. Open popup → **Support** → **Extension Health** → **Run check**.
-3. Expect **Trusted sites**, **Version**, and filter checks to pass.
+1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.18.0).
+2. Open the extension popup from the toolbar.
+3. Go to the **Support** tab → **Extension Health** → click **Run check**.
+4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.
 
 ### Regression checklist (before merging YouTube / DNR / privacy changes)
 
 | Site / feature | How to verify |
 |----------------|---------------|
-| YouTube playback | Video plays; no error **282054944**; log tag `2.11.0-stable` |
+| YouTube playback | Video plays; no error **282054944**; log tag `2.11.1-playfirst` |
 | YouTube ads | DOM skip/mute works; **no** `InnerTube fetch: stripped` in logs |
 | GitHub | Sign-in, repo browse, assets load |
 | Google Drive / Docs | Open files, edit |
@@ -81,8 +86,10 @@ Log tag: `2.11.1-playfirst`. Never remove all `tp-yt-iron-overlay-backdrop` node
 ### Chrome on cloud VMs
 
 ```bash
-google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps &
+google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps --load-extension=/workspace &
 ```
+
+`--load-extension` auto-loads the repo on first launch; if it does not appear, use **Load unpacked** on `chrome://extensions` and point at `/workspace`. Cloud Chrome may also listen on **remote debugging port 9222** (`curl -s http://127.0.0.1:9222/json/list`). MV3 service worker may show **Inactive** when idle — normal.
 
 ### Reload gotchas
 
@@ -93,6 +100,5 @@ google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-defaul
 ### VM update script (dependency refresh only)
 
 ```text
-node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
-node --check src/background.js
+node scripts/validate-extension.mjs
 ```

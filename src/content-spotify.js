@@ -183,7 +183,7 @@
   });
   _spotObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
-  const _spotInterval = setInterval(tick, 1000);
+  let _spotInterval = setInterval(tick, 1000);
   tick();
 
   // Cleanup on navigation — prevents observer accumulation on SPA route changes
@@ -200,6 +200,16 @@
     if (adActive) { muteAudio(wasMuted); hideOverlay(); adActive = false; }
   }
 
+  function startSpotifyBlocking() {
+    if (!settings?.spotify) return;
+    if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+    _spotObserver.disconnect();
+    _spotObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+    clearInterval(_spotInterval);
+    _spotInterval = setInterval(tick, 1000);
+    tick();
+  }
+
   // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
   chrome.storage.onChanged.addListener((changes) => {
     const wl = changes.whitelist?.newValue;
@@ -209,6 +219,7 @@
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === 'GLOBAL_PAUSE') stopSpotifyBlocking();
+    if (message?.type === 'GLOBAL_RESUME') startSpotifyBlocking();
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
       if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) stopSpotifyBlocking();

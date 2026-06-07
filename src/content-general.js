@@ -110,8 +110,33 @@
     '.onetrust-pc-dark-filter',
   ];
 
+  // Site-specific ad-slot selectors — host-scoped, so aggressive matches (e.g. ".ad")
+  // only ever run on the named domain. German publishers label slots Banderole/
+  // Sitebar/Fireplace/Wallpaper/Werbung; bild.de renders a "Fireplace" takeover
+  // (top banner + mirrored left/right skyscrapers). safeToRemove() still guards
+  // against removing real content containers.
+  const SITE_SPECIFIC = {
+    'bild.de': [
+      '.ad', '[class^="ad-"]', '[class^="ad_"]', '[class*="-ad-"]', '[class$="-ad"]', '[class$="_ad"]',
+      '[class*="advert"]',
+      '[class*="werbung"]', '[id*="werbung"]',
+      '[class*="fireplace"]', '[id*="fireplace"]',
+      '[class*="wallpaper"]', '[id*="wallpaper"]',
+      '[class*="banderole"]', '[id*="banderole"]',
+      '[class*="sitebar"]', '[id*="sitebar"]',
+      '[class*="billboard"]', '[id*="billboard"]',
+      '[class*="skyscraper"]', '[id*="skyscraper"]',
+      '[data-ad]', '[data-advert]', '[data-ad-slot]',
+      '[id^="ad-"]', '[id^="ad_"]', '[id*="-ad-"]',
+    ],
+  };
+  let _siteSelList = [];
+  for (const dom in SITE_SPECIFIC) {
+    if (_host === dom || _host.endsWith('.' + dom)) { _siteSelList = SITE_SPECIFIC[dom]; break; }
+  }
+  const AD_LIST_ALL = _siteSelList.length ? AD_SELECTORS_LIST.concat(_siteSelList) : AD_SELECTORS_LIST;
   // Pre-join for single querySelectorAll — falls back to individual queries on error
-  const AD_SEL_COMBINED = AD_SELECTORS_LIST.join(',');
+  const AD_SEL_COMBINED = AD_LIST_ALL.join(',');
 
   function safeToRemove(el) {
     if (!el) return false;
@@ -146,7 +171,7 @@
       }
     } catch (_) {
       // Fallback: one selector at a time if combined throws (malformed entry)
-      for (const sel of AD_SELECTORS_LIST) {
+      for (const sel of AD_LIST_ALL) {
         try {
           document.querySelectorAll(sel).forEach(el => {
             if (safeToRemove(el)) el.remove();

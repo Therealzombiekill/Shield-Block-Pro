@@ -7,10 +7,17 @@ import { parseFilterList } from './filter-parser.js';
 import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
 // Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
-// (plain block/allow — which is all our filter lists emit). Detect the platform limit
-// and use it; fall back to 5,000 on older browsers or where the constant is missing.
-const MAX_DYNAMIC_RULES = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest
-  && chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES) || 5000;
+// (plain block/allow — which is all our filter lists emit). Chrome 121+ exposes a
+// dedicated 30,000-rule cap for these "safe" rules via MAX_NUMBER_OF_DYNAMIC_RULES;
+// Firefox and Chrome <121 only expose the combined 5,000 dynamic+session constant.
+// Read the dedicated cap first so the filter budget actually grows on modern Chrome —
+// reading only the combined constant silently pins us to the old 5,000 limit.
+const MAX_DYNAMIC_RULES = (() => {
+  const d = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest) || {};
+  return d.MAX_NUMBER_OF_DYNAMIC_RULES
+    ?? d.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES
+    ?? 5000;
+})();
 // Filter-list budget: leave ~700 rules of headroom for the feature ranges (removeparam,
 // matrix, user, whitelist, privacy, pause) and never spill past the filter ID band
 // (10000-29999). Stays 4300 on the old 5k cap; grows to 19800 on Chrome 121+.
@@ -129,7 +136,8 @@ function adGuardUrl(filterId) {
 // ── Filter list registry ──────────────────────────────────────────────────────
 // Rules are pulled from each list up to `max` entries.
 // ID ranges MUST NOT overlap — each list's [start, start+max-1] must be disjoint.
-// Chrome hard-caps updateDynamicRules at 5,000 total; sync truncates lists to the reserved filter budget.
+// Chrome <121 caps updateDynamicRules at 5,000; Chrome 121+ allows 30,000 "safe" (block/allow) rules.
+// Per-list `max` values below are auto-scaled to the detected cap in _allocateFilterRanges().
 //
 //   List                │ start  │ max  │ end (exclusive)
 //   ────────────────────┼────────┼──────┼────────────────
@@ -699,7 +707,7 @@ async function _retryFailedLists() {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set(existing.map(r => r.id));
       const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
-      const budget = 5000 - existing.length;
+      const budget = MAX_DYNAMIC_RULES - existing.length;
       if (budget > 0 && uniqueNew.length > 0) {
         await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
         logEvent('filter-sync', 'info', `Retry: added ${Math.min(uniqueNew.length, budget)} rules`);

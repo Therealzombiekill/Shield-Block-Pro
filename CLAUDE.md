@@ -51,7 +51,7 @@ All Declarative Net Request rules share a single integer ID namespace. Collision
 | 47000–47002 | Privacy/security rules (referrer, HTTPS upgrade, DNT/GPC) |
 | 49999 | Global pause-all allow rule |
 
-Chrome hard-caps `updateDynamicRules` at 5,000 rules total. Each filter list in `FILTER_LISTS` has a `start` and `max` that must not overlap with any other list. When adding a new list entry, verify no overlap using the startup `_checkRanges()` self-check (logged at info level).
+Chrome caps `updateDynamicRules` at 5,000 rules on Chrome <121, and at 30,000 "safe" (block/allow) rules on Chrome 121+. `MAX_DYNAMIC_RULES` in `background.js` detects the platform cap and `_allocateFilterRanges()` auto-scales each list's `max` to fill it. Each filter list in `FILTER_LISTS` has a `start` and `max` that must not overlap with any other list. When adding a new list entry, verify no overlap using the startup `_checkRanges()` self-check (logged at info level).
 
 ### Filter pipeline
 
@@ -138,6 +138,6 @@ CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom p
 ## Key constraints
 
 - **No eval()**: Scriptlets are implemented as named functions in `IMPL` map in `scriptlets.js`, called by name — never `eval`'d from filter list strings.
-- **5,000 dynamic rule cap**: Chrome enforces this hard. The sum of all `max` values in `FILTER_LISTS` must stay ≤ 5,000. The startup `_checkRanges()` check verifies this.
+- **Dynamic rule cap**: Chrome <121 caps dynamic rules at 5,000; Chrome 121+ allows 30,000 "safe" (block/allow) rules, while "unsafe" rules (`redirect`/`modifyHeaders`, e.g. `$removeparam` and privacy header rules) stay capped at 5,000. The sum of all post-scale `max` values in `FILTER_LISTS` must stay ≤ the detected `MAX_DYNAMIC_RULES`. The startup `_checkRanges()` check verifies this.
 - **No content scripts on YouTube cosmetics**: `content-general.js` and `content-procedural.js` explicitly skip `youtube.com` — cosmetic selectors can match player elements and cause black screens.
 - **CSP**: `"extension_pages": "script-src 'self'; object-src 'self'"` — no inline scripts, no remote scripts. The popup cannot fetch cross-origin URLs directly; it sends `FETCH_FILTER_URL` to the background which does the fetch and enforces a 512KB size limit.

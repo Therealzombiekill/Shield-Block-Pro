@@ -25,11 +25,17 @@ const BENCHMARK_DOMAINS = {
     'advertising-api-fe.amazon.com', 'amazon-adsystem.com', 'aax.amazon.com',
   ],
   analytics: [
-    'cloudflareinsights.com', 'cdn.rudderlabs.com',
+    'cloudflareinsights.com', 'cdn.rudderlabs.com', 'cdn.segment.com',
+    'api.segment.io', 'api.mixpanel.com', 'cdn.mxpnl.com', 'api2.amplitude.com',
+    'cdn.amplitude.com', 'static.hotjar.com', 'clarity.ms',
   ],
   trackers: [
     'analytics.x.com', 'qevents.quora.com', 'mcs-va.tiktokv.com',
     'advertising.apple.com', 'prd.jwpltx.com',
+  ],
+  messaging: [
+    'sdk.iad-01.braze.com', 'cdn.onesignal.com', 'api.onesignal.com',
+    'track.customer.io',
   ],
 };
 

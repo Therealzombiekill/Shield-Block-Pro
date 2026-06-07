@@ -5312,5 +5312,225 @@
         "websocket"
       ]
     }
+  },
+  {
+    "id": 391,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||admob.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 392,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||mintegral.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 393,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||rayjump.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 394,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||mtgglobals.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 395,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||pixel.reddit.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 396,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||alb.reddit.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 397,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||q.quora.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 398,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ads.quora.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 399,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ads-fa.spotify.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 400,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||gabo-receiver-service.spotify.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
   }
 ]

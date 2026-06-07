@@ -46,7 +46,7 @@ Useful DevTools entry points:
 
 After loading unpacked:
 
-1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.10.3).
+1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.18.0).
 2. Open the extension popup from the toolbar.
 3. Go to the **Support** tab → **Extension Health** → click **Run check**.
 4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.
@@ -72,10 +72,10 @@ SPA navigations use pristine `/player` fetch responses; DOM layer handles in-pla
 ### Chrome on cloud VMs (GUI testing)
 
 ```bash
-google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps &
+google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps --load-extension=/workspace &
 ```
 
-Then load unpacked from `/workspace`. MV3 service worker may show **Inactive** when idle — normal.
+`--load-extension` auto-loads the repo on first launch; if it does not appear, use **Load unpacked** on `chrome://extensions` and point at `/workspace`. Cloud Chrome may also listen on **remote debugging port 9222** (`curl -s http://127.0.0.1:9222/json/list`). MV3 service worker may show **Inactive** when idle — normal.
 
 ### Reload gotchas
 

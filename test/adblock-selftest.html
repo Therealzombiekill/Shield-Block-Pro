@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShieldBlock Pro — Ad-block Self-Test</title>
+<style>
+  :root{
+    --bg:#1e1f2b; --panel:#262838; --line:#34374d; --text:#e7e9f3; --muted:#9aa0bd;
+    --accent:#8b7cff; --ok:#3ddc84; --bad:#ff6b6b; --warn:#ffc14d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  .wrap{max-width:900px;margin:0 auto;padding:24px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 16px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;font-size:14px}
+  button:disabled{opacity:.5;cursor:default}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .score{font-size:42px;font-weight:800;line-height:1}
+  .score small{font-size:16px;color:var(--muted);font-weight:600}
+  .bars{display:grid;grid-template-columns:160px 1fr 60px;gap:6px 12px;align-items:center;margin-top:12px}
+  .bars .cat{color:var(--muted)}
+  .track{height:10px;background:var(--line);border-radius:6px;overflow:hidden}
+  .fill{height:100%;background:var(--ok);width:0;transition:width .3s}
+  .pct{text-align:right;font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel)}
+  .tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  .t-blocked{background:rgba(61,220,132,.15);color:var(--ok)}
+  .t-allowed{background:rgba(255,107,107,.15);color:var(--bad)}
+  .t-timeout{background:rgba(255,193,77,.15);color:var(--warn)}
+  .t-pending{background:var(--line);color:var(--muted)}
+  .note{color:var(--muted);font-size:12.5px}
+  code{background:var(--bg);padding:1px 6px;border-radius:5px;border:1px solid var(--line)}
+  a{color:var(--accent)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛡️ ShieldBlock Pro — Ad-block Self-Test</h1>
+  <p class="sub">A repeatable, in-repo benchmark. It tries to load known ad/tracker endpoints; anything the network refuses counts as <b>blocked</b>.</p>
+
+  <div class="card">
+    <div class="row">
+      <button id="run">Run test</button>
+      <button id="copy" class="ghost" disabled>Copy results</button>
+      <span id="status" class="note">Idle.</span>
+    </div>
+    <div class="legend">
+      <span><span class="tag t-blocked">blocked</span> request refused (good — extension or hosts file)</span>
+      <span><span class="tag t-allowed">allowed</span> request went through (a gap, or a benign host)</span>
+      <span><span class="tag t-timeout">timeout</span> no response in time (inconclusive)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <div class="score"><span id="scoreNum">—</span><small id="scoreOf"></small></div>
+        <div class="note" id="scoreLine">Run the test to compute a blocked rate.</div>
+      </div>
+    </div>
+    <div class="bars" id="bars"></div>
+  </div>
+
+  <div class="card">
+    <table id="tbl">
+      <thead><tr><th>Endpoint</th><th>Category</th><th style="width:90px">Result</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 8px">How to read this (important)</h3>
+    <ol class="note" style="margin:0;padding-left:18px">
+      <li><b>Serve over http, not <code>file://</code></b> — DNR rules apply most faithfully to a real page. From this folder run
+        <code>python3 -m http.server 8099</code> and open <code>http://localhost:8099/test/adblock-selftest.html</code>.</li>
+      <li><b>Establish the noise floor.</b> Disable ShieldBlock (or any blocker), reload, Run test. Anything still "blocked" is a
+        <i>dead host / DNS failure</i>, not a real block — note those endpoints and ignore them in the real run.</li>
+      <li><b>Real run.</b> Enable ShieldBlock, let a filter sync finish (popup → Support → Run check), reload, Run test.
+        <b>Real blocked rate = blocked-with-extension − dead-host floor.</b></li>
+      <li><b>Compare.</b> Repeat with uBO Lite / AdGuard installed instead. The deltas tell you exactly which categories you trail in.</li>
+    </ol>
+    <p class="note" style="margin-top:10px">⚠️ This is a directional smoke-test, not an authority. For the definitive score use the external suites listed in
+      <code>BENCHMARKS.md</code> (d3ward toolz, adblock-tester.com, EFF Cover Your Tracks). The endpoint list below is editable — keep it fresh.</p>
+  </div>
+</div>
+
+<script>
+// ── Curated probe list ────────────────────────────────────────────────────────
+// Real ad/tracker endpoints commonly blocked by EasyList/EasyPrivacy/hosts lists.
+// Edit freely. Keep paths pointing at resources that normally resolve, so an
+// "allowed" result genuinely means "not blocked" rather than "host is down".
+const PROBES = [
+  // ── Ad networks / exchanges ───────────────────────────────────────────────
+  ['Ads','Google AdSense','https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js'],
+  ['Ads','Google Publisher Tag','https://securepubads.g.doubleclick.net/tag/js/gpt.js'],
+  ['Ads','Google ad services','https://adservice.google.com/adsid/integrator.js'],
+  ['Ads','DoubleClick','https://ad.doubleclick.net/favicon.ico'],
+  ['Ads','Amazon ad system','https://s.amazon-adsystem.com/iu3'],
+  ['Ads','Criteo','https://static.criteo.net/js/ld/ld.js'],
+  ['Ads','AppNexus (adnxs)','https://ib.adnxs.com/px'],
+  ['Ads','PubMatic','https://ads.pubmatic.com/AdServer/js/showad.js'],
+  ['Ads','Rubicon/Magnite','https://fastlane.rubiconproject.com/a/api/fastlane.json'],
+  ['Ads','OpenX','https://us-u.openx.net/w/1.0/cm'],
+  ['Ads','Index Exchange','https://js-sec.indexww.com/ht/p/183642-test.js'],
+  ['Ads','Taboola','https://cdn.taboola.com/libtrc/unip/1/tfa.js'],
+  ['Ads','Outbrain','https://widgets.outbrain.com/outbrain.js'],
+  ['Ads','Media.net','https://contextual.media.net/nmedianet.js'],
+  ['Ads','The Trade Desk','https://js.adsrvr.org/up_loader.1.1.0.js'],
+  ['Ads','Adform','https://track.adform.net/serving/scripts/trackpoint/async/'],
+  ['Ads','Smart AdServer','https://ec-ns.sascdn.com/diff/js/smart.js'],
+  ['Ads','33Across','https://cdn-ima.33across.com/ima.js'],
+  ['Ads','Sharethrough','https://native.sharethrough.com/assets/sfp.js'],
+  ['Ads','Yieldmo','https://static.yieldmo.com/ym.1.js'],
+
+  // ── Analytics / tracking ──────────────────────────────────────────────────
+  ['Analytics','Google Analytics','https://www.google-analytics.com/analytics.js'],
+  ['Analytics','Google Tag Manager','https://www.googletagmanager.com/gtm.js'],
+  ['Analytics','GA4 / gtag','https://www.googletagmanager.com/gtag/js'],
+  ['Analytics','Hotjar','https://static.hotjar.com/c/hotjar-1.js'],
+  ['Analytics','Segment','https://cdn.segment.com/analytics.js/v1/x/analytics.min.js'],
+  ['Analytics','Mixpanel','https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js'],
+  ['Analytics','Amplitude','https://cdn.amplitude.com/libs/amplitude-8.0.0-min.gz.js'],
+  ['Analytics','Heap','https://cdn.heapanalytics.com/js/heap-1.js'],
+  ['Analytics','FullStory','https://edge.fullstory.com/s/fs.js'],
+  ['Analytics','Mouseflow','https://cdn.mouseflow.com/projects/test.js'],
+  ['Analytics','Crazy Egg','https://script.crazyegg.com/pages/scripts/0000/0000.js'],
+  ['Analytics','New Relic','https://js-agent.newrelic.com/nr-spa-1216.min.js'],
+  ['Analytics','Chartbeat','https://static.chartbeat.com/js/chartbeat.js'],
+  ['Analytics','Quantcast','https://pixel.quantserve.com/pixel'],
+  ['Analytics','Comscore','https://sb.scorecardresearch.com/beacon.js'],
+  ['Analytics','Bing/MS Ads','https://bat.bing.com/bat.js'],
+  ['Analytics','Branch','https://cdn.branch.io/branch-latest.min.js'],
+
+  // ── Social trackers ───────────────────────────────────────────────────────
+  ['Social','Facebook Pixel','https://connect.facebook.net/en_US/fbevents.js'],
+  ['Social','Twitter/X widgets','https://platform.twitter.com/widgets.js'],
+  ['Social','LinkedIn Insight','https://snap.licdn.com/li.lms-analytics/insight.min.js'],
+  ['Social','TikTok Pixel','https://analytics.tiktok.com/i18n/pixel/events.js'],
+  ['Social','Pinterest Tag','https://s.pinimg.com/ct/core.js'],
+  ['Social','Reddit Pixel','https://www.redditstatic.com/ads/pixel.js'],
+  ['Social','Snap Pixel','https://sc-static.net/scevent.min.js'],
+
+  // ── Fingerprinting / device ID ────────────────────────────────────────────
+  ['Fingerprint','FingerprintJS','https://fpcdn.io/v3/test'],
+  ['Fingerprint','FingerprintJS (api)','https://api.fpjs.io/'],
+
+  // ── Cryptomining (mostly historical; good dead-host control) ───────────────
+  ['Cryptomine','Coinhive','https://coinhive.com/lib/coinhive.min.js'],
+  ['Cryptomine','CoinImp','https://www.coinimp.com/scripts/min.js'],
+];
+
+const CATS = [...new Set(PROBES.map(p => p[0]))];
+const tbody = document.querySelector('#tbl tbody');
+const statusEl = document.getElementById('status');
+const rowEls = [];
+
+function buildTable(){
+  tbody.innerHTML = '';
+  rowEls.length = 0;
+  for(const [cat,name,url] of PROBES){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${name}<div class="note" style="font-size:11px;word-break:break-all">${url}</div></td>`
+      + `<td>${cat}</td><td><span class="tag t-pending">pending</span></td>`;
+    tbody.appendChild(tr);
+    rowEls.push(tr.querySelector('td:last-child'));
+  }
+}
+
+function probe(url, timeoutMs = 6000){
+  return new Promise(resolve => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => { ctrl.abort(); }, timeoutMs);
+    fetch(url, { mode:'no-cors', cache:'no-store', signal:ctrl.signal, redirect:'follow' })
+      .then(() => { clearTimeout(t); resolve('allowed'); })   // connection succeeded → NOT blocked
+      .catch(e => {
+        clearTimeout(t);
+        resolve(e.name === 'AbortError' ? 'timeout' : 'blocked'); // network error → blocked (or dead host)
+      });
+  });
+}
+
+// Limited-concurrency runner so we finish fast without flooding.
+async function runPool(items, worker, concurrency = 6){
+  let i = 0;
+  const next = async () => { while(i < items.length){ const idx = i++; await worker(items[idx], idx); } };
+  await Promise.all(Array.from({length:concurrency}, next));
+}
+
+function setTag(el, result){
+  el.innerHTML = `<span class="tag t-${result}">${result}</span>`;
+}
+
+function render(results){
+  // Overall (blocked / decided), where decided = blocked + allowed (timeouts excluded).
+  const blocked = results.filter(r => r === 'blocked').length;
+  const allowed = results.filter(r => r === 'allowed').length;
+  const decided = blocked + allowed;
+  const pct = decided ? Math.round(blocked / decided * 100) : 0;
+  document.getElementById('scoreNum').textContent = pct + '%';
+  document.getElementById('scoreOf').textContent = ` blocked (${blocked}/${decided})`;
+  document.getElementById('scoreLine').textContent =
+    `${blocked} blocked · ${allowed} allowed · ${results.filter(r=>r==='timeout').length} timeout (excluded)`;
+
+  const bars = document.getElementById('bars');
+  bars.innerHTML = '';
+  for(const cat of CATS){
+    const idxs = PROBES.map((p,i)=>[p[0],i]).filter(([c])=>c===cat).map(([,i])=>i);
+    const b = idxs.filter(i => results[i] === 'blocked').length;
+    const d = idxs.filter(i => results[i] === 'blocked' || results[i] === 'allowed').length;
+    const p = d ? Math.round(b/d*100) : 0;
+    const color = p >= 90 ? 'var(--ok)' : p >= 60 ? 'var(--warn)' : 'var(--bad)';
+    bars.insertAdjacentHTML('beforeend',
+      `<div class="cat">${cat}</div>`
+      + `<div class="track"><div class="fill" style="width:${p}%;background:${color}"></div></div>`
+      + `<div class="pct">${p}% <span class="note">(${b}/${d})</span></div>`);
+  }
+}
+
+let lastResults = null;
+async function run(){
+  const runBtn = document.getElementById('run');
+  runBtn.disabled = true;
+  document.getElementById('copy').disabled = true;
+  buildTable();
+  statusEl.textContent = 'Testing…';
+  const results = new Array(PROBES.length).fill('pending');
+  let done = 0;
+  await runPool(PROBES, async ([,,url], idx) => {
+    const r = await probe(url);
+    results[idx] = r;
+    setTag(rowEls[idx], r);
+    statusEl.textContent = `Testing… ${++done}/${PROBES.length}`;
+  });
+  lastResults = results;
+  render(results);
+  statusEl.textContent = `Done — ${new Date().toLocaleTimeString()}`;
+  runBtn.disabled = false;
+  document.getElementById('copy').disabled = false;
+}
+
+function copyResults(){
+  if(!lastResults) return;
+  const lines = ['ShieldBlock Pro self-test — ' + new Date().toISOString(), ''];
+  PROBES.forEach((p,i) => lines.push(`${lastResults[i].padEnd(8)} ${p[0].padEnd(12)} ${p[1]}`));
+  const blocked = lastResults.filter(r=>r==='blocked').length;
+  const decided = lastResults.filter(r=>r==='blocked'||r==='allowed').length;
+  lines.push('', `TOTAL: ${blocked}/${decided} blocked (${decided?Math.round(blocked/decided*100):0}%)`);
+  navigator.clipboard.writeText(lines.join('\n')).then(
+    () => statusEl.textContent = 'Results copied to clipboard.',
+    () => statusEl.textContent = 'Copy failed (clipboard blocked).'
+  );
+}
+
+document.getElementById('run').addEventListener('click', run);
+document.getElementById('copy').addEventListener('click', copyResults);
+buildTable();
+</script>
+</body>
+</html>

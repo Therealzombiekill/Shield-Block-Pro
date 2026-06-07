@@ -5070,5 +5070,247 @@
         "websocket"
       ]
     }
+  },
+  {
+    "id": 380,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||audio-ad-delivery.spotify.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 381,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adstudio.spotify.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 382,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||pixel.spotify.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 383,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ads.tritondigital.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 384,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||tapjoy.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 385,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||startapp.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 386,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||startappservice.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 387,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adsapi.snapchat.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 388,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||tr6.snapchat.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 389,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||log.tiktokv.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 390,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||mon.tiktokv.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
   }
 ]

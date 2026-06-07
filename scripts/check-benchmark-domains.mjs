@@ -12,13 +12,16 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BENCHMARK_DOMAINS = {
   audio: [
     'ads.spotify.com', 'adeventtracker.spotify.com', 'megaphone.fm', 'traffic.megaphone.fm',
+    'audio-ad-delivery.spotify.com', 'adstudio.spotify.com', 'pixel.spotify.com', 'ads.tritondigital.com',
   ],
   mobile: [
     'adsdk.vivo.com.cn', 'adtech.vivoglobal.com', 'lenovoads.com', 'ads.lenovo.com',
+    'tapjoy.com', 'startapp.com', 'startappservice.com',
   ],
   social: [
     'advertising.twitter.com', 'widgets.pinterest.com', 'ads-dev.pinterest.com',
     'rereddit.com', 'analytics.facebook.com', 'ads.facebook.com',
+    'adsapi.snapchat.com', 'tr6.snapchat.com', 'log.tiktokv.com', 'mon.tiktokv.com',
   ],
 };
 

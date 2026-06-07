@@ -2659,24 +2659,6 @@
     }
   },
   {
-    "id": 4918,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||aspiration.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 4919,
     "priority": 2,
     "action": {
@@ -3361,24 +3343,6 @@
     }
   },
   {
-    "id": 4977,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||bsnl.co.in^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 4978,
     "priority": 2,
     "action": {
@@ -3512,24 +3476,6 @@
     },
     "condition": {
       "urlFilter": "||cadreon.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 4989,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||cafepress.com^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",
@@ -3908,42 +3854,6 @@
     },
     "condition": {
       "urlFilter": "||com.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5020,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||comodo.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5021,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||comodo.net^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",
@@ -4531,24 +4441,6 @@
     }
   },
   {
-    "id": 5066,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||digg.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 5067,
     "priority": 2,
     "action": {
@@ -4970,24 +4862,6 @@
     },
     "condition": {
       "urlFilter": "||euleriantech.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5103,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||evite.com^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",
@@ -5906,24 +5780,6 @@
     },
     "condition": {
       "urlFilter": "||hotkey.io^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5177,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||howstuffworks.com^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",
@@ -7447,24 +7303,6 @@
     }
   },
   {
-    "id": 5307,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||marthastewart.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 5308,
     "priority": 2,
     "action": {
@@ -8041,24 +7879,6 @@
     }
   },
   {
-    "id": 5352,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||msn.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 5355,
     "priority": 2,
     "action": {
@@ -8084,24 +7904,6 @@
     },
     "condition": {
       "urlFilter": "||mtree.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5357,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||n.pr^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",
@@ -8606,24 +8408,6 @@
     },
     "condition": {
       "urlFilter": "||ntpix.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5391,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||nutmeg.com^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",
@@ -10093,24 +9877,6 @@
     }
   },
   {
-    "id": 5493,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||realnetworks.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 5494,
     "priority": 2,
     "action": {
@@ -10891,24 +10657,6 @@
     }
   },
   {
-    "id": 5552,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||slickdeals.net^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 5553,
     "priority": 2,
     "action": {
@@ -11659,24 +11407,6 @@
     },
     "condition": {
       "urlFilter": "||theclusive.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5611,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||theknot.com^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",
@@ -12987,45 +12717,6 @@
     }
   },
   {
-    "id": 5714,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||yandex.ru^",
-      "resourceTypes": [
-        "font",
-        "image",
-        "media",
-        "other",
-        "ping",
-        "script",
-        "stylesheet",
-        "sub_frame",
-        "xmlhttprequest"
-      ]
-    }
-  },
-  {
-    "id": 5716,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||yandex.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 5718,
     "priority": 2,
     "action": {
@@ -13123,24 +12814,6 @@
     },
     "condition": {
       "urlFilter": "||yume.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5731,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||zagg.com^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",

@@ -255,7 +255,6 @@ const DEFAULT_SETTINGS = {
   streaming: true,      // SSAI ad-mute on additional streaming platforms (Max, Disney+, etc.)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
-  paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
   referrerStrip: true,  // strip Referer header on 3rd-party requests
   httpsUpgrade: true,   // upgrade http:// navigations to https://
   timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)

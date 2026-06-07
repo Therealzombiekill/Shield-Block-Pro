@@ -224,17 +224,6 @@
         "src/content-youtube.js"
       ],
       "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://*/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-paywall.js"
-      ],
-      "run_at": "document_idle",
-      "match_about_blank": false
     }
   ],
   "declarative_net_request": {

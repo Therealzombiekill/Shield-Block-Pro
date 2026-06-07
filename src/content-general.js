@@ -303,8 +303,6 @@
   }
 
   // ── Main tick ─────────────────────────────────────────────────────────────────
-  // NOTE: Soft paywall bypass is handled by content-paywall.js (separate content
-  // script with its own MutationObserver). Do not duplicate it here.
   function tick() {
     cleanAds();
     cleanNewsletters();

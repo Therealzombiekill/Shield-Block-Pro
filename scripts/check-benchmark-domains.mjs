@@ -37,6 +37,10 @@ const BENCHMARK_DOMAINS = {
     'sdk.iad-01.braze.com', 'cdn.onesignal.com', 'api.onesignal.com',
     'track.customer.io',
   ],
+  replay: [
+    'cdn.heapanalytics.com', 'edge.fullstory.com', 'cdn.mouseflow.com',
+    'cdn.logrocket.io', 'jssdkcdns.mparticle.com',
+  ],
 };
 
 const rules = [];

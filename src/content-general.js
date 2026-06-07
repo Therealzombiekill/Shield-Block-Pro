@@ -57,6 +57,18 @@
     } catch (_) {}
   }
 
+  // Persistently hide site-specific ad slots via a standing CSS rule. cleanAds() only
+  // *removes* nodes, but sites like bild.de re-insert their Fireplace/Sitebar slots
+  // after deletion, so the ad flashes back; display:none hides re-inserted nodes
+  // instantly with no JS race. _siteSelList is host-scoped so this only loads there.
+  function injectSiteHideCSS() {
+    if (!_siteSelList.length || document.getElementById('_sb_site_css')) return;
+    const style = document.createElement('style');
+    style.id = '_sb_site_css';
+    style.textContent = _siteSelList.join(',') + '{display:none!important}';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   injectBundledCosmeticCSS();
 
   // ── Ad selectors ────────────────────────────────────────────────────────────
@@ -137,6 +149,9 @@
   const AD_LIST_ALL = _siteSelList.length ? AD_SELECTORS_LIST.concat(_siteSelList) : AD_SELECTORS_LIST;
   // Pre-join for single querySelectorAll — falls back to individual queries on error
   const AD_SEL_COMBINED = AD_LIST_ALL.join(',');
+
+  // Inject the standing hide rule now that the host's selectors are known.
+  injectSiteHideCSS();
 
   function safeToRemove(el) {
     if (!el) return false;
@@ -325,6 +340,7 @@
       _observer.disconnect();
       clearTimeout(_debounce);
       document.getElementById('_sb_cosmetic_css')?.remove();
+      document.getElementById('_sb_site_css')?.remove();
     }
   });
 
@@ -334,10 +350,12 @@
       _observer.disconnect();
       clearTimeout(_debounce);
       document.getElementById('_sb_cosmetic_css')?.remove();
+      document.getElementById('_sb_site_css')?.remove();
     }
     if (msg.type === 'GLOBAL_RESUME') {
       if (_target) _observer.observe(_target, { childList: true, subtree: true });
       injectBundledCosmeticCSS();
+      injectSiteHideCSS();
       tick();
     }
     if (msg.type === 'WHITELIST_CHANGED') {
@@ -346,6 +364,7 @@
         _observer.disconnect();
         clearTimeout(_debounce);
         document.getElementById('_sb_cosmetic_css')?.remove();
+      document.getElementById('_sb_site_css')?.remove();
       }
     }
   });

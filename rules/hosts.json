@@ -3307,53 +3307,6 @@
     }
   },
   {
-    "id": 4971,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||boq.google.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ],
-      "excludedInitiatorDomains": [
-        "accounts.google.com",
-        "analytics.google.com",
-        "api.github.com",
-        "calendar.google.com",
-        "chat.google.com",
-        "classroom.google.com",
-        "docs.google.com",
-        "drive.google.com",
-        "gist.github.com",
-        "github.com",
-        "githubassets.com",
-        "githubusercontent.com",
-        "google.com",
-        "keep.google.com",
-        "mail.google.com",
-        "meet.google.com",
-        "music.youtube.com",
-        "photos.google.com",
-        "sheets.google.com",
-        "slides.google.com",
-        "tagmanager.google.com",
-        "tv.youtube.com",
-        "www.github.com",
-        "www.google.com",
-        "youtu.be",
-        "youtube-nocookie.com",
-        "youtube.com"
-      ]
-    }
-  },
-  {
     "id": 4972,
     "priority": 2,
     "action": {
@@ -13465,53 +13418,6 @@
         "sub_frame",
         "media",
         "ping"
-      ]
-    }
-  },
-  {
-    "id": 5757,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||apis.google.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ],
-      "excludedInitiatorDomains": [
-        "accounts.google.com",
-        "analytics.google.com",
-        "api.github.com",
-        "calendar.google.com",
-        "chat.google.com",
-        "classroom.google.com",
-        "docs.google.com",
-        "drive.google.com",
-        "gist.github.com",
-        "github.com",
-        "githubassets.com",
-        "githubusercontent.com",
-        "google.com",
-        "keep.google.com",
-        "mail.google.com",
-        "meet.google.com",
-        "music.youtube.com",
-        "photos.google.com",
-        "sheets.google.com",
-        "slides.google.com",
-        "tagmanager.google.com",
-        "tv.youtube.com",
-        "www.github.com",
-        "www.google.com",
-        "youtu.be",
-        "youtube-nocookie.com",
-        "youtube.com"
       ]
     }
   },

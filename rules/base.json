@@ -4762,5 +4762,68 @@
         "xmlhttprequest"
       ]
     }
+  },
+  {
+    "id": 363,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||sascdn.com^",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ]
+    }
+  },
+  {
+    "id": 364,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||pinimg.com/ct/",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ]
+    }
+  },
+  {
+    "id": 365,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||redditstatic.com/ads/",
+      "resourceTypes": [
+        "font",
+        "image",
+        "media",
+        "other",
+        "ping",
+        "script",
+        "sub_frame",
+        "websocket",
+        "xmlhttprequest"
+      ]
+    }
   }
 ]

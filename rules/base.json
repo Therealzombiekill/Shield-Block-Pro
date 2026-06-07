@@ -5554,5 +5554,753 @@
         "websocket"
       ]
     }
+  },
+  {
+    "id": 402,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||c.bing.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 403,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||sstats.adobe.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 404,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adobedtm.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 405,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||plausible.io^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 406,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||matomo.cloud^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 407,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||browser-intake-datadoghq.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 408,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||browser-intake-datadoghq.eu^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 409,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||browser-intake-us5-datadoghq.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 410,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||api.raygun.io^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 411,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||lr-ingest.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 412,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||awin1.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 413,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||emjcd.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 414,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adjust.world^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 415,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||appsflyersdk.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 416,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||inner-active.mobi^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 417,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||inmobicdn.net^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 418,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||wcs.naver.net^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 419,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ad.daum.net^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 420,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||tiara.daum.net^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 421,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||e.qq.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 422,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||pingjs.qq.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 423,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||acjs.aliyun.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 424,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||eclick.baidu.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 425,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||pos.baidu.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 426,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||hm.baidu.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 427,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||cpro.baidu.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 428,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||dup.baidustatic.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 429,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||vk-ads.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 430,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||rs.mail.ru^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 431,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ads.vk.com^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 432,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adtimaserver.vn^",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 433,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/ads.js",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 434,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/pagead.js",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
+  },
+  {
+    "id": 435,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/advertisement.js",
+      "resourceTypes": [
+        "script",
+        "image",
+        "xmlhttprequest",
+        "sub_frame",
+        "media",
+        "font",
+        "stylesheet",
+        "other",
+        "ping",
+        "websocket"
+      ]
+    }
   }
 ]

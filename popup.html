@@ -209,8 +209,10 @@ body.sb-ready .sc:nth-child(9){animation-delay:.28s}
 
 /* Filter bar */
 .fbar{
+  position:sticky;bottom:0;z-index:5;margin-top:8px;
   display:flex;flex-direction:column;align-items:stretch;
-  border-top:1px solid var(--border);background:var(--s1);
+  border-top:1px solid var(--border);
+  background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
 }
 .fbar-top{
   display:flex;align-items:center;justify-content:space-between;
@@ -983,7 +985,10 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       <div class="sup-card sup-card-sm">
         <div class="sup-hd">
           <div class="sup-label">Extension Health</div>
-          <button class="ghost sup-ghost-sm" id="run-health-check">Run check</button>
+          <div class="sup-btn-row" style="gap:4px;margin:0">
+            <button class="ghost sup-ghost-sm" id="support-force-sync">↺ Sync</button>
+            <button class="ghost sup-ghost-sm" id="run-health-check">Run check</button>
+          </div>
         </div>
         <div id="health-summary">Click 'Run check' to test all subsystems</div>
         <div id="health-checks"></div>

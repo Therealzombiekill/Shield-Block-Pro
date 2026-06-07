@@ -908,6 +908,32 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // ── Filter Sync ────────────────────────────────────────────────────────────
 
 let _syncLock = false;
+const COSMETIC_PARSER_VERSION = 'procedural-v1';
+
+/** Clear per-list cosmetic caches when the parser gains procedural support (forces re-parse). */
+async function _invalidateCosmeticCacheIfNeeded() {
+  try {
+    const { sbCosmeticParserVersion } = await chrome.storage.local.get('sbCosmeticParserVersion');
+    if (sbCosmeticParserVersion === COSMETIC_PARSER_VERSION) return;
+    const all = await chrome.storage.local.get(null);
+    const stale = Object.keys(all).filter(k =>
+      k.startsWith('fd_') || k.startsWith('fc_') || k.startsWith('fs_') ||
+      k.startsWith('cfdc_') || k.startsWith('cfc_') || k.startsWith('cfsc_'));
+    if (stale.length) await chrome.storage.local.remove(stale);
+    await chrome.storage.local.set({
+      sbCosmeticParserVersion: COSMETIC_PARSER_VERSION,
+      domainCosmetics: {}, cosmeticSelectors: [], scriptletRules: {},
+    });
+    logEvent('filter-sync', 'info', 'Cosmetic parser upgraded — cleared stale cosmetic caches for re-sync');
+  } catch (_) {}
+}
+
+async function _waitForSyncUnlock(maxMs = 120000) {
+  const start = Date.now();
+  while (_syncLock && Date.now() - start < maxMs) {
+    await new Promise(r => setTimeout(r, 400));
+  }
+}
 let _lastSyncError = null;
 let _syncListStatus = {}; // { [key]: { status:'ok'|'error'|'cached'|'304', ruleCount, error? } }
 
@@ -1434,7 +1460,11 @@ async function writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScript
 }
 
 async function syncFilterLists(force = false) {
-  if (_syncLock) return;
+  if (_syncLock) {
+    if (force) await _waitForSyncUnlock();
+    else return;
+    if (_syncLock) return;
+  }
   _syncLock = true;
   const _syncStart = Date.now();
   let syncFailureCount = 0;
@@ -2959,6 +2989,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ active, until: active ? globalPause.until : null });
         break;
       }
+      case 'GET_PROCEDURAL_COUNT': {
+        const { domainCosmetics = {}, filterSyncedAt = null } =
+          await chrome.storage.local.get(['domainCosmetics', 'filterSyncedAt']);
+        sendResponse({
+          count: countProceduralInDomainCosmetics(domainCosmetics),
+          filterSyncedAt,
+          syncInProgress: _syncLock,
+        });
+        break;
+      }
       case 'GET_BENCHMARK_SCORES': {
         const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
         sendResponse({ scores: benchmarkScores });
@@ -3327,6 +3367,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   }
 
   await applySettingsSideEffects(await getSettings(), { syncFilters: false });
+  await _invalidateCosmeticCacheIfNeeded();
 
   // Fetch filter lists immediately — without this, a fresh install or update
   // has NO dynamic rules until the next browser restart triggers onStartup.
@@ -3390,6 +3431,7 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!existing) chrome.alarms.create('filterSync', { periodInMinutes: 720 });
   const sbAlarm = await chrome.alarms.get('safeBrowsingRefresh');
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
+  await _invalidateCosmeticCacheIfNeeded();
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
     if (sbRulesVersion !== 'ranges-2.18') {

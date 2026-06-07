@@ -111,8 +111,12 @@ assert('compile-static-rules.mjs exists', readFileSync(join(root, 'scripts/compi
 
 // ── 8. content-procedural refreshes on storage change ───────────────────────
 const procSrc = readFileSync(join(root, 'src/content-procedural.js'), 'utf8');
+const bgSrc   = readFileSync(join(root, 'src/background.js'), 'utf8');
 assert('Procedural: listens for domainCosmetics changes', procSrc.includes('changes.domainCosmetics'));
 assert('Procedural: rebuildSelectorLists on sync', procSrc.includes('rebuildSelectorLists'));
+assert('Background: cosmetic cache invalidation on parser upgrade', bgSrc.includes('COSMETIC_PARSER_VERSION'));
+assert('Background: incremental writeCosmeticProgress during sync', bgSrc.includes('writeCosmeticProgress'));
+assert('Background: GET_PROCEDURAL_COUNT message', bgSrc.includes('GET_PROCEDURAL_COUNT'));
 
 console.log('\n── Summary ──');
 console.log(`Passed: ${facts.filter(f => f.ok).length}/${facts.length + failed} checks`);

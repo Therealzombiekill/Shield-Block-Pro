@@ -334,11 +334,17 @@ $('sync-btn')?.addEventListener('click', async () => {
   let tries = 0;
   const poll = setInterval(async () => {
     await refreshFilterStatus();
-    const s = await msg('GET_FILTER_STATUS');
-    if ((s && !s.syncInProgress) || ++tries > 90) {
+    const [s, proc] = await Promise.all([msg('GET_FILTER_STATUS'), msg('GET_PROCEDURAL_COUNT')]);
+    const done = s && !s.syncInProgress;
+    if (proc?.count > 0 && $('ftext')) {
+      const strong = $('ftext').querySelector('strong');
+      if (strong) strong.textContent = `${(s?.activeRules ?? 0).toLocaleString()} rules · ${proc.count} procedural`;
+    }
+    if (done || ++tries > 90) {
       clearInterval(poll);
       $('sync-btn').textContent = '↺ sync';
       _syncing = false;
+      if ($('fdot')) $('fdot').className = 'fdot';
     }
   }, 1000);
 });
@@ -594,6 +600,32 @@ $('download-log-txt')?.addEventListener('click', async () => {
 
 // ── Diagnostic export (full JSON snapshot with logs + filter status) ─────────
 // ── Extension health self-test ─────────────────────────────────────────────────
+async function triggerForceSync(statusEl) {
+  if (_syncing) return;
+  if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Syncing filter lists… (up to 90s)'; }
+  $('sync-btn')?.click();
+  let tries = 0;
+  while (tries++ < 90) {
+    await new Promise(r => setTimeout(r, 1000));
+    const proc = await msg('GET_PROCEDURAL_COUNT');
+    if (proc && !proc.syncInProgress) {
+      if (statusEl) {
+        statusEl.style.color = proc.count > 0 ? 'var(--green)' : '#f59e0b';
+        statusEl.textContent = proc.count > 0
+          ? `Sync done — ${proc.count} procedural rules loaded`
+          : 'Sync finished but 0 procedural rules — check Log tab';
+      }
+      return proc;
+    }
+  }
+  if (statusEl) { statusEl.style.color = '#f59e0b'; statusEl.textContent = 'Sync still running — wait and Run check again'; }
+  return null;
+}
+
+$('support-force-sync')?.addEventListener('click', () => {
+  triggerForceSync($('health-summary'));
+});
+
 $('run-health-check')?.addEventListener('click', async () => {
   const btn     = $('run-health-check');
   const summary = $('health-summary');

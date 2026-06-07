@@ -28,3 +28,18 @@ export function countProceduralInDomainCosmetics(domainCosmetics) {
   }
   return n;
 }
+
+/** Deduplicate scriptlet rules per domain (max 50 each). */
+export function finalizeScriptletRules(allScriptletRules) {
+  const out = {};
+  for (const [dom, rules] of Object.entries(allScriptletRules ?? {})) {
+    const seen = new Set();
+    out[dom] = (rules ?? []).filter(r => {
+      const k = r.name + JSON.stringify(r.args);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }).slice(0, 50);
+  }
+  return out;
+}

@@ -335,7 +335,7 @@ $('sync-btn')?.addEventListener('click', async () => {
   const poll = setInterval(async () => {
     await refreshFilterStatus();
     const s = await msg('GET_FILTER_STATUS');
-    if (s && !s.syncInProgress || ++tries > 20) {
+    if ((s && !s.syncInProgress) || ++tries > 90) {
       clearInterval(poll);
       $('sync-btn').textContent = '↺ sync';
       _syncing = false;

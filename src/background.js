@@ -4,7 +4,7 @@
 
 import './browser-compat.js';
 import { parseFilterList, isProceduralCosmetic } from './filter-parser.js';
-import { finalizeDomainCosmetics, countProceduralInDomainCosmetics } from './cosmetic-utils.js';
+import { finalizeDomainCosmetics, countProceduralInDomainCosmetics, finalizeScriptletRules } from './cosmetic-utils.js';
 import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
 // Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
@@ -1422,6 +1422,17 @@ function _appendCachedListData(stored, list, limit, buckets) {
   logEvent('filter-sync', 'warn', `${list.name}: fetch failed — ${cached.length} cached rules reused`);
 }
 
+/** Persist cosmetics/scriptlets during sync so a SW kill mid-fetch still leaves procedural rules. */
+async function writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules) {
+  try {
+    await chrome.storage.local.set({
+      cosmeticSelectors: [...new Set(allCosmetics)],
+      domainCosmetics:   finalizeDomainCosmetics(allDomainCosmetics),
+      scriptletRules:    finalizeScriptletRules(allScriptletRules),
+    });
+  } catch (_) {}
+}
+
 async function syncFilterLists(force = false) {
   if (_syncLock) return;
   _syncLock = true;
@@ -1495,6 +1506,7 @@ async function syncFilterLists(force = false) {
           for (const p of cachedRp.global ?? []) allRemoveParams.global.add(p);
           allRemoveParams.domain.push(...(cachedRp.domain ?? []));
         }
+        await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
       } else {
         staleLists.push({ list, limit, etag: stored[`fe_${list.key}`] ?? null });
       }
@@ -1552,6 +1564,7 @@ async function syncFilterLists(force = false) {
               allRemoveParams.domain.push(...(cachedRp.domain ?? []));
             }
             _syncListStatus[failKey] = { status: 'cached', ruleCount: cached.length, error: failMsg };
+            await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
           } else {
             _syncListStatus[failKey] = { status: 'error', error: failMsg };
           }
@@ -1596,6 +1609,7 @@ async function syncFilterLists(force = false) {
           });
           logEvent('filter-sync', 'info', `${val.list.name}: unchanged (304) — ${cached.length} rules reused`);
           _syncListStatus[val.list.key] = { status: '304', ruleCount: cached.length };
+          await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
           continue;
         }
 
@@ -1628,6 +1642,7 @@ async function syncFilterLists(force = false) {
           };
           if (val.etag) updates[`fe_${val.list.key}`] = val.etag;
           await chrome.storage.local.set(updates);
+          await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
           logEvent('filter-sync', 'info', `${val.list.name}: fetched ${rules.length} rules`);
           _syncListStatus[val.list.key] = { status: 'ok', ruleCount: rules.length };
         } catch (e) {
@@ -1704,16 +1719,7 @@ async function syncFilterLists(force = false) {
     // Deduplicate domain cosmetics — procedural selectors prioritized (see cosmetic-utils.js)
     let domainCosmeticsFinal = finalizeDomainCosmetics(allDomainCosmetics);
 
-    // Deduplicate scriptlet rules per domain
-    const scriptletRulesFinal = {};
-    for (const [dom, rules] of Object.entries(allScriptletRules)) {
-      const seen = new Set();
-      scriptletRulesFinal[dom] = rules.filter(r => {
-        const k = r.name + JSON.stringify(r.args);
-        if (seen.has(k)) return false;
-        seen.add(k); return true;
-      }).slice(0, 50); // max 50 scriptlets per domain
-    }
+    const scriptletRulesFinal = finalizeScriptletRules(allScriptletRules);
 
     // Checkpoint: persist the core synced state NOW — immediately after the DNR swap
     // and BEFORE the network-bound custom-list block below — so the recorded sync state

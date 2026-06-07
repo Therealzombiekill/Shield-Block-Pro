@@ -54,24 +54,6 @@
     }
   },
   {
-    "id": 4521,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||t.co^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 4522,
     "priority": 2,
     "action": {

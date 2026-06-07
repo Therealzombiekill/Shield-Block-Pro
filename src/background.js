@@ -213,7 +213,7 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 // ── Settings ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
-  twitch: true, amazon: true, general: true,
+  twitch: true, general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
   spotify: true,

@@ -127,6 +127,14 @@ try {
   assert('Benchmark gap domains blocked', false, e.stdout?.toString() || e.message);
 }
 
+// ── 10. Publisher false-positive guard ───────────────────────────────────────
+try {
+  execSync('node scripts/audit-publisher-blocks.mjs', { cwd: root, stdio: 'pipe' });
+  assert('No publisher apex blocks in static rules', true);
+} catch (e) {
+  assert('No publisher apex blocks in static rules', false, e.stdout?.toString() || e.message);
+}
+
 console.log('\n── Summary ──');
 console.log(`Passed: ${facts.filter(f => f.ok).length}/${facts.length + failed} checks`);
 if (failed) {

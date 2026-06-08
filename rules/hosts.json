@@ -8160,24 +8160,6 @@
     }
   },
   {
-    "id": 5380,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||newscorp.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
     "id": 5381,
     "priority": 2,
     "action": {
@@ -8365,24 +8347,6 @@
     },
     "condition": {
       "urlFilter": "||nutmeg.com^",
-      "resourceTypes": [
-        "script",
-        "xmlhttprequest",
-        "image",
-        "sub_frame",
-        "media",
-        "ping"
-      ]
-    }
-  },
-  {
-    "id": 5392,
-    "priority": 2,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
-      "urlFilter": "||nytimes.com^",
       "resourceTypes": [
         "script",
         "xmlhttprequest",

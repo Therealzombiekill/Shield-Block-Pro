@@ -68,4 +68,12 @@ try {
   failed++;
 }
 
+try {
+  execSync('node scripts/audit-publisher-blocks.mjs', { cwd: root, stdio: 'pipe' });
+  console.log('audit-publisher-blocks: OK');
+} catch (e) {
+  console.error('audit-publisher-blocks: FAIL', e.stdout?.toString() || e.message);
+  failed++;
+}
+
 process.exit(failed ? 1 : 0);

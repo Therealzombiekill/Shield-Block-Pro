@@ -7,7 +7,22 @@
  * for apis.google.com / boq.google.com entries.
  */
 
+/**
+ * Major news / publisher first-party sites — never apply apex ||domain^ network blocks.
+ * (Blocks scripts/XHR/images on these hosts break the site; ads use separate ad-tech domains.)
+ */
+export const PUBLISHER_FIRST_PARTY_DOMAINS = [
+  'nytimes.com', 'wsj.com', 'washingtonpost.com', 'cnn.com', 'bbc.com', 'bbc.co.uk',
+  'reuters.com', 'bloomberg.com', 'theguardian.com', 'ft.com', 'economist.com',
+  'apnews.com', 'npr.org', 'pbs.org', 'latimes.com', 'chicagotribune.com',
+  'bostonglobe.com', 'vox.com', 'theatlantic.com', 'huffpost.com', 'theverge.com',
+  'wired.com', 'arstechnica.com', 'techcrunch.com', 'engadget.com', 'msnbc.com',
+  'nbcnews.com', 'cbsnews.com', 'foxnews.com', 'newscorp.com', 'news.com.au',
+  'dailymail.co.uk', 'independent.co.uk', 'substack.com',
+];
+
 export const PROTECTED_DOMAINS = new Set([
+  ...PUBLISHER_FIRST_PARTY_DOMAINS,
   // YouTube — playback
   'youtube.com', 'youtu.be', 'youtube-nocookie.com',
   'ytimg.com', 'yt3.ggpht.com', 'googlevideo.com',

@@ -578,6 +578,14 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 .sup-card .sup-p-note{font-size:11px;color:var(--muted);margin-top:4px}
 .sup-card .sup-p-desc{font-size:11px;color:var(--muted);margin-bottom:8px}
 .mt6{margin-top:6px}
+.prcard{background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.prcard-hd{font-size:11px;color:var(--muted);margin-bottom:7px}
+.prcard-hd span{color:var(--text);font-weight:600}
+.prcard-shields{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+.pr-shield{font-size:10.5px;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.pr-shield.on{color:var(--text)}
+.pr-shield.off{color:var(--muted);opacity:.5}
+.pr-off{font-size:11px;color:var(--yellow,#f59e0b)}
 .wl-hd-mt{margin-top:12px}
 </style>
 </head>
@@ -690,6 +698,11 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
     <div class="ss ss-chart">
       <div class="ss-hd">7-day activity</div>
       <canvas id="spark-chart" height="36"></canvas>
+    </div>
+
+    <div class="prcard">
+      <div class="prcard-hd">Privacy on <span id="pr-host">this page</span></div>
+      <div class="prcard-shields" id="pr-shields"></div>
     </div>
 
     <div class="fbar">

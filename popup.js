@@ -16,9 +16,45 @@ let _logInterval = null;
 let _catalog     = null;      // curated filter catalog (lazy-loaded)
 let _catalogCat  = 'ads';     // active catalog category
 let _catalogOpen = false;     // catalog panel visibility state
+// ── Per-site privacy report card ──────────────────────────────────────────────
+async function refreshPageReport() {
+  try {
+    const hostEl = $('pr-host'), shieldsEl = $('pr-shields');
+    if (!shieldsEl) return;
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    let host = '';
+    try { if (tab?.url) host = new URL(tab.url).hostname.replace(/^www\./, ''); } catch (_) {}
+    if (hostEl) hostEl.textContent = host || 'this page';
+    if (!tab?.url?.startsWith('http')) { shieldsEl.innerHTML = '<div class="pr-off">No page to protect here</div>'; return; }
+
+    const s = (await msg('GET_SETTINGS')) ?? {};
+    const wl = Array.isArray(s.whitelist) ? s.whitelist : [];
+    const whitelisted = host && wl.some(d => host === d || host.endsWith('.' + d));
+    let paused = false;
+    try { const gp = await msg('GET_GLOBAL_PAUSE'); paused = !!(gp?.active || (gp?.until && gp.until > Date.now())); } catch (_) {}
+    if (whitelisted || paused) {
+      shieldsEl.innerHTML = `<div class="pr-off">⏸ Protection ${whitelisted ? 'allowlisted' : 'paused'} on this site</div>`;
+      return;
+    }
+    const shields = [
+      ['Fingerprint spoofed', s.privacy       !== false],
+      ['Local IP hidden',     s.webrtcProtect !== false],
+      ['Referrer stripped',   s.referrerStrip !== false],
+      ['HTTPS upgraded',      s.httpsUpgrade  !== false],
+      ['DNT + GPC sent',      s.privacyHeaders!== false],
+      ['Cookie banners',      s.cookies       !== false],
+      ['Tracker params',      s.tracking      !== false],
+      ['Ads & trackers',      s.general       !== false],
+    ];
+    shieldsEl.innerHTML = shields.map(([label, on]) =>
+      `<div class="pr-shield ${on ? 'on' : 'off'}">${on ? '✓' : '○'} ${label}</div>`).join('');
+  } catch (_) {}
+}
+
 async function refreshStatsPanel() {
   await Promise.all([
     refreshStats(),
+    refreshPageReport(),
     drawSparkline(),
     checkPauseStatus(),
     checkGlobalPause(),

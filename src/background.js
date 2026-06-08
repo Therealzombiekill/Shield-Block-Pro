@@ -2578,15 +2578,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
         } catch (e) { warn('Privacy layer', e.message); }
 
-        // 15. Benchmark baseline recorded
-        try {
-          const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
-          const recorded = ['d3ward', 'adblockTester', 'eff'].filter(k => benchmarkScores[k]?.score != null);
-          if (recorded.length === 3) pass('Benchmarks', `Scores on file: ${recorded.join(', ')}`);
-          else if (recorded.length > 0) warn('Benchmarks', `${recorded.length}/3 sites scored — finish in Support → Benchmarks`);
-          else warn('Benchmarks', 'No scores yet — open benchmark pages in Support tab');
-        } catch (e) { warn('Benchmarks', e.message); }
-
         // 16. Extension version
         pass('Version', chrome.runtime.getManifest().version);
 
@@ -2972,43 +2963,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           filterSyncedAt,
           syncInProgress: _syncLock,
         });
-        break;
-      }
-      case 'GET_BENCHMARK_SCORES': {
-        const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
-        sendResponse({ scores: benchmarkScores });
-        break;
-      }
-      case 'SET_BENCHMARK_SCORES': {
-        const incoming = msg.scores ?? {};
-        const { benchmarkScores: prev = {} } = await chrome.storage.local.get('benchmarkScores');
-        const merged = { ...prev };
-        for (const [key, val] of Object.entries(incoming)) {
-          if (val?.score == null || val.score === '') continue;
-          merged[key] = {
-            score: String(val.score).trim(),
-            notes: val.notes ? String(val.notes).trim() : '',
-            date: Date.now(),
-          };
-        }
-        await chrome.storage.local.set({ benchmarkScores: merged });
-        sendResponse({ ok: true, scores: merged });
-        break;
-      }
-      case 'OPEN_BENCHMARK_PAGES': {
-        const BENCHMARK_URLS = [
-          { id: 'd3ward',          url: 'https://d3ward.github.io/toolz/adblock.html', title: 'd3ward adblock test' },
-          { id: 'adblockTester',   url: 'https://adblock-tester.com/',                 title: 'AdBlock Tester' },
-          { id: 'eff',             url: 'https://coveryourtracks.eff.org/',            title: 'EFF Cover Your Tracks' },
-        ];
-        const opened = [];
-        for (const b of BENCHMARK_URLS) {
-          try {
-            const tab = await chrome.tabs.create({ url: b.url, active: opened.length === 0 });
-            opened.push({ id: b.id, tabId: tab.id });
-          } catch (e) { opened.push({ id: b.id, error: e.message }); }
-        }
-        sendResponse({ ok: true, opened });
         break;
       }
       case 'EXPORT_DIAGNOSTIC': {

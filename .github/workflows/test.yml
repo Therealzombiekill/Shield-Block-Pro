@@ -1,0 +1,27 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'   # ESM syntax detection for src/*.js imports
+
+      - name: Extension structure validation
+        run: node scripts/validate-extension.mjs
+
+      - name: Roadmap smoke checks
+        run: node scripts/test-roadmap.mjs
+
+      - name: Unit tests
+        run: node --test tests/*.test.mjs
+
+      - name: Benchmark domain coverage
+        run: node scripts/check-benchmark-domains.mjs

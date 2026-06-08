@@ -8,7 +8,16 @@ ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, track
 
 ## How to test
 
-There are no automated tests. Manual testing workflow:
+Automated checks (also run on every push/PR via `.github/workflows/test.yml`, Node 22):
+- `node --test tests/*.test.mjs` — unit tests: filter-parser contract, static-rule
+  integrity (unique IDs, valid actions/resourceTypes, under the 30k cap),
+  false-positive regression guard (legit domains stay un-blocked, trackers stay
+  blocked), manifest integrity.
+- `node scripts/validate-extension.mjs` — structure/syntax validation.
+- `node scripts/test-roadmap.mjs` — roadmap smoke checks.
+- `node scripts/check-benchmark-domains.mjs` — benchmark domain coverage.
+
+There's no in-browser test harness, so manual testing is still the final gate:
 
 1. Load unpacked in Chrome at `chrome://extensions`
 2. After editing any `src/*.js` or `popup.*` file, click "Reload" on the extension card or use the Extensions toolbar menu

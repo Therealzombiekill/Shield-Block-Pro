@@ -21,7 +21,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'   # ESM syntax detection for src/*.js imports
 
       - name: Fetch upstream filter lists
         run: |

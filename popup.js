@@ -387,6 +387,23 @@ document.querySelectorAll('[data-s]').forEach(input => {
   });
 });
 
+// CNAME uncloaking needs an optional permission (Firefox). The generic handler
+// above persists the setting; this requests the permission on enable (reverting
+// if denied — e.g. on Chrome, which can't do blocking webRequest) and re-arms
+// the background listener.
+$('t-cname')?.addEventListener('change', async (e) => {
+  if (e.target.checked) {
+    let granted = false;
+    try { granted = await chrome.permissions.request({ permissions: ['webRequest', 'webRequestBlocking', 'dns'] }); } catch (_) {}
+    if (!granted) {
+      e.target.checked = false;
+      await msg('SET_SETTINGS', { settings: { cnameUncloak: false } });
+      return;
+    }
+  }
+  await msg('SETUP_CNAME');
+});
+
 async function loadSettings() {
   const s = await msg('GET_SETTINGS');
   if (!s) return;

@@ -248,6 +248,7 @@ const DEFAULT_SETTINGS = {
   timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)
   privacyHeaders: true, // send DNT: 1 and Sec-GPC: 1 on every request
   webrtcProtect: true,  // hide local IP from WebRTC (default_public_interface_only)
+  cnameUncloak: false,  // Firefox-only: unmask trackers behind first-party CNAMEs (opt-in)
 };
 
 // ── Per-domain block stats (in-memory, lost on SW restart — used for top-domains panel) ─
@@ -1351,6 +1352,72 @@ async function applyWebRTCPolicy(enabled) {
   }
 }
 
+// ── CNAME uncloaking (Firefox) ────────────────────────────────────────────────
+// Trackers hide behind first-party CNAMEs (metrics.example.com -> CNAME -> a
+// tracker host) to evade blockers. On Firefox we resolve the canonical name and
+// block if it points to a known tracker. Firefox-only (needs blocking webRequest
+// + dns, granted as optional permissions); no-ops everywhere else.
+const CNAME_TRACKER_SUFFIXES = [
+  'eulerian.net','ati-host.net','at-o.net','omtrdc.net','sc.omtrdc.net','demdex.net',
+  '2o7.net','adobedc.net','everesttech.net','dnsdelegation.io','storetail.io',
+  'tagcommander.com','commander1.com','wizaly.com','webtrekk.net','wt-eu02.net',
+  'wt-safetag.com','keyade.com','intentmedia.net','ojrq.net','online-metrix.net',
+  'sojern.com','adventori.com','contentsquare.net','ingenioustech.io','smartprofile.io',
+  'tracedock.com','mpsnare.com','affex.org','kameleoon.eu','oghub.io','tnsservices.com',
+];
+const _cnameCache = new Map(); // hostname -> true (block) | false (allow)
+let _cnameListening = false;
+
+function _isCnameTracker(canonical) {
+  if (!canonical) return false;
+  const c = canonical.toLowerCase().replace(/\.$/, '');
+  return CNAME_TRACKER_SUFFIXES.some(s => c === s || c.endsWith('.' + s));
+}
+
+async function _cnameOnBeforeRequest(details) {
+  try {
+    const host = new URL(details.url).hostname;
+    if (_cnameCache.has(host)) return _cnameCache.get(host) ? { cancel: true } : undefined;
+    let canonical = '';
+    try { canonical = (await chrome.dns.resolve(host, ['canonical_name']))?.canonicalName || ''; } catch (_) {}
+    const block = !!canonical && canonical.replace(/\.$/, '') !== host && _isCnameTracker(canonical);
+    if (_cnameCache.size > 4000) _cnameCache.clear();
+    _cnameCache.set(host, block);
+    if (block) {
+      logEvent('cname', 'info', `Blocked CNAME-cloaked tracker: ${host} -> ${canonical}`);
+      incrementStat('general', details.tabId);
+      return { cancel: true };
+    }
+  } catch (_) {}
+  return undefined;
+}
+
+async function setupCNAMEUncloak(enabled) {
+  // Hard Firefox guard — chrome.dns + blocking webRequest exist only there.
+  if (!chrome.webRequest?.onBeforeRequest || !chrome.dns?.resolve) return;
+  let granted = false;
+  try { granted = await chrome.permissions.contains({ permissions: ['webRequestBlocking', 'dns'] }); } catch (_) {}
+  if (enabled && granted && !_cnameListening) {
+    try {
+      chrome.webRequest.onBeforeRequest.addListener(
+        _cnameOnBeforeRequest,
+        { urls: ['<all_urls>'], types: ['script','image','stylesheet','object','xmlhttprequest','ping','font','media','sub_frame','websocket','other'] },
+        ['blocking'],
+      );
+      _cnameListening = true;
+      logEvent('cname', 'info', 'CNAME uncloaking active');
+    } catch (e) { logEvent('cname', 'warn', `CNAME setup failed: ${e.message}`); }
+  } else if ((!enabled || !granted) && _cnameListening) {
+    try { chrome.webRequest.onBeforeRequest.removeListener(_cnameOnBeforeRequest); } catch (_) {}
+    _cnameListening = false;
+    _cnameCache.clear();
+    logEvent('cname', 'info', 'CNAME uncloaking off');
+  }
+}
+// Best-effort re-arm on every SW evaluation (cold start / wake); no-op on Chrome
+// or until the optional permission is granted.
+getSettings().then(s => setupCNAMEUncloak(s?.cnameUncloak === true)).catch(() => {});
+
 async function applyReferrerRule(enabled) {
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
@@ -2061,6 +2128,7 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
     applyHttpsUpgradeRule(merged.httpsUpgrade !== false),
     applyPrivacyHeadersRule(merged.privacyHeaders !== false),
     applyWebRTCPolicy(merged.webrtcProtect !== false),
+    setupCNAMEUncloak(merged.cnameUncloak === true),
     applyWhitelistRules(),
     restoreGlobalPauseRule(),
     applyRemoveParamRules(), // self-gates on the tracking toggle
@@ -2424,6 +2492,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
 
+      case 'SETUP_CNAME': {
+        const _cs = await getSettings();
+        await setupCNAMEUncloak(_cs.cnameUncloak === true);
+        sendResponse({ ok: true });
+        break;
+      }
       case 'GET_PAGE_STATS': {
         try {
           const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });

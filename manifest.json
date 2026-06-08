@@ -144,6 +144,16 @@
         "id": "hosts_rules",
         "enabled": true,
         "path": "rules/hosts.json"
+      },
+      {
+        "id": "easylist_static",
+        "enabled": true,
+        "path": "rules/easylist-static.json"
+      },
+      {
+        "id": "easyprivacy_static",
+        "enabled": true,
+        "path": "rules/easyprivacy-static.json"
       }
     ]
   },

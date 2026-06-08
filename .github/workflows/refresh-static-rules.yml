@@ -1,0 +1,61 @@
+name: Refresh static rules
+
+# Recompiles the bundled static rulesets from upstream filter lists and opens a
+# PR if anything changed. Keeps the frozen static snapshot fresh without manual
+# work. Opens a PR (never auto-merges) so the regenerated rules still get a pass.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch upstream filter lists
+        run: |
+          set -euo pipefail
+          curl -sSL https://easylist.to/easylist/easylist.txt                 -o /tmp/easylist.txt
+          curl -sSL https://easylist.to/easylist/easyprivacy.txt              -o /tmp/easyprivacy.txt
+          curl -sSL https://easylist.to/easylistgermany/easylistgermany.txt   -o /tmp/easylistgermany.txt
+          curl -sSL "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext" -o /tmp/peterlowe.txt
+
+      - name: Compile static rulesets
+        run: |
+          set -euo pipefail
+          node scripts/compile-static-rules.mjs /tmp/easylist.txt          --out rules/easylist-static.json        --start-id 20000 --max 6000
+          node scripts/compile-static-rules.mjs /tmp/easyprivacy.txt       --out rules/easyprivacy-static.json     --start-id 30000 --max 4000
+          node scripts/compile-static-rules.mjs /tmp/easylistgermany.txt   --out rules/easylistgermany-static.json --start-id 40000 --max 2500
+          node scripts/compile-static-rules.mjs /tmp/peterlowe.txt         --out rules/peterlowe-static.json       --start-id 50000 --max 4000
+
+      - name: Validate
+        run: node scripts/validate-extension.mjs
+
+      - name: Open PR if rules changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: 'chore: refresh static filter rules'
+          title: 'Refresh static filter rules'
+          body: |
+            Automated weekly refresh of the compiled static rulesets
+            (EasyList, EasyPrivacy, EasyList Germany, Peter Lowe).
+
+            Review the diff and run a quick real-world pass before merging.
+          branch: auto/refresh-static-rules
+          delete-branch: true
+          add-paths: |
+            rules/easylist-static.json
+            rules/easyprivacy-static.json
+            rules/easylistgermany-static.json
+            rules/peterlowe-static.json

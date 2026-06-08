@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, trackers, cookie banners, and streaming platform ads. There is no build step, no bundler, and no package.json — all source files are loaded directly by the browser. To test changes, load the extension as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked → point at this directory) and reload it after every change.
+ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, trackers, and cookie banners. There is no build step, no bundler, and no package.json — all source files are loaded directly by the browser. To test changes, load the extension as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked → point at this directory) and reload it after every change.
 
 ## How to test
 
@@ -24,21 +24,11 @@ To verify filter parsing changes, open the popup → **Support** tab → "Run ch
 
 The extension runs code in three distinct contexts that cannot directly call each other's APIs:
 
-**MAIN world** (`inject-privacy.js`, `inject-youtube.js`, `inject-twitch.js`, `scriptlets.js`): Runs in the page's JavaScript context. Can access `window`, override native APIs, and intercept fetch. Cannot call `chrome.*` APIs. Must communicate via `window.postMessage`.
+**MAIN world** (`inject-privacy.js`, `scriptlets.js`): Runs in the page's JavaScript context. Can access `window`, override native APIs, and intercept fetch. Cannot call `chrome.*` APIs. Must communicate via `window.postMessage`.
 
 **ISOLATED world** (all `content-*.js` files, `src/browser-compat.js` prepended): Runs in Chrome's isolated content script context. Can call `chrome.runtime.sendMessage` and `chrome.storage`. Cannot access page JS globals. Receives postMessages from MAIN world scripts. Every content script does `GET_SETTINGS` with a 300ms retry guard to handle service worker wake-up race conditions.
 
 **Service worker** (`src/background.js`): Handles all persistent state, filter syncing, DNR rule management, and stat accumulation. Exposes a single `chrome.runtime.onMessage` handler with 54 message type cases. Chrome kills the SW after ~30s idle — `_startKeepAlive()` / `_stopKeepAlive()` ping storage every 20s during long operations (filter sync, safe browsing fetch) to prevent premature termination.
-
-### Two-script pattern for platform-specific blocking
-
-YouTube and Twitch each use two coordinated scripts:
-- `inject-youtube.js` / `inject-twitch.js` — MAIN world, `document_start`: patches native fetch/XHR/globals to strip ad data before the player processes it
-- `content-youtube.js` / `content-twitch.js` — ISOLATED world, `document_idle`: DOM-level fallback (click skip buttons, mute during ads, detect ad state via DOM selectors)
-
-The MAIN world script receives enable/disable signals from the ISOLATED script via `window.postMessage({ type: 'SB_YOUTUBE_DISABLE' })` etc., since MAIN world cannot read settings from storage.
-
-`content-youtube.js` also implements opt-in **YouTube Extras** (`settings.youtubeExtras`, default off): hide Shorts shelves/nav and remove end-screen cards. These run only inside the active ad-blocking path and use narrow, page-level selectors to avoid the player-cosmetic black-screen risk.
 
 ### DNR rule ID space
 
@@ -99,20 +89,6 @@ const _wl = settings?.whitelist ?? [];
 const _host = location.hostname.replace(/^www\./, '');
 if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 ```
-
-### SSAI streaming platforms
-
-Server-Side Ad Insertion stitches ads into the content stream, so they can't be removed at the network layer. Two layers handle it:
-- **Dedicated scripts**: `content-twitch.js`, `content-hulu.js`, `content-kick.js`, `content-spotify.js`
-- **Generic handler**: `content-streaming.js` (`settings.streaming`) covers Max, Disney+, Paramount+, Peacock, Pluto TV and Tubi via a per-host config map.
-
-The strategy:
-1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements) — `content-streaming.js` adds a player-scoped "Ad…" text detector as a durable fallback
-2. Mute the video element (`video.muted = true`) for the ad duration
-3. Remove ad UI overlays from the DOM (the dedicated scripts; `content-streaming.js` is **mute-only** to stay playback-safe on players we can't test)
-4. Restore original mute state when the ad ends
-
-Spotify additionally attempts a skip (seeks to `audio.duration - 0.1` or clicks the next-track button).
 
 ### Annoyance blocker
 

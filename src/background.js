@@ -243,16 +243,10 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 // ── Settings ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
-  twitch: true, general: true,
+  general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
-  spotify: true,
-  hulu: true,
-  kick: true,
-  youtube: true,
-  youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
   annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
-  streaming: true,      // SSAI ad-mute on additional streaming platforms (Max, Disney+, etc.)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
   referrerStrip: true,  // strip Referer header on 3rd-party requests
@@ -2566,24 +2560,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else if (syncFailures < 4) warn('List sync errors', `${syncFailures} list(s) failed last sync — check Log tab`);
           else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
         } catch (e) { warn('List sync errors', e.message); }
-
-        // 13. YouTube / streaming scripts registered
-        try {
-          const cs = chrome.runtime.getManifest().content_scripts ?? [];
-          const yt = cs.filter(e => e.matches?.some(m => /youtube/.test(m)));
-          const hasInject = yt.some(e => e.js?.includes('src/inject-youtube.js') && e.world === 'MAIN');
-          const hasContent = yt.some(e => e.js?.includes('src/content-youtube.js'));
-          const hasTwitch = cs.some(e => e.js?.includes('src/content-twitch.js'));
-          if (hasInject && hasContent && hasTwitch) {
-            pass('Streaming scripts', 'YouTube MAIN+ISOLATED + Twitch layers registered');
-          } else {
-            const missing = [];
-            if (!hasInject) missing.push('inject-youtube');
-            if (!hasContent) missing.push('content-youtube');
-            if (!hasTwitch) missing.push('content-twitch');
-            fail('Streaming scripts', `Missing: ${missing.join(', ')}`);
-          }
-        } catch (e) { warn('Streaming scripts', e.message); }
 
         // 14. Privacy + procedural engine in manifest
         try {

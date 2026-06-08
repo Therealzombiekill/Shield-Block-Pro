@@ -377,7 +377,7 @@
         _observer.disconnect();
         clearTimeout(_debounce);
         document.getElementById('_sb_cosmetic_css')?.remove();
-      document.getElementById('_sb_site_css')?.remove();
+        document.getElementById('_sb_site_css')?.remove();
       }
     }
   });

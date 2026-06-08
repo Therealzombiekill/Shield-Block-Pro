@@ -247,6 +247,7 @@ const DEFAULT_SETTINGS = {
   httpsUpgrade: true,   // upgrade http:// navigations to https://
   timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)
   privacyHeaders: true, // send DNT: 1 and Sec-GPC: 1 on every request
+  webrtcProtect: true,  // hide local IP from WebRTC (default_public_interface_only)
 };
 
 // ── Per-domain block stats (in-memory, lost on SW restart — used for top-domains panel) ─
@@ -386,6 +387,7 @@ async function reapplyFeatureRules() {
     applyReferrerRule(s.referrerStrip !== false),
     applyHttpsUpgradeRule(s.httpsUpgrade !== false),
     applyPrivacyHeadersRule(s.privacyHeaders !== false),
+    applyWebRTCPolicy(s.webrtcProtect !== false),
     applyUserFilterRules(),
     applyWhitelistRules(),
   ]);
@@ -1327,6 +1329,28 @@ async function allowSafeBrowsingSitePermanent(url) {
 // Remove the Referer header from all cross-origin requests via DNR modifyHeaders.
 // This prevents sites from seeing which page you came from.
 // Complements inject-privacy.js's document.referrer override (which covers the JS layer).
+async function applyWebRTCPolicy(enabled) {
+  // WebRTC can expose your real local/public IP via ICE candidates even behind a
+  // VPN. 'default_public_interface_only' routes WebRTC through the public interface
+  // only — local network IPs are hidden, while calls still connect (no breakage).
+  try {
+    if (!chrome.privacy?.network?.webRTCIPHandlingPolicy) {
+      logEvent('privacy', 'info', 'WebRTC policy API unavailable — skipped');
+      return;
+    }
+    if (enabled) {
+      await chrome.privacy.network.webRTCIPHandlingPolicy.set({ value: 'default_public_interface_only' });
+    } else {
+      await chrome.privacy.network.webRTCIPHandlingPolicy.clear({});
+    }
+    logEvent('privacy', 'info', enabled
+      ? 'WebRTC IP-leak protection active (public interface only)'
+      : 'WebRTC protection off');
+  } catch (e) {
+    logEvent('privacy', 'warn', `applyWebRTCPolicy failed: ${e.message}`);
+  }
+}
+
 async function applyReferrerRule(enabled) {
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
@@ -2036,6 +2060,7 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
     applyReferrerRule(merged.referrerStrip !== false),
     applyHttpsUpgradeRule(merged.httpsUpgrade !== false),
     applyPrivacyHeadersRule(merged.privacyHeaders !== false),
+    applyWebRTCPolicy(merged.webrtcProtect !== false),
     applyWhitelistRules(),
     restoreGlobalPauseRule(),
     applyRemoveParamRules(), // self-gates on the tracking toggle
@@ -3225,6 +3250,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     applyReferrerRule(_s.referrerStrip !== false),
     applyHttpsUpgradeRule(_s.httpsUpgrade !== false),
     applyPrivacyHeadersRule(_s.privacyHeaders !== false),
+    applyWebRTCPolicy(_s.webrtcProtect !== false),
     applyUserFilterRules(),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),
@@ -3342,6 +3368,7 @@ chrome.runtime.onStartup.addListener(async () => {
     applyReferrerRule(_ss.referrerStrip !== false),
     applyHttpsUpgradeRule(_ss.httpsUpgrade !== false),
     applyPrivacyHeadersRule(_ss.privacyHeaders !== false),
+    applyWebRTCPolicy(_ss.webrtcProtect !== false),
     applyUserFilterRules(),
     loadSafeBrowsingCache(),
     computeStaticRuleCount(),

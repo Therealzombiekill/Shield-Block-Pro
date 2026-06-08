@@ -12,7 +12,8 @@
     "scripting",
     "webNavigation",
     "alarms",
-    "contextMenus"
+    "contextMenus",
+    "privacy"
   ],
   "host_permissions": [
     "<all_urls>"

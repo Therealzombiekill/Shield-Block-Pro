@@ -57,6 +57,18 @@
     } catch (_) {}
   }
 
+  // Persistently hide site-specific ad slots via a standing CSS rule. cleanAds() only
+  // *removes* nodes, but sites like bild.de re-insert their Fireplace/Sitebar slots
+  // after deletion, so the ad flashes back; display:none hides re-inserted nodes
+  // instantly with no JS race. _siteSelList is host-scoped so this only loads there.
+  function injectSiteHideCSS() {
+    if (!_siteSelList.length || document.getElementById('_sb_site_css')) return;
+    const style = document.createElement('style');
+    style.id = '_sb_site_css';
+    style.textContent = _siteSelList.join(',') + '{display:none!important}';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   injectBundledCosmeticCSS();
 
   // ── Ad selectors ────────────────────────────────────────────────────────────
@@ -110,8 +122,36 @@
     '.onetrust-pc-dark-filter',
   ];
 
+  // Site-specific ad-slot selectors — host-scoped, so aggressive matches (e.g. ".ad")
+  // only ever run on the named domain. German publishers label slots Banderole/
+  // Sitebar/Fireplace/Wallpaper/Werbung; bild.de renders a "Fireplace" takeover
+  // (top banner + mirrored left/right skyscrapers). safeToRemove() still guards
+  // against removing real content containers.
+  const SITE_SPECIFIC = {
+    'bild.de': [
+      '.ad', '[class^="ad-"]', '[class^="ad_"]', '[class*="-ad-"]', '[class$="-ad"]', '[class$="_ad"]',
+      '[class*="advert"]',
+      '[class*="werbung"]', '[id*="werbung"]',
+      '[class*="fireplace"]', '[id*="fireplace"]',
+      '[class*="wallpaper"]', '[id*="wallpaper"]',
+      '[class*="banderole"]', '[id*="banderole"]',
+      '[class*="sitebar"]', '[id*="sitebar"]',
+      '[class*="billboard"]', '[id*="billboard"]',
+      '[class*="skyscraper"]', '[id*="skyscraper"]',
+      '[data-ad]', '[data-advert]', '[data-ad-slot]',
+      '[id^="ad-"]', '[id^="ad_"]', '[id*="-ad-"]',
+    ],
+  };
+  let _siteSelList = [];
+  for (const dom in SITE_SPECIFIC) {
+    if (_host === dom || _host.endsWith('.' + dom)) { _siteSelList = SITE_SPECIFIC[dom]; break; }
+  }
+  const AD_LIST_ALL = _siteSelList.length ? AD_SELECTORS_LIST.concat(_siteSelList) : AD_SELECTORS_LIST;
   // Pre-join for single querySelectorAll — falls back to individual queries on error
-  const AD_SEL_COMBINED = AD_SELECTORS_LIST.join(',');
+  const AD_SEL_COMBINED = AD_LIST_ALL.join(',');
+
+  // Inject the standing hide rule now that the host's selectors are known.
+  injectSiteHideCSS();
 
   function safeToRemove(el) {
     if (!el) return false;
@@ -127,14 +167,29 @@
     return true;
   }
 
+  // Count UNIQUE ad elements once each. Re-inserted slots (sites like bild.de keep
+  // re-adding the same Fireplace/Sitebar) share a signature, so the stat reflects real
+  // ads blocked rather than cleanup-tick churn — which previously inflated it 10–100x.
+  const _countedAds = new Set();
+  const _adSig = (el) => {
+    const cls = typeof el.className === 'string' ? el.className : '';
+    return el.tagName + '|' + (el.id || '') + '|' + cls.slice(0, 100) + '|' +
+           (el.getAttribute('data-ad-slot') || el.getAttribute('data-google-query-id') || '');
+  };
   function cleanAds() {
-    let _removed = 0;
+    let _removed = 0, _newUnique = 0;
     try {
       document.querySelectorAll(AD_SEL_COMBINED).forEach(el => {
-        if (safeToRemove(el)) { el.remove(); _removed++; }
+        if (safeToRemove(el)) {
+          const sig = _adSig(el);
+          if (!_countedAds.has(sig)) { _countedAds.add(sig); _newUnique++; }
+          el.remove(); _removed++;
+        }
       });
+      if (_newUnique > 0) {
+        chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'general', count: _newUnique }).catch(()=>{});
+      }
       if (_removed > 0) {
-        chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'general' }).catch(()=>{});
         // Rate-limit logging to once per 5s to avoid flooding background
         const now = Date.now();
         if (!window._sbLastGenLog || now - window._sbLastGenLog > 5000) {
@@ -146,7 +201,7 @@
       }
     } catch (_) {
       // Fallback: one selector at a time if combined throws (malformed entry)
-      for (const sel of AD_SELECTORS_LIST) {
+      for (const sel of AD_LIST_ALL) {
         try {
           document.querySelectorAll(sel).forEach(el => {
             if (safeToRemove(el)) el.remove();
@@ -263,8 +318,6 @@
   }
 
   // ── Main tick ─────────────────────────────────────────────────────────────────
-  // NOTE: Soft paywall bypass is handled by content-paywall.js (separate content
-  // script with its own MutationObserver). Do not duplicate it here.
   function tick() {
     cleanAds();
     cleanNewsletters();
@@ -300,6 +353,7 @@
       _observer.disconnect();
       clearTimeout(_debounce);
       document.getElementById('_sb_cosmetic_css')?.remove();
+      document.getElementById('_sb_site_css')?.remove();
     }
   });
 
@@ -309,10 +363,12 @@
       _observer.disconnect();
       clearTimeout(_debounce);
       document.getElementById('_sb_cosmetic_css')?.remove();
+      document.getElementById('_sb_site_css')?.remove();
     }
     if (msg.type === 'GLOBAL_RESUME') {
       if (_target) _observer.observe(_target, { childList: true, subtree: true });
       injectBundledCosmeticCSS();
+      injectSiteHideCSS();
       tick();
     }
     if (msg.type === 'WHITELIST_CHANGED') {
@@ -321,6 +377,7 @@
         _observer.disconnect();
         clearTimeout(_debounce);
         document.getElementById('_sb_cosmetic_css')?.remove();
+        document.getElementById('_sb_site_css')?.remove();
       }
     }
   });

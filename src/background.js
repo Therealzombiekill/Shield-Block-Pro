@@ -96,17 +96,11 @@ const STATIC_REMOVE_PARAMS = new Set([
 
 // ── Time saved estimates (seconds per blocked item by type) ───────────────────
 const TIME_SAVED_SECONDS = {
-  youtube:  15, // avg of 5s skippable + 30s unskippable
-  twitch:   30, // full SSAI ad break
-  spotify:  30, // audio ad segment
-  hulu:     30, // video ad break
-  kick:     30, // video ad break
-  amazon:    3, // page load improvement
-  general:   5, // typical ad script load time
-  social:    2, // skipped sponsored post
-  cookies:   8, // time to find + click "reject all"
-  annoyances: 3, // dismissed nag / widget / banner
-  streaming: 30, // SSAI ad break (additional platforms)
+  amazon:     1, // blocked sponsored slot — page-load improvement
+  general:    1, // blocked web ad/tracker — load + render time avoided
+  social:     1, // skipped sponsored post
+  cookies:    5, // time to find + click "reject all" by hand
+  annoyances: 2, // dismissed nag / widget / banner
 };
 
 // ── Browser detection ─────────────────────────────────────────────────────────
@@ -243,19 +237,12 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 // ── Settings ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
-  twitch: true, general: true,
+  general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
-  spotify: true,
-  hulu: true,
-  kick: true,
-  youtube: true,
-  youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
   annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
-  streaming: true,      // SSAI ad-mute on additional streaming platforms (Max, Disney+, etc.)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
-  paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
   referrerStrip: true,  // strip Referer header on 3rd-party requests
   httpsUpgrade: true,   // upgrade http:// navigations to https://
   timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)
@@ -773,19 +760,20 @@ async function _isOnline() {
 }
 
 
-function incrementStat(type, tabId) {
+function incrementStat(type, tabId, count = 1) {
+  count = Math.max(1, count | 0); // content scripts now send the real element count
   // Update per-page stats synchronously (in-memory only)
   if (tabId) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
-    ps.total = (ps.total | 0) + 1;
-    ps.dom   = (ps.dom   | 0) + 1;
+    ps.total = (ps.total | 0) + count;
+    ps.dom   = (ps.dom   | 0) + count;
     // Record every stat type per-tab so the popup "This page" breakdown is complete
-    ps[type] = (ps[type] | 0) + 1;
+    ps[type] = (ps[type] | 0) + count;
     _pageStats.set(tabId, ps);
   }
   // Accumulate — flush to storage in a single write after 500ms idle
-  _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
-  _pendingTimeSaved  += TIME_SAVED_SECONDS[type] ?? 2;
+  _pendingStats[type] = (_pendingStats[type] ?? 0) + count;
+  _pendingTimeSaved  += (TIME_SAVED_SECONDS[type] ?? 1) * count;
   const pending = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
   if (pending >= 20) {
     clearTimeout(_pendingFlush);
@@ -837,9 +825,7 @@ async function countNetworkBlocks(tabId, url) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
     ps.total   = (ps.total   | 0) + count;
     ps.network = (ps.network | 0) + count;
-    const cat = url?.includes('twitch.tv')  ? 'twitch'
-              : url?.includes('amazon.')     ? 'amazon'
-              : 'general';
+    const cat = url?.includes('amazon.') ? 'amazon' : 'general';
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
 
@@ -848,13 +834,14 @@ async function countNetworkBlocks(tabId, url) {
     // never clobber one another's increments.
     _flushQueue = _flushQueue.then(async () => {
       try {
-        const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
-        const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
+        const { stats, lifetime, timeSaved: prevSaved } = await chrome.storage.local.get(['stats','lifetime','timeSaved']);
+        const s  = stats   ?? { total:0, amazon:0, general:0, social:0, cookies:0, annoyances:0 };
         const lt = lifetime ?? { total:0 };
         s.total  = (s.total  | 0) + count;
         s[cat]   = (s[cat]   | 0) + count;
         lt.total = (lt.total | 0) + count;
-        await chrome.storage.local.set({ stats: s, lifetime: lt });
+        const savedNet = (prevSaved ?? 0) + (TIME_SAVED_SECONDS[cat] ?? 1) * count;
+        await chrome.storage.local.set({ stats: s, lifetime: lt, timeSaved: savedNet });
         try {
           chrome.action.setBadgeText({ text: formatBadge(s.total) });
           // Honour badgeEnabled — don't re-show the badge if the user turned it off
@@ -2233,7 +2220,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
 
       case 'INCREMENT_STAT':
-        incrementStat(msg.statType ?? 'general', sender?.tab?.id);
+        incrementStat(msg.statType ?? 'general', sender?.tab?.id, msg.count);
         sendResponse({ ok: true });
         break;
       case 'GET_REQUEST_LOG':
@@ -2568,24 +2555,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
         } catch (e) { warn('List sync errors', e.message); }
 
-        // 13. YouTube / streaming scripts registered
-        try {
-          const cs = chrome.runtime.getManifest().content_scripts ?? [];
-          const yt = cs.filter(e => e.matches?.some(m => /youtube/.test(m)));
-          const hasInject = yt.some(e => e.js?.includes('src/inject-youtube.js') && e.world === 'MAIN');
-          const hasContent = yt.some(e => e.js?.includes('src/content-youtube.js'));
-          const hasTwitch = cs.some(e => e.js?.includes('src/content-twitch.js'));
-          if (hasInject && hasContent && hasTwitch) {
-            pass('Streaming scripts', 'YouTube MAIN+ISOLATED + Twitch layers registered');
-          } else {
-            const missing = [];
-            if (!hasInject) missing.push('inject-youtube');
-            if (!hasContent) missing.push('content-youtube');
-            if (!hasTwitch) missing.push('content-twitch');
-            fail('Streaming scripts', `Missing: ${missing.join(', ')}`);
-          }
-        } catch (e) { warn('Streaming scripts', e.message); }
-
         // 14. Privacy + procedural engine in manifest
         try {
           const cs = chrome.runtime.getManifest().content_scripts ?? [];
@@ -2602,15 +2571,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             warn('Privacy layer', `Missing: ${miss.join(', ')}`);
           }
         } catch (e) { warn('Privacy layer', e.message); }
-
-        // 15. Benchmark baseline recorded
-        try {
-          const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
-          const recorded = ['d3ward', 'adblockTester', 'eff'].filter(k => benchmarkScores[k]?.score != null);
-          if (recorded.length === 3) pass('Benchmarks', `Scores on file: ${recorded.join(', ')}`);
-          else if (recorded.length > 0) warn('Benchmarks', `${recorded.length}/3 sites scored — finish in Support → Benchmarks`);
-          else warn('Benchmarks', 'No scores yet — open benchmark pages in Support tab');
-        } catch (e) { warn('Benchmarks', e.message); }
 
         // 16. Extension version
         pass('Version', chrome.runtime.getManifest().version);
@@ -2997,43 +2957,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           filterSyncedAt,
           syncInProgress: _syncLock,
         });
-        break;
-      }
-      case 'GET_BENCHMARK_SCORES': {
-        const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
-        sendResponse({ scores: benchmarkScores });
-        break;
-      }
-      case 'SET_BENCHMARK_SCORES': {
-        const incoming = msg.scores ?? {};
-        const { benchmarkScores: prev = {} } = await chrome.storage.local.get('benchmarkScores');
-        const merged = { ...prev };
-        for (const [key, val] of Object.entries(incoming)) {
-          if (val?.score == null || val.score === '') continue;
-          merged[key] = {
-            score: String(val.score).trim(),
-            notes: val.notes ? String(val.notes).trim() : '',
-            date: Date.now(),
-          };
-        }
-        await chrome.storage.local.set({ benchmarkScores: merged });
-        sendResponse({ ok: true, scores: merged });
-        break;
-      }
-      case 'OPEN_BENCHMARK_PAGES': {
-        const BENCHMARK_URLS = [
-          { id: 'd3ward',          url: 'https://d3ward.github.io/toolz/adblock.html', title: 'd3ward adblock test' },
-          { id: 'adblockTester',   url: 'https://adblock-tester.com/',                 title: 'AdBlock Tester' },
-          { id: 'eff',             url: 'https://coveryourtracks.eff.org/',            title: 'EFF Cover Your Tracks' },
-        ];
-        const opened = [];
-        for (const b of BENCHMARK_URLS) {
-          try {
-            const tab = await chrome.tabs.create({ url: b.url, active: opened.length === 0 });
-            opened.push({ id: b.id, tabId: tab.id });
-          } catch (e) { opened.push({ id: b.id, error: e.message }); }
-        }
-        sendResponse({ ok: true, opened });
         break;
       }
       case 'EXPORT_DIAGNOSTIC': {

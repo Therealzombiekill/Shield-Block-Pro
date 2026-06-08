@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.18.0",
-  "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
+  "version": "2.19.0",
+  "description": "Block ads, trackers, and cookie banners across the web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
     "tabs",
@@ -120,120 +121,6 @@
       ],
       "run_at": "document_idle",
       "all_frames": false
-    },
-    {
-      "matches": [
-        "*://www.twitch.tv/*",
-        "*://twitch.tv/*",
-        "*://*.twitch.tv/*"
-      ],
-      "js": [
-        "src/inject-twitch.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "*://www.twitch.tv/*",
-        "*://twitch.tv/*",
-        "*://*.twitch.tv/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-twitch.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://open.spotify.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-spotify.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://www.hulu.com/*",
-        "*://hulu.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-hulu.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://kick.com/*",
-        "*://www.kick.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-kick.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://*.max.com/*",
-        "*://*.disneyplus.com/*",
-        "*://*.paramountplus.com/*",
-        "*://*.peacocktv.com/*",
-        "*://*.pluto.tv/*",
-        "*://*.tubitv.com/*",
-        "*://*.roku.com/*",
-        "*://*.sling.com/*",
-        "*://*.fubo.tv/*",
-        "*://*.crackle.com/*",
-        "*://*.discoveryplus.com/*",
-        "*://*.plex.tv/*",
-        "*://*.xumo.com/*",
-        "*://*.vudu.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-streaming.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://www.youtube.com/*",
-        "*://youtube.com/*",
-        "*://music.youtube.com/*"
-      ],
-      "js": [
-        "src/inject-youtube.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "*://www.youtube.com/*",
-        "*://youtube.com/*",
-        "*://music.youtube.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-youtube.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://*/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-paywall.js"
-      ],
-      "run_at": "document_idle",
-      "match_about_blank": false
     }
   ],
   "declarative_net_request": {
@@ -257,6 +144,26 @@
         "id": "hosts_rules",
         "enabled": true,
         "path": "rules/hosts.json"
+      },
+      {
+        "id": "easylist_static",
+        "enabled": true,
+        "path": "rules/easylist-static.json"
+      },
+      {
+        "id": "easyprivacy_static",
+        "enabled": true,
+        "path": "rules/easyprivacy-static.json"
+      },
+      {
+        "id": "easylistgermany_static",
+        "enabled": true,
+        "path": "rules/easylistgermany-static.json"
+      },
+      {
+        "id": "peterlowe_static",
+        "enabled": true,
+        "path": "rules/peterlowe-static.json"
       }
     ]
   },

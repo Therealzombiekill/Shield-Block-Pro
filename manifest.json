@@ -154,6 +154,16 @@
         "id": "easyprivacy_static",
         "enabled": true,
         "path": "rules/easyprivacy-static.json"
+      },
+      {
+        "id": "easylistgermany_static",
+        "enabled": true,
+        "path": "rules/easylistgermany-static.json"
+      },
+      {
+        "id": "peterlowe_static",
+        "enabled": true,
+        "path": "rules/peterlowe-static.json"
       }
     ]
   },

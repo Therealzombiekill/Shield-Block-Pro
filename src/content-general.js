@@ -167,14 +167,29 @@
     return true;
   }
 
+  // Count UNIQUE ad elements once each. Re-inserted slots (sites like bild.de keep
+  // re-adding the same Fireplace/Sitebar) share a signature, so the stat reflects real
+  // ads blocked rather than cleanup-tick churn — which previously inflated it 10–100x.
+  const _countedAds = new Set();
+  const _adSig = (el) => {
+    const cls = typeof el.className === 'string' ? el.className : '';
+    return el.tagName + '|' + (el.id || '') + '|' + cls.slice(0, 100) + '|' +
+           (el.getAttribute('data-ad-slot') || el.getAttribute('data-google-query-id') || '');
+  };
   function cleanAds() {
-    let _removed = 0;
+    let _removed = 0, _newUnique = 0;
     try {
       document.querySelectorAll(AD_SEL_COMBINED).forEach(el => {
-        if (safeToRemove(el)) { el.remove(); _removed++; }
+        if (safeToRemove(el)) {
+          const sig = _adSig(el);
+          if (!_countedAds.has(sig)) { _countedAds.add(sig); _newUnique++; }
+          el.remove(); _removed++;
+        }
       });
+      if (_newUnique > 0) {
+        chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'general', count: _newUnique }).catch(()=>{});
+      }
       if (_removed > 0) {
-        chrome.runtime.sendMessage({ type: 'INCREMENT_STAT', statType: 'general' }).catch(()=>{});
         // Rate-limit logging to once per 5s to avoid flooding background
         const now = Date.now();
         if (!window._sbLastGenLog || now - window._sbLastGenLog > 5000) {

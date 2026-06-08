@@ -96,17 +96,11 @@ const STATIC_REMOVE_PARAMS = new Set([
 
 // ── Time saved estimates (seconds per blocked item by type) ───────────────────
 const TIME_SAVED_SECONDS = {
-  youtube:  15, // avg of 5s skippable + 30s unskippable
-  twitch:   30, // full SSAI ad break
-  spotify:  30, // audio ad segment
-  hulu:     30, // video ad break
-  kick:     30, // video ad break
-  amazon:    3, // page load improvement
-  general:   5, // typical ad script load time
-  social:    2, // skipped sponsored post
-  cookies:   8, // time to find + click "reject all"
-  annoyances: 3, // dismissed nag / widget / banner
-  streaming: 30, // SSAI ad break (additional platforms)
+  amazon:     1, // blocked sponsored slot — page-load improvement
+  general:    1, // blocked web ad/tracker — load + render time avoided
+  social:     1, // skipped sponsored post
+  cookies:    5, // time to find + click "reject all" by hand
+  annoyances: 2, // dismissed nag / widget / banner
 };
 
 // ── Browser detection ─────────────────────────────────────────────────────────
@@ -766,19 +760,20 @@ async function _isOnline() {
 }
 
 
-function incrementStat(type, tabId) {
+function incrementStat(type, tabId, count = 1) {
+  count = Math.max(1, count | 0); // content scripts now send the real element count
   // Update per-page stats synchronously (in-memory only)
   if (tabId) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
-    ps.total = (ps.total | 0) + 1;
-    ps.dom   = (ps.dom   | 0) + 1;
+    ps.total = (ps.total | 0) + count;
+    ps.dom   = (ps.dom   | 0) + count;
     // Record every stat type per-tab so the popup "This page" breakdown is complete
-    ps[type] = (ps[type] | 0) + 1;
+    ps[type] = (ps[type] | 0) + count;
     _pageStats.set(tabId, ps);
   }
   // Accumulate — flush to storage in a single write after 500ms idle
-  _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
-  _pendingTimeSaved  += TIME_SAVED_SECONDS[type] ?? 2;
+  _pendingStats[type] = (_pendingStats[type] ?? 0) + count;
+  _pendingTimeSaved  += (TIME_SAVED_SECONDS[type] ?? 1) * count;
   const pending = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
   if (pending >= 20) {
     clearTimeout(_pendingFlush);
@@ -830,9 +825,7 @@ async function countNetworkBlocks(tabId, url) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
     ps.total   = (ps.total   | 0) + count;
     ps.network = (ps.network | 0) + count;
-    const cat = url?.includes('twitch.tv')  ? 'twitch'
-              : url?.includes('amazon.')     ? 'amazon'
-              : 'general';
+    const cat = url?.includes('amazon.') ? 'amazon' : 'general';
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
 
@@ -841,13 +834,14 @@ async function countNetworkBlocks(tabId, url) {
     // never clobber one another's increments.
     _flushQueue = _flushQueue.then(async () => {
       try {
-        const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
-        const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
+        const { stats, lifetime, timeSaved: prevSaved } = await chrome.storage.local.get(['stats','lifetime','timeSaved']);
+        const s  = stats   ?? { total:0, amazon:0, general:0, social:0, cookies:0, annoyances:0 };
         const lt = lifetime ?? { total:0 };
         s.total  = (s.total  | 0) + count;
         s[cat]   = (s[cat]   | 0) + count;
         lt.total = (lt.total | 0) + count;
-        await chrome.storage.local.set({ stats: s, lifetime: lt });
+        const savedNet = (prevSaved ?? 0) + (TIME_SAVED_SECONDS[cat] ?? 1) * count;
+        await chrome.storage.local.set({ stats: s, lifetime: lt, timeSaved: savedNet });
         try {
           chrome.action.setBadgeText({ text: formatBadge(s.total) });
           // Honour badgeEnabled — don't re-show the badge if the user turned it off
@@ -2226,7 +2220,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
 
       case 'INCREMENT_STAT':
-        incrementStat(msg.statType ?? 'general', sender?.tab?.id);
+        incrementStat(msg.statType ?? 'general', sender?.tab?.id, msg.count);
         sendResponse({ ok: true });
         break;
       case 'GET_REQUEST_LOG':

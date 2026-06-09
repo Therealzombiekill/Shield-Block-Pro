@@ -89,7 +89,7 @@ Log tag: `2.11.1-playfirst`. Never remove all `tp-yt-iron-overlay-backdrop` node
 google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-default-apps --load-extension=/workspace &
 ```
 
-`--load-extension` auto-loads the repo on first launch; if it does not appear, use **Load unpacked** on `chrome://extensions` and point at `/workspace`. Cloud Chrome may also listen on **remote debugging port 9222** (`curl -s http://127.0.0.1:9222/json/list`). MV3 service worker may show **Inactive** when idle — normal.
+`--load-extension` auto-loads the repo on first launch; if it does not appear, use **Load unpacked** on `chrome://extensions` and point at `/workspace`. On some cloud VM Chrome builds (wrapper adds `--test-type`), `--load-extension` is ignored — enable **Developer mode** and **Load unpacked** manually. Cloud Chrome may also listen on **remote debugging port 9222** (`curl -s http://127.0.0.1:9222/json/list`). MV3 service worker may show **Inactive** when idle — normal.
 
 ### Reload gotchas
 

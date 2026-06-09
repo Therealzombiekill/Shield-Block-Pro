@@ -102,14 +102,15 @@ if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
 ### SSAI streaming platforms
 
-Server-Side Ad Insertion stitches ads into the content stream, so they can't be removed at the network layer. Two layers handle it:
+Server-Side Ad Insertion stitches ads into the content stream, so they can't be removed at the network layer. Dedicated scripts handle the platforms we can actually test:
 - **Dedicated scripts**: `content-twitch.js`, `content-hulu.js`, `content-kick.js`, `content-spotify.js`
-- **Generic handler**: `content-streaming.js` (`settings.streaming`) covers Max, Disney+, Paramount+, Peacock, Pluto TV and Tubi via a per-host config map.
+
+> A generic `content-streaming.js` handler (`settings.streaming`) for Max/Disney+/Paramount+/Peacock/Pluto/Tubi/Roku/Sling/etc. was **removed** — mainstream ad blockers cover those platforms better, and a mute-only fallback on players we can't test carried a real false-mute risk (a stray ad-class element page-wide muted the whole session). The `streaming` setting and `streaming` stat bucket were removed with it.
 
 The strategy:
-1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements) — `content-streaming.js` adds a player-scoped "Ad…" text detector as a durable fallback
+1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements)
 2. Mute the video element (`video.muted = true`) for the ad duration
-3. Remove ad UI overlays from the DOM (the dedicated scripts; `content-streaming.js` is **mute-only** to stay playback-safe on players we can't test)
+3. Remove ad UI overlays from the DOM
 4. Restore original mute state when the ad ends
 
 Spotify additionally attempts a skip (seeks to `audio.duration - 0.1` or clicks the next-track button).

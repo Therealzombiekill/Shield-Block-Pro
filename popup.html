@@ -579,12 +579,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 .fil-divider-lg{padding-bottom:12px}
 .sup-card .sup-p-note{font-size:11px;color:var(--muted);margin-top:4px}
 .sup-card .sup-p-desc{font-size:11px;color:var(--muted);margin-bottom:8px}
-.bench-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:4px}
-.bench-row{display:flex;align-items:center;gap:8px}
-.bench-name{font-size:10px;color:var(--muted);min-width:96px;font-family:var(--mono)}
-.bench-input{flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:10px;padding:5px 8px;outline:none}
 .mt6{margin-top:6px}
-#benchmark-status{font-family:var(--mono);font-size:10px;color:var(--green);min-height:12px}
 .wl-hd-mt{margin-top:12px}
 </style>
 </head>
@@ -676,10 +671,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div class="sc an">
           <span class="sc-n" id="s-an">0</span>
           <span class="sc-l">Nags</span>
-        </div>
-        <div class="sc st">
-          <span class="sc-n" id="s-st">0</span>
-          <span class="sc-l">Streaming</span>
         </div>
       </div>
     </div>
@@ -890,16 +881,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div class="sw"><input type="checkbox" id="t-kk" data-s="kick" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
 
-      <label class="tr" for="t-str">
-        <div class="tr-info">
-          <div class="ti ti-str">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#6366f1"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zM10 7.5l5 3.5-5 3.5v-7z"/></svg>
-          </div>
-          <div class="ttxt"><strong>More Streaming</strong><span>Mute ads on more streaming services</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-str" data-s="streaming" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
-
       <div class="sec-hd">Privacy & Advanced</div>
 
       <label class="tr" for="t-sb">
@@ -990,29 +971,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div id="health-checks"></div>
       </div>
 
-      <!-- ── Benchmark baseline ───────────────────────────────────────── -->
-      <div class="sup-card sup-card-sm">
-        <div class="sup-hd">
-          <div class="sup-label">Blocking Benchmarks</div>
-          <button class="ghost sup-ghost-sm" id="open-benchmarks">Open tests</button>
-        </div>
-        <p class="sup-p-desc">Score against d3ward, AdBlock Tester, and EFF Cover Your Tracks. Record results to track progress vs AdGuard/uBOL.</p>
-        <div class="bench-grid">
-          <label class="bench-row"><span class="bench-name">d3ward toolz</span>
-            <input type="text" id="bench-d3ward" class="bench-input" placeholder="e.g. 95/100" maxlength="32">
-          </label>
-          <label class="bench-row"><span class="bench-name">AdBlock Tester</span>
-            <input type="text" id="bench-adblock" class="bench-input" placeholder="e.g. 45/50" maxlength="32">
-          </label>
-          <label class="bench-row"><span class="bench-name">EFF CYT</span>
-            <input type="text" id="bench-eff" class="bench-input" placeholder="e.g. unique / protected" maxlength="64">
-          </label>
-        </div>
-        <div class="sup-btn-row mt6">
-          <button class="ghost ghost-bd sup-ghost-full" id="save-benchmarks">Save scores</button>
-        </div>
-        <div id="benchmark-status" class="sup-p-desc"></div>
-      </div>
 
       <div class="sup-card">
         <div class="sup-label">Free Software</div>

@@ -51,7 +51,7 @@ DevTools: service worker console on the extension card; popup via right-click to
 | Benchmark domains | `node scripts/check-benchmark-domains.mjs` |
 | JS syntax check | Included in `validate-extension.mjs` |
 | Static rules compile | `node scripts/compile-static-rules.mjs easylist.txt --out rules/generated.json` (release-time only) |
-| Benchmark baseline | Support tab → Blocking Benchmarks; see `docs/benchmarks.md` |
+| Benchmark baseline | Open the test URLs manually; see `docs/benchmarks.md` |
 
 ### Hello-world verification
 

@@ -13,12 +13,13 @@ Measure the extension against standard public tests before and after filter/engi
 ## How to run
 
 1. Load unpacked extension in Chrome (Developer mode).
-2. Open popup → **Support** → **Blocking Benchmarks** → **Open tests** (opens all three tabs).
-3. Complete each site's test flow.
-4. Enter scores in the popup fields → **Save scores**.
-5. Run **Extension Health** → confirm **Benchmarks** row shows 3/3 scored.
+2. Open the three test URLs above, each in its own tab.
+3. Complete each site's test flow and note the score.
+4. Re-run with ShieldBlock paused (popup → pause) or on a clean profile to confirm the delta.
 
-Scores persist in `chrome.storage.local` under `benchmarkScores`.
+> The in-popup "Blocking Benchmarks" score-entry panel was removed (it only stored
+> numbers you typed in by hand). Record results in the comparison table below — or
+> your own notes — instead.
 
 ## Comparison targets (reference)
 

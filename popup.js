@@ -1337,7 +1337,7 @@ $('pause-btn')?.addEventListener('click', async () => {
     $('pause-btn').classList.remove('pause-active');
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
   } else {
-    const minutes = parseInt($('pause-dur')?.value) || 30;
+    const minutes = parseInt($('pause-dur')?.value, 10) || 30;
     await msg('PAUSE_SITE', { domain, minutes });
     const h = Math.floor(minutes / 60), m = minutes % 60;
     $('pause-btn').textContent = `▶ ${minutes >= 60 ? h + 'h' + (m ? ' ' + m + 'm' : '') : minutes + 'm'} left`;

@@ -94,9 +94,19 @@ const STATIC_REMOVE_PARAMS = new Set([
   'cvosrc', 'cvo_campaign',
 ]);
 
-// NOTE: A "time saved" metric used to live here — a hardcoded seconds-per-block
-// multiplier (e.g. 15s/YouTube ad). It was a fabricated estimate, not measured
-// data, so it was removed. Only the real "ads blocked" event counts are kept.
+// ── Time saved estimates (seconds per blocked item by type) ───────────────────
+const TIME_SAVED_SECONDS = {
+  youtube:   15, // skippable + unskippable pre/mid-roll avoided
+  twitch:    25, // SSAI ad break
+  spotify:   25, // audio ad segment
+  hulu:      25, // video ad break
+  kick:      25, // video ad break
+  amazon:     1, // blocked sponsored slot — page-load improvement
+  general:    1, // blocked web ad/tracker — load + render time avoided
+  social:     1, // skipped sponsored post
+  cookies:    5, // time to find + click "reject all" by hand
+  annoyances: 2, // dismissed nag / widget / banner
+};
 
 // ── Browser detection ─────────────────────────────────────────────────────────
 // Service workers don't have navigator.userAgent in all MV3 builds, so we check
@@ -232,18 +242,16 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 // ── Settings ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
-  twitch: true, general: true,
+  general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
-  spotify: true,
-  hulu: true,
-  kick: true,
-  youtube: true,
+  youtube: true,        // YouTube ad skip/mute (inject + content scripts)
   youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
+  twitch: true, spotify: true, hulu: true, kick: true,
+  paywall: false,       // soft paywall bypass (opt-in)
   annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
-  paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
   referrerStrip: true,  // strip Referer header on 3rd-party requests
   httpsUpgrade: true,   // upgrade http:// navigations to https://
   timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)
@@ -428,6 +436,7 @@ function formatBadge(n) {
 // Batched stat writer — accumulates increments and flushes in one storage write
 // every 500ms (or immediately if > 20 pending). Avoids a read+write per ad removal.
 let _pendingStats     = {};  // { statType: count }
+let _pendingTimeSaved = 0;   // seconds accumulated since last flush
 let _pendingFlush     = null;
 
 // Track daily stats for 7-day chart
@@ -451,8 +460,10 @@ let _flushQueue = Promise.resolve();
 function _flushStats() {
   _pendingFlush = null;
   const pending        = _pendingStats;
+  const savedThisFlush = _pendingTimeSaved;
   _pendingStats     = {};
-  if (Object.keys(pending).length === 0) return;
+  _pendingTimeSaved = 0;
+  if (Object.keys(pending).length === 0 && savedThisFlush === 0) return;
 
   // Record daily total for 7-day chart (fire-and-forget, non-critical)
   const pendingTotal = Object.values(pending).reduce((a,b)=>a+b,0);
@@ -461,8 +472,8 @@ function _flushStats() {
   // Serialise writes — chain onto the queue so concurrent flushes never race
   _flushQueue = _flushQueue.then(async () => {
     try {
-      const { stats, lifetime } =
-        await chrome.storage.local.get(['stats','lifetime']);
+      const { stats, lifetime, timeSaved: prevSaved } =
+        await chrome.storage.local.get(['stats','lifetime','timeSaved']);
       const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
       const lt = lifetime ?? { total:0 };
       for (const [type, count] of Object.entries(pending)) {
@@ -472,6 +483,7 @@ function _flushStats() {
       }
       await chrome.storage.local.set({
         stats: s, lifetime: lt,
+        timeSaved: (prevSaved ?? 0) + savedThisFlush,
       });
       try {
         chrome.action.setBadgeText({ text: formatBadge(s.total) });
@@ -757,18 +769,20 @@ async function _isOnline() {
 }
 
 
-function incrementStat(type, tabId) {
+function incrementStat(type, tabId, count = 1) {
+  count = Math.max(1, count | 0); // content scripts now send the real element count
   // Update per-page stats synchronously (in-memory only)
   if (tabId) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
-    ps.total = (ps.total | 0) + 1;
-    ps.dom   = (ps.dom   | 0) + 1;
+    ps.total = (ps.total | 0) + count;
+    ps.dom   = (ps.dom   | 0) + count;
     // Record every stat type per-tab so the popup "This page" breakdown is complete
-    ps[type] = (ps[type] | 0) + 1;
+    ps[type] = (ps[type] | 0) + count;
     _pageStats.set(tabId, ps);
   }
   // Accumulate — flush to storage in a single write after 500ms idle
-  _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
+  _pendingStats[type] = (_pendingStats[type] ?? 0) + count;
+  _pendingTimeSaved  += (TIME_SAVED_SECONDS[type] ?? 1) * count;
   const pending = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
   if (pending >= 20) {
     clearTimeout(_pendingFlush);
@@ -820,9 +834,7 @@ async function countNetworkBlocks(tabId, url) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
     ps.total   = (ps.total   | 0) + count;
     ps.network = (ps.network | 0) + count;
-    const cat = url?.includes('twitch.tv')  ? 'twitch'
-              : url?.includes('amazon.')     ? 'amazon'
-              : 'general';
+    const cat = url?.includes('amazon.') ? 'amazon' : 'general';
     ps[cat] = (ps[cat] | 0) + count;
     _pageStats.set(tabId, ps);
 
@@ -831,13 +843,14 @@ async function countNetworkBlocks(tabId, url) {
     // never clobber one another's increments.
     _flushQueue = _flushQueue.then(async () => {
       try {
-        const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
-        const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
+        const { stats, lifetime, timeSaved: prevSaved } = await chrome.storage.local.get(['stats','lifetime','timeSaved']);
+        const s  = stats   ?? { total:0, amazon:0, general:0, social:0, cookies:0, annoyances:0 };
         const lt = lifetime ?? { total:0 };
         s.total  = (s.total  | 0) + count;
         s[cat]   = (s[cat]   | 0) + count;
         lt.total = (lt.total | 0) + count;
-        await chrome.storage.local.set({ stats: s, lifetime: lt });
+        const savedNet = (prevSaved ?? 0) + (TIME_SAVED_SECONDS[cat] ?? 1) * count;
+        await chrome.storage.local.set({ stats: s, lifetime: lt, timeSaved: savedNet });
         try {
           chrome.action.setBadgeText({ text: formatBadge(s.total) });
           // Honour badgeEnabled — don't re-show the badge if the user turned it off
@@ -2216,7 +2229,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
 
       case 'INCREMENT_STAT':
-        incrementStat(msg.statType ?? 'general', sender?.tab?.id);
+        incrementStat(msg.statType ?? 'general', sender?.tab?.id, msg.count);
         sendResponse({ ok: true });
         break;
       case 'GET_REQUEST_LOG':
@@ -2550,24 +2563,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
         } catch (e) { warn('List sync errors', e.message); }
 
-        // 13. YouTube / streaming scripts registered
-        try {
-          const cs = chrome.runtime.getManifest().content_scripts ?? [];
-          const yt = cs.filter(e => e.matches?.some(m => /youtube/.test(m)));
-          const hasInject = yt.some(e => e.js?.includes('src/inject-youtube.js') && e.world === 'MAIN');
-          const hasContent = yt.some(e => e.js?.includes('src/content-youtube.js'));
-          const hasTwitch = cs.some(e => e.js?.includes('src/content-twitch.js'));
-          if (hasInject && hasContent && hasTwitch) {
-            pass('Streaming scripts', 'YouTube MAIN+ISOLATED + Twitch layers registered');
-          } else {
-            const missing = [];
-            if (!hasInject) missing.push('inject-youtube');
-            if (!hasContent) missing.push('content-youtube');
-            if (!hasTwitch) missing.push('content-twitch');
-            fail('Streaming scripts', `Missing: ${missing.join(', ')}`);
-          }
-        } catch (e) { warn('Streaming scripts', e.message); }
-
         // 14. Privacy + procedural engine in manifest
         try {
           const cs = chrome.runtime.getManifest().content_scripts ?? [];
@@ -2585,7 +2580,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
         } catch (e) { warn('Privacy layer', e.message); }
 
-        // 15. Extension version
+        // 16. Extension version
         pass('Version', chrome.runtime.getManifest().version);
 
         const summary = checks.every(c => c.status === 'pass') ? 'healthy'

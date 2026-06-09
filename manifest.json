@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.18.0",
-  "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
+  "version": "2.19.0",
+  "description": "Block ads, trackers, and cookie banners across the web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
     "tabs",
@@ -233,6 +234,26 @@
         "id": "hosts_rules",
         "enabled": true,
         "path": "rules/hosts.json"
+      },
+      {
+        "id": "easylist_static",
+        "enabled": true,
+        "path": "rules/easylist-static.json"
+      },
+      {
+        "id": "easyprivacy_static",
+        "enabled": true,
+        "path": "rules/easyprivacy-static.json"
+      },
+      {
+        "id": "easylistgermany_static",
+        "enabled": true,
+        "path": "rules/easylistgermany-static.json"
+      },
+      {
+        "id": "peterlowe_static",
+        "enabled": true,
+        "path": "rules/peterlowe-static.json"
       }
     ]
   },

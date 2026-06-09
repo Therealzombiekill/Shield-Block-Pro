@@ -7,6 +7,16 @@ import { parseFilterList, isProceduralCosmetic } from './filter-parser.js';
 import { finalizeDomainCosmetics, countProceduralInDomainCosmetics, finalizeScriptletRules } from './cosmetic-utils.js';
 import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
+// Request persistent storage so the filter-list cache isn't quota-capped or evicted
+// on Firefox — belt-and-suspenders with the unlimitedStorage permission. This is the
+// source of the historical "Resource::kQuotaBytes quota exceeded" sync failures:
+// without the persistent box, storage.local hits the per-group quota as lists pile up.
+try {
+  navigator.storage?.persist?.()
+    .then(granted => { try { logEvent('system', 'info', `Persistent storage ${granted ? 'granted' : 'denied'}`); } catch (_) {} })
+    .catch(() => {});
+} catch (_) {}
+
 // Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
 // (plain block/allow — which is all our filter lists emit). Detect the platform limit
 // and use it; fall back to 5,000 on older browsers or where the constant is missing.

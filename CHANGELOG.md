@@ -13,6 +13,16 @@
 - **Auto-refresh GitHub Action** — weekly job recompiles the static rulesets
   from upstream lists and opens a PR, keeping the frozen snapshot fresh.
 - `ROADMAP.md` documenting the privacy-first / zero-breakage direction.
+- **CNAME uncloaking** (Firefox, opt-in) — unmask trackers behind first-party
+  CNAMEs via blocking webRequest + dns (optional permissions).
+- **Automated test suite + CI** — `node --test tests/*.test.mjs` (parser, rule
+  integrity, false-positive regression guard, manifest) run on every push/PR.
+
+### Fixed
+- Harden the Firefox storage-quota fix: request persistent storage
+  (`navigator.storage.persist()`) on startup alongside the `unlimitedStorage`
+  permission, so filter sync no longer hits `Resource::kQuotaBytes` and drops
+  the smaller regional lists. (Original `unlimitedStorage` fix shipped in 2.19.0.)
 
 ## [2.19.0]
 ### Removed

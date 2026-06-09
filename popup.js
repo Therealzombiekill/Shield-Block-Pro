@@ -2,14 +2,6 @@
 
 const $ = id => document.getElementById(id);
 
-function formatTimeSaved(s) {
-  s = Math.floor(s || 0);
-  if (s < 60)    return s + 's';
-  if (s < 3600)  return Math.floor(s / 60) + 'm';
-  if (s < 86400) { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); return m ? `${h}h ${m}m` : `${h}h`; }
-  const d = Math.floor(s/86400), h = Math.floor((s%86400)/3600); return h ? `${d}d ${h}h` : `${d}d`;
-}
-
 // ── Nav ───────────────────────────────────────────────────────────────
 // ── Single consolidated nav handler ──────────────────────────────────────────
 let _logInterval = null;
@@ -134,7 +126,7 @@ async function refreshStats() {
   try {
     const [s, lt, ps, stored] = await Promise.all([
       msg('GET_STATS'), msg('GET_LIFETIME'), msg('GET_PAGE_STATS'),
-      chrome.storage.local.get(['timeSaved','filterSyncedAt']),
+      chrome.storage.local.get(['filterSyncedAt']),
     ]);
     const stats = s  ?? { total:0, amazon:0, general:0, social:0, cookies:0 };
     const life  = lt ?? { total:0 };
@@ -162,7 +154,6 @@ async function refreshStats() {
     if ($('s-an')) $('s-an').textContent = fmt(stats.annoyances || 0);
     if ($('s-st')) $('s-st').textContent = fmt(stats.streaming  || 0);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
-    $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 
     const syncedAt = stored?.filterSyncedAt;
     if ($('stat-last-sync')) {

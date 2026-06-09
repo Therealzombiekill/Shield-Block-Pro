@@ -94,20 +94,9 @@ const STATIC_REMOVE_PARAMS = new Set([
   'cvosrc', 'cvo_campaign',
 ]);
 
-// ── Time saved estimates (seconds per blocked item by type) ───────────────────
-const TIME_SAVED_SECONDS = {
-  youtube:  15, // avg of 5s skippable + 30s unskippable
-  twitch:   30, // full SSAI ad break
-  spotify:  30, // audio ad segment
-  hulu:     30, // video ad break
-  kick:     30, // video ad break
-  amazon:    3, // page load improvement
-  general:   5, // typical ad script load time
-  social:    2, // skipped sponsored post
-  cookies:   8, // time to find + click "reject all"
-  annoyances: 3, // dismissed nag / widget / banner
-  streaming: 30, // SSAI ad break (additional platforms)
-};
+// NOTE: A "time saved" metric used to live here — a hardcoded seconds-per-block
+// multiplier (e.g. 15s/YouTube ad). It was a fabricated estimate, not measured
+// data, so it was removed. Only the real "ads blocked" event counts are kept.
 
 // ── Browser detection ─────────────────────────────────────────────────────────
 // Service workers don't have navigator.userAgent in all MV3 builds, so we check
@@ -440,7 +429,6 @@ function formatBadge(n) {
 // Batched stat writer — accumulates increments and flushes in one storage write
 // every 500ms (or immediately if > 20 pending). Avoids a read+write per ad removal.
 let _pendingStats     = {};  // { statType: count }
-let _pendingTimeSaved = 0;   // seconds accumulated since last flush
 let _pendingFlush     = null;
 
 // Track daily stats for 7-day chart
@@ -464,10 +452,8 @@ let _flushQueue = Promise.resolve();
 function _flushStats() {
   _pendingFlush = null;
   const pending        = _pendingStats;
-  const savedThisFlush = _pendingTimeSaved;
   _pendingStats     = {};
-  _pendingTimeSaved = 0;
-  if (Object.keys(pending).length === 0 && savedThisFlush === 0) return;
+  if (Object.keys(pending).length === 0) return;
 
   // Record daily total for 7-day chart (fire-and-forget, non-critical)
   const pendingTotal = Object.values(pending).reduce((a,b)=>a+b,0);
@@ -476,8 +462,8 @@ function _flushStats() {
   // Serialise writes — chain onto the queue so concurrent flushes never race
   _flushQueue = _flushQueue.then(async () => {
     try {
-      const { stats, lifetime, timeSaved: prevSaved } =
-        await chrome.storage.local.get(['stats','lifetime','timeSaved']);
+      const { stats, lifetime } =
+        await chrome.storage.local.get(['stats','lifetime']);
       const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
       const lt = lifetime ?? { total:0 };
       for (const [type, count] of Object.entries(pending)) {
@@ -487,7 +473,6 @@ function _flushStats() {
       }
       await chrome.storage.local.set({
         stats: s, lifetime: lt,
-        timeSaved: (prevSaved ?? 0) + savedThisFlush,
       });
       try {
         chrome.action.setBadgeText({ text: formatBadge(s.total) });
@@ -785,7 +770,6 @@ function incrementStat(type, tabId) {
   }
   // Accumulate — flush to storage in a single write after 500ms idle
   _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
-  _pendingTimeSaved  += TIME_SAVED_SECONDS[type] ?? 2;
   const pending = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
   if (pending >= 20) {
     clearTimeout(_pendingFlush);

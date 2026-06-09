@@ -79,7 +79,7 @@ ShieldBlock Pro ("the Extension") is a browser extension developed and maintaine
 The Extension stores the following data exclusively on your local device using browser-provided storage APIs (chrome.storage.local and the browser's built-in IndexedDB). None of this data ever leaves your device.
 
 Settings & preferences — which features are enabled, your whitelist of sites, and toggle states. Stored in chrome.storage.local.
-Ad block statistics — counts of ads blocked per platform (YouTube, Twitch, Spotify, etc.) and an estimate of time saved. Stored in chrome.storage.local.
+Ad block statistics — counts of ads blocked per platform (YouTube, Twitch, Spotify, etc.). Stored in chrome.storage.local.
 Event logs — a rolling debug log (last 7 days) of extension activity used for in-popup diagnostics. Stored in IndexedDB on your device. Logs are never sent anywhere.
 Filter list cache — downloaded filter list files (EasyList, uBlock filters, etc.) are cached locally so the extension works without re-downloading on every page. Stored in chrome.storage.local.
 3. Data we do NOT collect

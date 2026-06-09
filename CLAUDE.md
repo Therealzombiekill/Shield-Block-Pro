@@ -79,7 +79,7 @@ Everything lives in `chrome.storage.local`. Key prefixes:
 - `cosmeticSelectors`, `domainCosmetics`, `scriptletRules` — aggregated post-sync caches
 - `removeParamData` — aggregated removeparam data
 - `settings` — user toggle state (see `DEFAULT_SETTINGS` in background.js)
-- `stats`, `lifetime`, `timeSaved` — block counts
+- `stats`, `lifetime` — block counts
 - `dailyStats` — `{ "YYYY-MM-DD": count }` for 7-day sparkline, kept 30 days
 - `filterMatrix` — `{ hostname: { ruleKey: 'allow'|'block'|'default' } }`
 - `persistedLog` — last 100 log entries cached for SW restart recovery

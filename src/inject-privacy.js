@@ -88,7 +88,7 @@
 
     const _getImageData = CanvasRenderingContext2D.prototype.getImageData;
     CanvasRenderingContext2D.prototype.getImageData = function () {
-      if (_isYT || !_privacyEnabled) return _getImageData.apply(this, arguments); // inject-youtube.js handles YouTube
+      if (_isYT || !_privacyEnabled) return _getImageData.apply(this, arguments); // skip on YouTube — canvas noise disrupts the player
       const d = _getImageData.apply(this, arguments);
       try {
         const noise = stableNoise(SESSION_SEED + arguments[0] + arguments[1]);
@@ -696,7 +696,7 @@
   }
 
   function startAntiAdblockObserver() {
-    // YouTube has its own handler (content-youtube.js). Generic anti-adblock DOM
+    // Skip YouTube entirely. Generic anti-adblock DOM
     // removal here fights YouTube's enforcement layer and triggers player error
     // 282054944 ("Something went wrong") for many ad-blocker users.
     if (/youtube\.com$|youtu\.be$/i.test(location.hostname.replace(/^www\./, '')) ||

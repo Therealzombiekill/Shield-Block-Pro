@@ -478,7 +478,7 @@ function _flushStats() {
     try {
       const { stats, lifetime, timeSaved: prevSaved } =
         await chrome.storage.local.get(['stats','lifetime','timeSaved']);
-      const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
+      const s  = stats   ?? { total:0, amazon:0, general:0, social:0, cookies:0 };
       const lt = lifetime ?? { total:0 };
       for (const [type, count] of Object.entries(pending)) {
         s.total  = (s.total  | 0) + count;
@@ -835,7 +835,7 @@ async function countNetworkBlocks(tabId, url) {
     });
     if (count === 0) return;
 
-    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
+    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
     ps.total   = (ps.total   | 0) + count;
     ps.network = (ps.network | 0) + count;
     const cat = url?.includes('amazon.') ? 'amazon' : 'general';
@@ -1395,7 +1395,7 @@ async function _cnameOnBeforeRequest(details) {
     _cnameCache.set(host, block);
     if (block) {
       logEvent('cname', 'info', `Blocked CNAME-cloaked tracker: ${host} -> ${canonical}`);
-      incrementStat('general', details.tabId);
+      incrementStat('general', details.tabId > 0 ? details.tabId : undefined);
       return { cancel: true };
     }
   } catch (_) {}
@@ -2463,7 +2463,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'GET_STATS': {
         const { stats } = await chrome.storage.local.get('stats');
-        sendResponse(stats ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 });
+        sendResponse(stats ?? { total:0, amazon:0, general:0, social:0, cookies:0 });
         break;
       }
       case 'GET_LIFETIME': {
@@ -2472,7 +2472,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'RESET_STATS':
-        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
+        await chrome.storage.local.set({ stats: { total:0, amazon:0, general:0, social:0, cookies:0 } });
         try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
         sendResponse({ ok: true });
         break;
@@ -3386,7 +3386,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     // Do NOT overwrite settings or whitelist if already restored from cloud sync
     // (cloud restore runs earlier in this handler and writes to local storage).
     const toWrite = {
-      stats:    { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 },
+      stats:    { total:0, amazon:0, general:0, social:0, cookies:0 },
       lifetime: { total:0 },
     };
     if (!existingSettings) toWrite.settings  = DEFAULT_SETTINGS;

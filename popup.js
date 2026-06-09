@@ -191,7 +191,6 @@ async function refreshStats() {
     $('s-ck').textContent = fmt(stats.cookies  || 0);
     $('s-wb').textContent = fmt(stats.general  || 0);
     if ($('s-an')) $('s-an').textContent = fmt(stats.annoyances || 0);
-    if ($('s-st')) $('s-st').textContent = fmt(stats.streaming  || 0);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 

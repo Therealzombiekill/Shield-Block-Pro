@@ -69,7 +69,7 @@ Everything lives in `chrome.storage.local`. Key prefixes:
 - `cosmeticSelectors`, `domainCosmetics`, `scriptletRules` — aggregated post-sync caches
 - `removeParamData` — aggregated removeparam data
 - `settings` — user toggle state (see `DEFAULT_SETTINGS` in background.js)
-- `stats`, `lifetime`, `timeSaved` — block counts
+- `stats`, `lifetime` — block counts
 - `dailyStats` — `{ "YYYY-MM-DD": count }` for 7-day sparkline, kept 30 days
 - `filterMatrix` — `{ hostname: { ruleKey: 'allow'|'block'|'default' } }`
 - `persistedLog` — last 100 log entries cached for SW restart recovery
@@ -90,6 +90,21 @@ const _host = location.hostname.replace(/^www\./, '');
 if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 ```
 
+### SSAI streaming platforms
+
+Server-Side Ad Insertion stitches ads into the content stream, so they can't be removed at the network layer. Dedicated scripts handle the platforms we can actually test:
+- **Dedicated scripts**: `content-twitch.js`, `content-hulu.js`, `content-kick.js`, `content-spotify.js`
+
+> A generic `content-streaming.js` handler (`settings.streaming`) for Max/Disney+/Paramount+/Peacock/Pluto/Tubi/Roku/Sling/etc. was **removed** — mainstream ad blockers cover those platforms better, and a mute-only fallback on players we can't test carried a real false-mute risk (a stray ad-class element page-wide muted the whole session). The `streaming` setting and `streaming` stat bucket were removed with it.
+
+The strategy:
+1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements)
+2. Mute the video element (`video.muted = true`) for the ad duration
+3. Remove ad UI overlays from the DOM
+4. Restore original mute state when the ad ends
+
+Spotify additionally attempts a skip (seeks to `audio.duration - 0.1` or clicks the next-track button).
+
 ### Annoyance blocker
 
 `content-annoyances.js` (ISOLATED, `document_idle`, `settings.annoyances`) removes intrusive third-party widgets the general cosmetic engine doesn't cover: live-chat widgets, web-push permission pre-prompts, smart app-install banners, survey/feedback bubbles, and sticky social-share bars. Selectors are vendor-scoped (named IDs/classes) to keep false positives near zero. Newsletter popups, anti-adblock walls and high-z interstitials remain in `content-general.js` (under `settings.cosmetic`) — do not duplicate them here.
@@ -98,7 +113,7 @@ if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
 `src/browser-compat.js` must be the first script loaded in every content script context (it's listed first in every `manifest.json` content_scripts entry). It maps `globalThis.chrome = globalThis.browser` in Firefox so all code can use `chrome.*` uniformly. The background SW imports it at the top: `import './browser-compat.js'`.
 
-`content-privacy.js` is a module content script (`"type": "module"`) that imports `./trusted-sites.js`. ES-module imports in content scripts are fetched over the extension URL, so any imported module **must** be listed in `web_accessible_resources` — `src/trusted-sites.js` is.
+`content-privacy.js` needs the shared helpers in `./trusted-sites.js`, but Chrome loads declarative `content_scripts` as **classic scripts** — `"type": "module"` is not a supported `content_scripts` key and a top-level `import` throws "Cannot use import statement outside a module". So `content-privacy.js` loads the module via dynamic `import(chrome.runtime.getURL('src/trusted-sites.js'))` inside its async IIFE, with a no-op fallback. Any module imported this way **must** be listed in `web_accessible_resources` — `src/trusted-sites.js` is.
 
 Firefox-specific callouts in the codebase:
 - `chrome.declarativeNetRequest.getMatchedRules` is not implemented in Firefox — guarded with `if (!chrome.declarativeNetRequest.getMatchedRules)`

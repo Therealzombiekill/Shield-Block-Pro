@@ -96,6 +96,11 @@ const STATIC_REMOVE_PARAMS = new Set([
 
 // ── Time saved estimates (seconds per blocked item by type) ───────────────────
 const TIME_SAVED_SECONDS = {
+  youtube:   15, // skippable + unskippable pre/mid-roll avoided
+  twitch:    25, // SSAI ad break
+  spotify:   25, // audio ad segment
+  hulu:      25, // video ad break
+  kick:      25, // video ad break
   amazon:     1, // blocked sponsored slot — page-load improvement
   general:    1, // blocked web ad/tracker — load + render time avoided
   social:     1, // skipped sponsored post
@@ -240,6 +245,10 @@ const DEFAULT_SETTINGS = {
   general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
+  youtube: true,        // YouTube ad skip/mute (inject + content scripts)
+  youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
+  twitch: true, spotify: true, hulu: true, kick: true,
+  paywall: false,       // soft paywall bypass (opt-in)
   annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
@@ -2417,7 +2426,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             cookies:    ps.cookies    ?? 0,
             general:    ps.general    ?? 0,
             annoyances: ps.annoyances ?? 0,
-            streaming:  ps.streaming  ?? 0,
           });
         } catch (_) { sendResponse({ total:0, network:0, dom:0 }); }
         break;

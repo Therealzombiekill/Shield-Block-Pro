@@ -66,28 +66,40 @@ function parseLine(line, idCounter) {
     const prefix   = line.slice(0, idx).trim();
     const rawAfter = line.slice(idx + 2).trim();
 
-    // ── Scriptlet: example.com##+js(name, arg1, arg2) ─────────────────────
+    // ── Scriptlet: example.com##+js(name, arg1, arg2)  (also a.com,b.de##+js(…)) ─
     if (rawAfter.startsWith('+js(') && rawAfter.endsWith(')')) {
       const inner = rawAfter.slice(4, -1).trim();
       const parts = inner.split(',').map(s => s.trim());
       const [name, ...args] = parts;
       if (!name) return null;
-      // '*' means apply to all domains
-      const domain = prefix ? prefix.toLowerCase() : '*';
-      // Skip exception domains (prefixed with ~) and multi-domain scriptlets
-      if (domain.startsWith('~') || domain.includes('|')) return null;
-      return { type: 'scriptlet', domain, name, args };
+      if (!prefix || prefix === '*') {
+        return { type: 'scriptlet', domains: ['*'], name, args };
+      }
+      // Multi-domain scriptlets (comma-separated) are common in regional lists.
+      // Expand into one entry per positive domain — previously a "a.com,b.de"
+      // prefix was stored under that composite key and never matched any host.
+      // Negated (~) members and pipe alternates can't be keyed per-domain, so drop them.
+      const domains = prefix.toLowerCase().split(',')
+        .map(d => d.trim())
+        .filter(d => d && !d.startsWith('~') && !d.includes('|'));
+      if (!domains.length) return null;
+      return { type: 'scriptlet', domains, name, args };
     }
 
-    // ── Domain-scoped cosmetic: example.com##.selector ────────────────────
+    // ── Domain-scoped cosmetic: example.com##.selector  (also a.com,b.de##.sel) ─
     if (prefix && prefix !== '*') {
-      // Skip multi-domain rules (comma-separated), exception prefixes, and
-      // pipe-separated alternates — these produce composite keys that never
-      // match any real hostname.
-      if (prefix.includes(',') || prefix.startsWith('~') || prefix.includes('|')) return null;
       if (rawAfter.length < 2 || rawAfter.length > 512) return null;
       if (hasUnsupportedPseudo(rawAfter)) return null;
-      return { type: 'domain-cosmetic', domain: prefix.toLowerCase(), selector: rawAfter };
+      // A rule can list several domains ("siteA.com,siteB.de##.ad"), which regional
+      // and non-English lists use heavily. Previously these were dropped entirely,
+      // so non-English sites lost cosmetic coverage. Expand into one entry per
+      // positive domain so the selector applies on each. Negated members
+      // (~sub.site.com) and pipe alternates can't be keyed per-domain, so drop them.
+      const domains = prefix.toLowerCase().split(',')
+        .map(d => d.trim())
+        .filter(d => d && !d.startsWith('~') && !d.includes('|'));
+      if (!domains.length) return null;
+      return { type: 'domain-cosmetic', domains, selector: rawAfter };
     }
 
     // ── Global cosmetic: ##.selector ──────────────────────────────────────
@@ -95,7 +107,7 @@ function parseLine(line, idCounter) {
     if (hasUnsupportedPseudo(rawAfter)) return null;
     // Global procedural rules → domainCosmetics['*'] for content-procedural.js
     if (isProceduralCosmetic(rawAfter)) {
-      return { type: 'domain-cosmetic', domain: '*', selector: rawAfter };
+      return { type: 'domain-cosmetic', domains: ['*'], selector: rawAfter };
     }
     return { type: 'cosmetic', selector: rawAfter };
   }
@@ -247,22 +259,25 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
       case 'cosmetic':
         if (cosmetics.size < MAX_COSMETICS) cosmetics.add(result.selector);
         break;
-      case 'domain-cosmetic':
-        if (domainCosmeticCount < MAX_DOMAIN_COSMETICS) {
-          const { domain, selector } = result;
+      case 'domain-cosmetic': {
+        // result.domains is always an array (single- or multi-domain, expanded)
+        for (const domain of result.domains) {
+          if (domainCosmeticCount >= MAX_DOMAIN_COSMETICS) break;
           if (!domainCosmetics[domain]) domainCosmetics[domain] = [];
-          domainCosmetics[domain].push(selector);
+          domainCosmetics[domain].push(result.selector);
           domainCosmeticCount++;
         }
         break;
-      case 'scriptlet':
-        if (scriptletCount < MAX_SCRIPTLETS) {
-          const { domain, name, args } = result;
+      }
+      case 'scriptlet': {
+        for (const domain of result.domains) {
+          if (scriptletCount >= MAX_SCRIPTLETS) break;
           if (!scriptletRules[domain]) scriptletRules[domain] = [];
-          scriptletRules[domain].push({ name, args });
+          scriptletRules[domain].push({ name: result.name, args: result.args });
           scriptletCount++;
         }
         break;
+      }
       case 'removeparam': {
         const { param, initDomains, exclDomains } = result;
         // ABP allows multiple params in one option via '|' (e.g. removeparam=utm_source|utm_medium).

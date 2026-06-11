@@ -162,6 +162,7 @@ async function refreshStats() {
     if ($('s-an')) $('s-an').textContent = fmt(stats.annoyances || 0);
     if ($('s-st')) $('s-st').textContent = fmt(stats.streaming  || 0);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
+    if ($('stat-cleaned')) $('stat-cleaned').textContent = fmt(stats.removeparam || 0);
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 
     const syncedAt = stored?.filterSyncedAt;
@@ -181,13 +182,14 @@ async function refreshStats() {
     }
 
     const n = page.total ?? 0;
-    if (n > 0) {
+    if (n > 0 || page.removeparam > 0) {
       const parts = [];
       if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
       if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);
       if (page.general > 0) parts.push(`${fmt(page.general)} web`);
       if (page.annoyances > 0) parts.push(`${fmt(page.annoyances)} nags`);
       if (page.streaming  > 0) parts.push(`${fmt(page.streaming)} stream`);
+      if (page.removeparam > 0) parts.push(`${fmt(page.removeparam)} cleaned`);
       $('stat-page').textContent = parts.length
         ? fmt(n) + ' · ' + parts.join(' · ')
         : fmt(n) + ' blocked';

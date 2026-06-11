@@ -108,6 +108,19 @@ const TIME_SAVED_SECONDS = {
   annoyances: 3, // dismissed nag / widget / banner
   streaming: 30, // SSAI ad break (additional platforms)
 };
+// A network-level block saves bandwidth + parse/exec time, not a watched ad.
+// 50ms per blocked request is Brave's published per-item estimate — conservative
+// and defensible, vs the per-type DOM estimates above which model skipped ads.
+const NETWORK_TIME_SAVED_SECONDS = 0.05;
+
+// Canonical zero-value stats object. `removeparam` counts stripped tracking
+// params — kept OUT of `total`/lifetime/badge (a cleaned URL is not a blocked ad).
+function emptyStats() {
+  return { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0,
+           general:0, social:0, cookies:0, annoyances:0, streaming:0, removeparam:0 };
+}
+// Stat types excluded from total/lifetime/badge/daily aggregation.
+const NON_BLOCK_STAT_TYPES = new Set(['removeparam']);
 
 // ── Browser detection ─────────────────────────────────────────────────────────
 // Service workers don't have navigator.userAgent in all MV3 builds, so we check
@@ -297,6 +310,61 @@ async function computeStaticRuleCount() {
 }
 let _staticRuleIds = new Set();
 
+// ── Matched-rule classification ────────────────────────────────────────────
+// getMatchedRules() reports EVERY matched rule — including `allow` (whitelist,
+// pause, YouTube-protect), `modifyHeaders` (DNT/GPC fires on every request),
+// `upgradeScheme`, and removeparam redirects. Counting those as "ads blocked"
+// turns the stat into a raw request counter. These maps let the poller count
+// only rules whose action actually neutralized something:
+//   'block'       → block rules + redirect-to-blank (counted as blocked)
+//   'removeparam' → queryTransform redirects (counted as params cleaned)
+//   null          → allow / modifyHeaders / upgradeScheme (never counted)
+const _staticRuleMeta = new Map(); // ruleId → { kind, domain } for bundled rules/*.json
+let _dynRuleMeta      = new Map(); // ruleId → { kind, domain } for dynamic rules
+let _dynRuleMetaAt    = 0;         // built timestamp — refreshed when stale (rules churn on sync)
+
+function _classifyRuleKind(rule) {
+  const t = rule?.action?.type;
+  if (t === 'block') return 'block';
+  if (t === 'redirect') {
+    // queryTransform/transform = tracking-param strip; extensionPath/url = ad neutralized
+    return rule.action.redirect?.transform ? 'removeparam' : 'block';
+  }
+  return null; // allow, allowAllRequests, modifyHeaders, upgradeScheme
+}
+
+// Best-effort human label for the domain a rule targets, for the request-log /
+// top-domains panels. MatchedRuleInfo carries no request URL (that is
+// onRuleMatchedDebug-only, unpacked extensions), so the rule condition is the
+// only honest source of "what got blocked".
+function _ruleDomainLabel(rule) {
+  const c = rule?.condition;
+  if (!c) return null;
+  if (c.requestDomains?.length) return c.requestDomains[0];
+  let f = c.urlFilter;
+  if (typeof f === 'string' && f.length > 1) {
+    f = f.replace(/^\|\|/, '').replace(/^\|/, '').replace(/^https?:\/\//, '');
+    f = f.split(/[/^*|]/)[0];
+    // Only return things that look like a hostname — generic patterns get no label
+    if (f && f.includes('.') && /^[a-z0-9.-]+$/i.test(f)) return f.toLowerCase();
+  }
+  return null;
+}
+
+function _ruleMetaOf(rule) {
+  return { kind: _classifyRuleKind(rule), domain: _ruleDomainLabel(rule) };
+}
+
+async function _refreshDynRuleMeta() {
+  try {
+    const rules = await chrome.declarativeNetRequest.getDynamicRules();
+    const map = new Map();
+    for (const r of rules) map.set(r.id, _ruleMetaOf(r));
+    _dynRuleMeta   = map;
+    _dynRuleMetaAt = Date.now();
+  } catch (_) {}
+}
+
 async function loadStaticRuleIds() {
   try {
     const manifest = chrome.runtime.getManifest();
@@ -306,7 +374,10 @@ async function loadStaticRuleIds() {
       try {
         const res   = await fetch(chrome.runtime.getURL(rs.path));
         const rules = await res.json();
-        if (Array.isArray(rules)) for (const r of rules) if (r.id) ids.add(r.id);
+        if (Array.isArray(rules)) for (const r of rules) if (r.id) {
+          ids.add(r.id);
+          _staticRuleMeta.set(r.id, _ruleMetaOf(r));
+        }
       } catch (_) {}
     }
     _staticRuleIds = ids;
@@ -443,10 +514,17 @@ let _pendingStats     = {};  // { statType: count }
 let _pendingTimeSaved = 0;   // seconds accumulated since last flush
 let _pendingFlush     = null;
 
+// Local-time day key (YYYY-MM-DD). toISOString() bucketed by UTC day, which
+// shifted evening activity into "tomorrow" for most of the Americas/Asia.
+function _localDayKey(ts = Date.now()) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // Track daily stats for 7-day chart
 async function recordDailyStats(count) {
   try {
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = _localDayKey();
     const { dailyStats = {} } = await chrome.storage.local.get('dailyStats');
     dailyStats[today] = (dailyStats[today] || 0) + count;
     // Keep only last 30 days
@@ -469,20 +547,23 @@ function _flushStats() {
   _pendingTimeSaved = 0;
   if (Object.keys(pending).length === 0 && savedThisFlush === 0) return;
 
-  // Record daily total for 7-day chart (fire-and-forget, non-critical)
-  const pendingTotal = Object.values(pending).reduce((a,b)=>a+b,0);
-  if (pendingTotal > 0) recordDailyStats(pendingTotal);
+  // Blocked total excludes non-block types (param strips) — they get their own counter
+  const blockedTotal = Object.entries(pending)
+    .reduce((a, [type, n]) => a + (NON_BLOCK_STAT_TYPES.has(type) ? 0 : n), 0);
 
-  // Serialise writes — chain onto the queue so concurrent flushes never race
+  // Serialise writes — chain onto the queue so concurrent flushes never race.
+  // recordDailyStats is a read-modify-write too, so it runs inside the queue.
   _flushQueue = _flushQueue.then(async () => {
+    if (blockedTotal > 0) await recordDailyStats(blockedTotal);
     try {
       const { stats, lifetime, timeSaved: prevSaved } =
         await chrome.storage.local.get(['stats','lifetime','timeSaved']);
-      const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
+      const s  = { ...emptyStats(), ...(stats ?? {}) };
       const lt = lifetime ?? { total:0 };
       for (const [type, count] of Object.entries(pending)) {
+        s[type] = (s[type] | 0) + count;
+        if (NON_BLOCK_STAT_TYPES.has(type)) continue;
         s.total  = (s.total  | 0) + count;
-        s[type]  = (s[type]  | 0) + count;
         lt.total = (lt.total | 0) + count;
       }
       await chrome.storage.local.set({
@@ -497,6 +578,7 @@ function _flushStats() {
         if (badgeSettings?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
       } catch (e) { logEvent('badge', 'warn', `Badge update failed: ${e.message}`); }
     } catch (_) {}
+    _saveSessionState(); // keep per-tab page stats alive across SW restarts
   });
 }
 
@@ -631,10 +713,9 @@ function logEvent(source, level, message, data = {}) {
   _schedulePersist();     // short-term cache (chrome.storage for SW restart restore)
 }
 
-// tabId → { total, network, dom, youtube, twitch, amazon, general }
-const _navStart   = new Map(); // tabId → timestamp of last navigation
-const _navCounting = new Set(); // tabIds currently in countNetworkBlocks (prevent concurrent calls)
-const _navCounted  = new Set(); // tabIds already counted this navigation
+// tabId → hostname of the top frame — lets the matched-rule poller attribute
+// network blocks to a platform category without an async tabs.get per match.
+const _tabHost = new Map();
 
 // ── Retry queue for failed filter fetches ─────────────────────────────────
 // Lists that fail during sync are queued for a single retry 5 minutes later.
@@ -773,19 +854,25 @@ async function _isOnline() {
 }
 
 
-function incrementStat(type, tabId) {
+function incrementStat(type, tabId, count = 1, timeSavedOverride = null) {
   // Update per-page stats synchronously (in-memory only)
-  if (tabId) {
-    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
-    ps.total = (ps.total | 0) + 1;
-    ps.dom   = (ps.dom   | 0) + 1;
+  if (tabId && tabId > 0) {
+    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0 };
     // Record every stat type per-tab so the popup "This page" breakdown is complete
-    ps[type] = (ps[type] | 0) + 1;
+    ps[type] = (ps[type] | 0) + count;
+    if (!NON_BLOCK_STAT_TYPES.has(type)) {
+      ps.total = (ps.total | 0) + count;
+      // DOM/network split: network counts arrive via the matched-rule poller
+      if (timeSavedOverride === null) ps.dom = (ps.dom | 0) + count;
+      else ps.network = (ps.network | 0) + count;
+    }
     _pageStats.set(tabId, ps);
   }
   // Accumulate — flush to storage in a single write after 500ms idle
-  _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
-  _pendingTimeSaved  += TIME_SAVED_SECONDS[type] ?? 2;
+  _pendingStats[type] = (_pendingStats[type] ?? 0) + count;
+  _pendingTimeSaved  += timeSavedOverride !== null
+    ? timeSavedOverride
+    : (TIME_SAVED_SECONDS[type] ?? 2) * count;
   const pending = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
   if (pending >= 20) {
     clearTimeout(_pendingFlush);
@@ -795,13 +882,16 @@ function incrementStat(type, tabId) {
   }
 }
 
-function logBlockedRequest(url, tabId) {
+// Records one blocked network request for the request-log / top-domains panels.
+// `domain` is derived from the matched rule's condition (the tracker that was
+// blocked) — NOT the page URL, which is what these panels used to show.
+function logBlockedRequest(domain, tabId) {
   try {
-    const hostname = new URL(url).hostname;
-    _requestLog.push({ url: hostname, ts: Date.now(), tabId });
+    if (!domain) return;
+    _requestLog.push({ url: domain, ts: Date.now(), tabId });
     if (_requestLog.length > LOG_MAX) _requestLog.shift();
     // Track domain frequency for the top-blocked-domains panel
-    _domainStats.set(hostname, (_domainStats.get(hostname) || 0) + 1);
+    _domainStats.set(domain, (_domainStats.get(domain) || 0) + 1);
     // Evict lowest-count entries if over limit — keeps high-frequency domains, drops noise
     if (_domainStats.size > DOMAIN_STATS_MAX) {
       const sorted = [..._domainStats.entries()].sort((a, b) => a[1] - b[1]);
@@ -810,71 +900,203 @@ function logBlockedRequest(url, tabId) {
   } catch (_) {}
 }
 
-// NOTE: chrome.declarativeNetRequest.onRuleMatchedDebug is only available to UNPACKED
-// extensions, and where it fires it double-logs every block that countNetworkBlocks()
-// already records via getMatchedRules() — inflating GET_TOP_DOMAINS / GET_PAGE_LOG with
-// duplicate entries. countNetworkBlocks() is the single source of truth for the request log.
+// ── Network block counting — global matched-rule poller ───────────────────────
+//
+// getMatchedRules() is the only MV3 signal for DNR blocks (onRuleMatchedDebug is
+// unpacked-only), and it has two hard constraints that shape this design:
+//   • QUOTA: 20 calls per 10 minutes. The old per-navigation snapshot burned one
+//     call per page load and went silently dark after ~20 pages.
+//   • RETENTION: matches are kept ~5 minutes. Polling globally (no tabId filter)
+//     once a minute therefore sees EVERY match — including lazy-loaded ads, SPA
+//     route changes and long-lived tabs the old one-shot snapshot missed.
+// A timestamp high-water mark dedupes across polls; both it and the quota window
+// are persisted to chrome.storage.session so SW restarts neither double-count
+// nor over-call. Matches are classified via _staticRuleMeta/_dynRuleMeta so only
+// real blocks count — allow/modifyHeaders/upgradeScheme matches are ignored and
+// removeparam matches go to their own "cleaned" counter.
+// Firefox has no getMatchedRules — DOM-level stats still work, network counts skip.
 
-async function countNetworkBlocks(tabId, url) {
-  if (_navCounted.has(tabId) || _navCounting.has(tabId)) return;
+const STATS_POLL_ALARM   = 'statsPoll';
+const GMR_QUOTA_WINDOW   = 10 * 60 * 1000; // Chrome: 20 calls / 10 min
+const GMR_QUOTA_MAX      = 16;             // self-imposed cap, leaves safety margin
+const MATCH_LOOKBACK_MS  = 5 * 60 * 1000;  // getMatchedRules retention window
+
+let _lastMatchTs   = 0;    // high-water mark of counted matches
+let _gmrCalls      = [];   // timestamps of getMatchedRules calls (rolling window)
+let _lastPollAt    = 0;    // throttle gate for event-driven polls
+let _pollInflight  = null; // concurrent pollers share one in-flight promise
+
+function _hostCategory(host) {
+  if (!host) return 'general';
+  if (host === 'youtu.be' || host.endsWith('.youtube.com') || host === 'youtube.com') return 'youtube';
+  if (host === 'twitch.tv'   || host.endsWith('.twitch.tv'))   return 'twitch';
+  if (host === 'spotify.com' || host.endsWith('.spotify.com')) return 'spotify';
+  if (host === 'hulu.com'    || host.endsWith('.hulu.com'))    return 'hulu';
+  if (host === 'kick.com'    || host.endsWith('.kick.com'))    return 'kick';
+  if (/(^|\.)amazon\.[a-z.]{2,6}$/.test(host)) return 'amazon';
+  return 'general';
+}
+
+// Single-flight lock — concurrent polls would read the same watermark and
+// count the same matches twice. All callers go through this.
+function _pollMatchedRules() {
+  if (_pollInflight) return _pollInflight;
+  _pollInflight = _doPollMatchedRules()
+    .catch(() => {})
+    .finally(() => { _pollInflight = null; });
+  return _pollInflight;
+}
+
+async function _doPollMatchedRules() {
   // getMatchedRules is not implemented in Firefox — skip gracefully
-  if (!chrome.declarativeNetRequest.getMatchedRules) {
-    _navCounted.add(tabId);
-    return;
-  }
-  _navCounting.add(tabId);
+  if (!chrome.declarativeNetRequest.getMatchedRules) return;
+  await _restoreSessionState(); // no-op after first call per SW life
+
+  // Quota gate — never exceed our self-imposed call budget
+  const now = Date.now();
+  _gmrCalls = _gmrCalls.filter(t => now - t < GMR_QUOTA_WINDOW);
+  if (_gmrCalls.length >= GMR_QUOTA_MAX) return;
+  _gmrCalls.push(now);
+  _lastPollAt = now;
+
   try {
-    const minTs = _navStart.get(tabId) ?? (Date.now() - 30000);
-    const matched = await chrome.declarativeNetRequest.getMatchedRules({ tabId, minTimeStamp: minTs });
-    const count = matched?.rulesMatchedInfo?.length ?? 0;
-    _navCounted.add(tabId); // only mark as counted after successful API call
-    // Log each matched rule for the request log panel
-    matched?.rulesMatchedInfo?.forEach(m => {
-      try { logBlockedRequest(m.request?.url || url, tabId); } catch(_) {}
-    });
-    if (count === 0) return;
+    const minTimeStamp = _lastMatchTs > 0 ? _lastMatchTs + 1 : now - MATCH_LOOKBACK_MS;
+    const matched = await chrome.declarativeNetRequest.getMatchedRules({ minTimeStamp });
+    const infos = matched?.rulesMatchedInfo ?? [];
+    if (infos.length === 0) { _saveSessionState(); return; }
 
-    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
-    ps.total   = (ps.total   | 0) + count;
-    ps.network = (ps.network | 0) + count;
-    const cat = url?.includes('twitch.tv')  ? 'twitch'
-              : url?.includes('amazon.')     ? 'amazon'
-              : 'general';
-    ps[cat] = (ps[cat] | 0) + count;
-    _pageStats.set(tabId, ps);
+    // Resolve metadata for any dynamic rule we haven't seen yet, and rebuild
+    // periodically — filter syncs rewrite the dynamic pool, which can leave an
+    // old ID pointing at a rule with a different condition. One getDynamicRules()
+    // per poll at most.
+    const dynId = chrome.declarativeNetRequest.DYNAMIC_RULESET_ID ?? '_dynamic';
+    const metaStale = now - _dynRuleMetaAt > 10 * 60 * 1000;
+    if (metaStale || infos.some(m => m.rule?.rulesetId === dynId && !_dynRuleMeta.has(m.rule.ruleId))) {
+      await _refreshDynRuleMeta();
+    }
 
-    // Chain onto the SAME queue as _flushStats() so DOM-block and network-block
-    // read-modify-writes of stats/lifetime are serialised against each other and
-    // never clobber one another's increments.
-    _flushQueue = _flushQueue.then(async () => {
-      try {
-        const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
-        const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
-        const lt = lifetime ?? { total:0 };
-        s.total  = (s.total  | 0) + count;
-        s[cat]   = (s[cat]   | 0) + count;
-        lt.total = (lt.total | 0) + count;
-        await chrome.storage.local.set({ stats: s, lifetime: lt });
-        try {
-          chrome.action.setBadgeText({ text: formatBadge(s.total) });
-          // Honour badgeEnabled — don't re-show the badge if the user turned it off
-          const { settings: _bs } = await chrome.storage.local.get('settings');
-          if (_bs?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
-        } catch (_) {}
-      } catch (_) {}
-    });
-  } catch (_) {}
-  finally { _navCounting.delete(tabId); }
+    const perTab = new Map(); // tabId → { cat → count } ('removeparam' rides along as a cat)
+    for (const m of infos) {
+      if (m.timeStamp > _lastMatchTs) _lastMatchTs = m.timeStamp;
+      const id     = m.rule?.ruleId;
+      const isDyn  = m.rule?.rulesetId === dynId;
+      let meta     = (isDyn ? _dynRuleMeta : _staticRuleMeta).get(id);
+      if (!meta) {
+        // Rule removed between match and poll. Filter-band + user-band dynamic IDs
+        // are always plain blocks; anything else is unknowable — don't count it.
+        const inBlockBand = isDyn &&
+          ((id >= FILTER_DYNAMIC_START && id <= FILTER_DYNAMIC_END) ||
+           (id >= USER_DNR_BASE && id <= USER_DNR_END));
+        if (!inBlockBand) continue;
+        meta = { kind: 'block', domain: null };
+      }
+      if (meta.kind !== 'block' && meta.kind !== 'removeparam') continue;
+      const tabId = m.tabId ?? -1;
+      const cat   = meta.kind === 'removeparam'
+        ? 'removeparam'
+        : _hostCategory(_tabHost.get(tabId));
+      const tabCats = perTab.get(tabId) ?? {};
+      tabCats[cat] = (tabCats[cat] ?? 0) + 1;
+      perTab.set(tabId, tabCats);
+      if (meta.kind === 'block') logBlockedRequest(meta.domain, tabId);
+    }
+
+    for (const [tabId, cats] of perTab) {
+      for (const [cat, n] of Object.entries(cats)) {
+        // Param strips save no watchable time; blocked requests save ~50ms each
+        const saved = cat === 'removeparam' ? 0 : n * NETWORK_TIME_SAVED_SECONDS;
+        incrementStat(cat, tabId, n, saved);
+      }
+    }
+    _saveSessionState();
+  } catch (e) {
+    // Quota errors should be impossible given the gate above — log, don't spam
+    logEvent('stats', 'warn', `getMatchedRules poll failed: ${e.message}`);
+  }
+}
+
+// Throttle wrapper: event-driven triggers (page load, popup open) coalesce into
+// one in-flight poll and respect a minimum gap so they can't drain the quota.
+function pollMatchedRulesSoon(minGapMs = 25000) {
+  if (!chrome.declarativeNetRequest.getMatchedRules) return Promise.resolve();
+  if (_pollInflight) return _pollInflight;
+  if (Date.now() - _lastPollAt < minGapMs) return Promise.resolve();
+  return _pollMatchedRules();
+}
+
+// ── Session-state persistence ─────────────────────────────────────────────────
+// MV3 kills the SW after ~30s idle, wiping in-memory maps — the popup's "This
+// page" / "Top blocked" panels used to reset constantly, and the poller would
+// lose its dedupe watermark (double counts) and quota window (over-calling).
+// chrome.storage.session survives SW restarts and is auto-cleared when the
+// browser closes — exactly the lifetime these session stats need.
+let _sessionRestored = null;
+let _sessSaveTimer   = null;
+
+function _saveSessionState() {
+  if (!chrome.storage.session) return;
+  if (_sessSaveTimer) return;
+  _sessSaveTimer = setTimeout(async () => {
+    _sessSaveTimer = null;
+    try {
+      await chrome.storage.session.set({ sessStats: {
+        lastMatchTs: _lastMatchTs,
+        gmrCalls:    _gmrCalls,
+        pageStats:   [..._pageStats.entries()],
+        tabHost:     [..._tabHost.entries()],
+        requestLog:  _requestLog.slice(-LOG_MAX),
+        domainStats: [..._domainStats.entries()].sort((a,b) => b[1]-a[1]).slice(0, 500),
+      }});
+    } catch (_) {}
+  }, 3000);
+}
+
+function _restoreSessionState() {
+  if (_sessionRestored) return _sessionRestored;
+  _sessionRestored = (async () => {
+    // Seed tab hosts for tabs that existed before this SW instance
+    try {
+      const tabs = await chrome.tabs.query({});
+      for (const t of tabs) {
+        if (t.id != null && t.url?.startsWith('http')) {
+          try { _tabHost.set(t.id, new URL(t.url).hostname); } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    if (!chrome.storage.session) return;
+    try {
+      const { sessStats } = await chrome.storage.session.get('sessStats');
+      if (!sessStats) return;
+      _lastMatchTs = sessStats.lastMatchTs ?? 0;
+      _gmrCalls    = Array.isArray(sessStats.gmrCalls) ? sessStats.gmrCalls : [];
+      // Recover the throttle gate too, so SW wakes don't add an extra poll
+      // right before the alarm's scheduled one.
+      _lastPollAt  = Math.max(_lastPollAt, ..._gmrCalls.map(Number).filter(Number.isFinite), 0);
+      for (const [k, v] of sessStats.pageStats   ?? []) if (!_pageStats.has(k))   _pageStats.set(k, v);
+      for (const [k, v] of sessStats.tabHost     ?? []) if (!_tabHost.has(k))     _tabHost.set(k, v);
+      for (const [k, v] of sessStats.domainStats ?? []) if (!_domainStats.has(k)) _domainStats.set(k, v);
+      if (_requestLog.length === 0 && Array.isArray(sessStats.requestLog)) {
+        _requestLog.push(...sessStats.requestLog);
+      }
+    } catch (_) {}
+  })();
+  return _sessionRestored;
 }
 
 // ── Tab lifecycle ──────────────────────────────────────────────────────────
 
 chrome.webNavigation.onBeforeNavigate.addListener(async ({ tabId, frameId, url }) => {
   if (frameId !== 0) return;
+  // Restore BEFORE resetting this tab's counters — otherwise a later restore
+  // could resurrect the previous page's stats over the fresh navigation.
+  await _restoreSessionState();
   _pageStats.delete(tabId);
-  _navStart.set(tabId, Date.now());
-  _navCounted.delete(tabId);
-  _navCounting.delete(tabId);
+  if (url?.startsWith('http')) {
+    try { _tabHost.set(tabId, new URL(url).hostname); } catch (_) {}
+  } else {
+    _tabHost.delete(tabId);
+  }
+  _saveSessionState();
 
   // ── Safe browsing check ──────────────────────────────────────────────────
   if (!url?.startsWith('http')) return;
@@ -894,15 +1116,15 @@ chrome.webNavigation.onCompleted.addListener(({ tabId, frameId, url }) => {
   if (frameId !== 0) return;
   if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://') ||
       url.startsWith('moz-extension://') || url.startsWith('about:') || url.startsWith('file://')) return;
-  setTimeout(() => countNetworkBlocks(tabId, url), 300);
+  // Pick up the initial request burst promptly; the throttle keeps a navigation
+  // storm from draining the getMatchedRules quota (the 1-min alarm catches up).
+  setTimeout(() => pollMatchedRulesSoon(25000), 1200);
 });
 
 // Clean up Maps when tab is closed (prevent memory leak)
 chrome.tabs.onRemoved.addListener((tabId) => {
   _pageStats.delete(tabId);
-  _navStart.delete(tabId);
-  _navCounted.delete(tabId);
-  _navCounting.delete(tabId);
+  _tabHost.delete(tabId);
 });
 
 // ── Filter Sync ────────────────────────────────────────────────────────────
@@ -2362,10 +2584,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'GET_DAILY_STATS': {
         const { dailyStats = {} } = await chrome.storage.local.get('dailyStats');
-        // Return last 7 days
+        // Return last 7 days (local-time day buckets, matching recordDailyStats)
         const days = [];
         for (let i = 6; i >= 0; i--) {
-          const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+          const d = _localDayKey(Date.now() - i * 86400000);
           days.push({ date: d, count: dailyStats[d] || 0 });
         }
         sendResponse(days);
@@ -2373,7 +2595,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'GET_STATS': {
         const { stats } = await chrome.storage.local.get('stats');
-        sendResponse(stats ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 });
+        sendResponse({ ...emptyStats(), ...(stats ?? {}) });
         break;
       }
       case 'GET_LIFETIME': {
@@ -2382,7 +2604,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'RESET_STATS':
-        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
+        await chrome.storage.local.set({ stats: emptyStats() });
         try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
         sendResponse({ ok: true });
         break;
@@ -2414,12 +2636,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       case 'GET_PAGE_STATS': {
         try {
+          await _restoreSessionState();
           const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
           if (!tab?.id) { sendResponse({ total:0, network:0, dom:0, amazon:0, social:0, cookies:0, general:0 }); break; }
-          const isWebPage = tab.url?.startsWith('http://') || tab.url?.startsWith('https://');
-          if (!_navCounted.has(tab.id) && isWebPage) {
-            await countNetworkBlocks(tab.id, tab.url);
-          }
+          // Freshen network counts for the popup; throttled so an open popup
+          // (which refreshes every 3s) can't drain the getMatchedRules quota.
+          await pollMatchedRulesSoon(10000);
           const ps = _pageStats.get(tab.id) ?? { total:0, network:0, dom:0 };
           sendResponse({
             total:      ps.total      ?? 0,
@@ -2431,6 +2653,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             general:    ps.general    ?? 0,
             annoyances: ps.annoyances ?? 0,
             streaming:  ps.streaming  ?? 0,
+            removeparam: ps.removeparam ?? 0,
           });
         } catch (_) { sendResponse({ total:0, network:0, dom:0 }); }
         break;
@@ -3180,6 +3403,7 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
 // ── Alarms ─────────────────────────────────────────────────────────────────
 
 chrome.alarms.onAlarm.addListener(async ({ name }) => {
+  if (name === STATS_POLL_ALARM) { _pollMatchedRules().catch(() => {}); return; }
   if (name === 'filterSync') { syncFilterLists(false).catch(e => logEvent('filter-sync', 'error', `Sync alarm error: ${e.message}`)); return; }
   if (name === 'retrySync') { await _retryFailedLists().catch(e => logEvent('filter-sync', 'error', `Retry alarm error: ${e.message}`)); return; }
   if (name === 'safeBrowsingRefresh') { fetchSafeBrowsingLists().catch(() => {}); return; }
@@ -3353,7 +3577,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     // Do NOT overwrite settings or whitelist if already restored from cloud sync
     // (cloud restore runs earlier in this handler and writes to local storage).
     const toWrite = {
-      stats:    { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 },
+      stats:    emptyStats(),
       lifetime: { total:0 },
     };
     if (!existingSettings) toWrite.settings  = DEFAULT_SETTINGS;
@@ -3406,6 +3630,13 @@ chrome.runtime.onStartup.addListener(async () => {
   await _restoreLog();
   logEvent('system', 'info', 'Service worker started (onStartup)');
 
+  // The hero stat is labelled "Session ads blocked" — make that true. Zero the
+  // session counter at browser launch; the cumulative count is preserved in
+  // `lifetime` (which has always been incremented in parallel) and shown in the
+  // popup's "Lifetime total" row. storage.session (poller state, per-tab stats)
+  // is cleared by the browser automatically.
+  await chrome.storage.local.set({ stats: emptyStats() });
+
   // Init feature engines on every browser start
   const _ss = await getSettings();
   // Restore cached static rule count before computing fresh (avoids showing 0 briefly)
@@ -3454,18 +3685,8 @@ chrome.runtime.onStartup.addListener(async () => {
     });
   }, 500);
   await setupContextMenus();
-  try {
-    const { stats } = await chrome.storage.local.get('stats');
-    const total = stats?.total ?? 0;
-    if (total > 0) {
-      chrome.action.setBadgeText({ text: formatBadge(total) });
-      chrome.action.setBadgeBackgroundColor({ color: '#7c6aff' });
-    }
-    try {
-      const { settings: badgeSettings } = await chrome.storage.local.get('settings');
-      if (badgeSettings?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
-    } catch (_) {}
-  } catch (_) {}
+  // Session counter starts at zero each browser launch — badge starts empty too
+  try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
 });
 
 // ── Catch-up sync on plain service-worker wake ──────────────────────────────
@@ -3485,5 +3706,28 @@ chrome.runtime.onStartup.addListener(async () => {
       // lock first on the wakes where those events ARE firing.
       setTimeout(() => syncFilterLists(true).catch(() => {}), 3000);
     }
+  } catch (_) {}
+})();
+
+// ── Stats poller bootstrap — runs on EVERY service-worker evaluation ─────────
+// The 1-minute alarm both drives the matched-rule poll and wakes the SW so no
+// match ages out of getMatchedRules' ~5-minute retention while the SW is dead.
+// Static rule metadata is needed by the poller to classify matches; onStartup
+// loads it too, but plain message/alarm wakes don't run onStartup.
+(async () => {
+  try {
+    _restoreSessionState(); // eager — minimizes the window where panels show empty
+    if (!chrome.declarativeNetRequest.getMatchedRules) return; // Firefox: DOM stats only
+    if (_staticRuleMeta.size === 0) loadStaticRuleIds().catch(() => {});
+    const existing = await chrome.alarms.get(STATS_POLL_ALARM);
+    if (!existing) await chrome.alarms.create(STATS_POLL_ALARM, { periodInMinutes: 1 });
+    // Catch-up poll: counts whatever accumulated since the last poll (the
+    // session watermark dedupes), then steady-state continues on the alarm.
+    // Restore first so the throttle/quota gates see the persisted state.
+    setTimeout(() => {
+      Promise.resolve(_restoreSessionState())
+        .then(() => pollMatchedRulesSoon(30000))
+        .catch(() => {});
+    }, 2500);
   } catch (_) {}
 })();

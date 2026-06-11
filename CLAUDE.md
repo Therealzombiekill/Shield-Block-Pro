@@ -65,6 +65,17 @@ Filter list text → `parseFilterList()` in `src/filter-parser.js` → four outp
 
 `$removeparam` rules are collected into `removeParamData` and applied by `applyRemoveParamRules()` which merges them with the hardcoded `STATIC_REMOVE_PARAMS` set and emits a single global DNR redirect+queryTransform rule where possible.
 
+### Stats pipeline (accurate counting)
+
+Two sources feed one batched accumulator (`incrementStat` → `_flushStats`, serialized on `_flushQueue`):
+
+1. **DOM blocks** — content scripts send `INCREMENT_STAT` with a platform `statType`; each type has a per-item time-saved estimate in `TIME_SAVED_SECONDS`.
+2. **Network blocks** — `_pollMatchedRules()` in background.js polls `chrome.declarativeNetRequest.getMatchedRules()` **globally** (no tabId) on the 1-minute `statsPoll` alarm, plus throttled event triggers (page load ≥25s gap, popup open ≥10s gap). The API has a hard quota (20 calls/10 min, self-capped at 16 via a persisted rolling window) and ~5-minute match retention, so a 1-minute global poll sees every match. A persisted timestamp high-water mark dedupes across polls and SW restarts.
+
+Matched rules are classified via `_staticRuleMeta`/`_dynRuleMeta` (rule ID → action kind + target domain): only `block` and non-transform `redirect` actions count as blocks (~50ms time-saved each, `NETWORK_TIME_SAVED_SECONDS`); queryTransform redirects count as `removeparam` ("cleaned", no time, excluded from totals); `allow`/`modifyHeaders`/`upgradeScheme` matches are **never** counted — the DNT/GPC header rule matches every request and would otherwise turn the counter into a request counter. The blocked-domain labels shown in the request-log/top-domains panels come from the matched rule's *condition* (`MatchedRuleInfo` carries no request URL; `onRuleMatchedDebug` is unpacked-only).
+
+Firefox has no `getMatchedRules` — network counting is skipped there; DOM stats still work.
+
 ### Storage layout
 
 Everything lives in `chrome.storage.local`. Key prefixes:
@@ -79,8 +90,11 @@ Everything lives in `chrome.storage.local`. Key prefixes:
 - `cosmeticSelectors`, `domainCosmetics`, `scriptletRules` — aggregated post-sync caches
 - `removeParamData` — aggregated removeparam data
 - `settings` — user toggle state (see `DEFAULT_SETTINGS` in background.js)
-- `stats`, `lifetime`, `timeSaved` — block counts
-- `dailyStats` — `{ "YYYY-MM-DD": count }` for 7-day sparkline, kept 30 days
+- `stats` — per-category session block counts (zeroed on every browser launch by `onStartup` — the popup hero is labelled "Session"). Includes `removeparam` (tracking params cleaned), which is excluded from `total`/badge/lifetime
+- `lifetime`, `timeSaved` — cumulative all-time counters (never auto-reset)
+- `dailyStats` — `{ "YYYY-MM-DD": count }` for 7-day sparkline, kept 30 days, local-time day buckets
+
+`chrome.storage.session` (auto-cleared on browser close) holds `sessStats`: the matched-rule poller's dedupe watermark + quota window, per-tab page stats, tab→host map, request log, and top-domain counts — so MV3 service-worker restarts don't wipe them.
 - `filterMatrix` — `{ hostname: { ruleKey: 'allow'|'block'|'default' } }`
 - `persistedLog` — last 100 log entries cached for SW restart recovery
 - `customHideRules` — element picker selections
@@ -141,6 +155,7 @@ CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom p
 
 ### Alarms
 
+- `statsPoll` — fires every 1 minute, triggers `_pollMatchedRules()` (network block counting; also keeps matches from aging out of `getMatchedRules`' ~5-minute retention while the SW is idle)
 - `filterSync` — fires every 720 minutes (12 hours), triggers `syncFilterLists(false)`
 - `retrySync` — fires 5 minutes after a partial sync failure, triggers `_retryFailedLists()`
 - `safeBrowsingRefresh` — fires every 6 hours, refreshes malware/phishing domain lists

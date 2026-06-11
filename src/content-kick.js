@@ -53,7 +53,7 @@
     return false;
   }
 
-  // NOTE: mute-only (like content-streaming.js). We must NOT remove AD_SELECTORS
+  // NOTE: mute-only (like the other dedicated SSAI handlers). We must NOT remove AD_SELECTORS
   // elements — isAdPlaying() detects the ad break from them, so removing them would
   // make the next tick think the ad ended and unmute while the SSAI ad still plays.
 

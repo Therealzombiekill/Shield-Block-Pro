@@ -50,12 +50,12 @@ DevTools: service worker console on the extension card; popup via right-click to
 | Roadmap verification | `node scripts/test-roadmap.mjs` (49 factual checks) |
 | Benchmark domains | `node scripts/check-benchmark-domains.mjs` |
 | JS syntax check | Included in `validate-extension.mjs` |
-| Static rules compile | `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>` — refresh `rules/easylist-static.json` (100000, max 20000) and `rules/easyprivacy-static.json` (130000, max 7000) at release time |
-| Benchmark baseline | Support tab → Blocking Benchmarks; see `docs/benchmarks.md` |
+| Static rules compile | `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>` — refresh at release time: easylist-static (100000, max 16800), easyprivacy-static (130000, max 6000), easylistgermany-static (140000, max 2200), peterlowe-static (150000, max 3300). Static IDs must stay >=100000 (outside all dynamic bands) and total enabled static rules <=30,000 |
+| Benchmark baseline | Open the adblock test URLs manually (d3ward, adblock-tester, EFF Cover Your Tracks) |
 
 ### Hello-world verification
 
-1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.19.0).
+1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.20.0).
 2. Open the extension popup from the toolbar.
 3. Go to the **Support** tab → **Extension Health** → click **Run check**.
 4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.

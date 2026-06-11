@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.19.0",
-  "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
+  "version": "2.20.0",
+  "description": "Block ads, trackers, and cookie banners across the web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -43,8 +43,7 @@
         "src/browser-compat.js",
         "src/content-privacy.js"
       ],
-      "run_at": "document_start",
-      "type": "module"
+      "run_at": "document_start"
     },
     {
       "matches": [
@@ -180,29 +179,6 @@
     },
     {
       "matches": [
-        "*://*.max.com/*",
-        "*://*.disneyplus.com/*",
-        "*://*.paramountplus.com/*",
-        "*://*.peacocktv.com/*",
-        "*://*.pluto.tv/*",
-        "*://*.tubitv.com/*",
-        "*://*.roku.com/*",
-        "*://*.sling.com/*",
-        "*://*.fubo.tv/*",
-        "*://*.crackle.com/*",
-        "*://*.discoveryplus.com/*",
-        "*://*.plex.tv/*",
-        "*://*.xumo.com/*",
-        "*://*.vudu.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-streaming.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
         "*://www.youtube.com/*",
         "*://youtube.com/*",
         "*://music.youtube.com/*"
@@ -268,6 +244,16 @@
         "id": "easyprivacy_static",
         "enabled": true,
         "path": "rules/easyprivacy-static.json"
+      },
+      {
+        "id": "easylistgermany_static",
+        "enabled": true,
+        "path": "rules/easylistgermany-static.json"
+      },
+      {
+        "id": "peterlowe_static",
+        "enabled": true,
+        "path": "rules/peterlowe-static.json"
       }
     ]
   },

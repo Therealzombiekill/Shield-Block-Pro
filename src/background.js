@@ -103,17 +103,16 @@ const STATIC_REMOVE_PARAMS = new Set([
 
 // ── Time saved estimates (seconds per blocked item by type) ───────────────────
 const TIME_SAVED_SECONDS = {
-  youtube:  15, // avg of 5s skippable + 30s unskippable
-  twitch:   30, // full SSAI ad break
-  spotify:  30, // audio ad segment
-  hulu:     30, // video ad break
-  kick:     30, // video ad break
-  amazon:    3, // page load improvement
-  general:   5, // typical ad script load time
-  social:    2, // skipped sponsored post
-  cookies:   8, // time to find + click "reject all"
-  annoyances: 3, // dismissed nag / widget / banner
-  streaming: 30, // SSAI ad break (additional platforms)
+  youtube:   15, // skippable + unskippable pre/mid-roll avoided
+  twitch:    25, // SSAI ad break
+  spotify:   25, // audio ad segment
+  hulu:      25, // video ad break
+  kick:      25, // video ad break
+  amazon:     1, // blocked sponsored slot — page-load improvement
+  general:    1, // blocked web ad/tracker — load + render time avoided
+  social:     1, // skipped sponsored post
+  cookies:    5, // time to find + click "reject all" by hand
+  annoyances: 2, // dismissed nag / widget / banner
 };
 // A network-level block saves bandwidth + parse/exec time, not a watched ad.
 // 50ms per blocked request is Brave's published per-item estimate — conservative
@@ -124,7 +123,7 @@ const NETWORK_TIME_SAVED_SECONDS = 0.05;
 // params — kept OUT of `total`/lifetime/badge (a cleaned URL is not a blocked ad).
 function emptyStats() {
   return { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0,
-           general:0, social:0, cookies:0, annoyances:0, streaming:0, removeparam:0 };
+           general:0, social:0, cookies:0, annoyances:0, removeparam:0 };
 }
 // Stat types excluded from total/lifetime/badge/daily aggregation.
 const NON_BLOCK_STAT_TYPES = new Set(['removeparam']);
@@ -278,19 +277,16 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 // ── Settings ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
-  twitch: true, general: true,
+  general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
-  spotify: true,
-  hulu: true,
-  kick: true,
-  youtube: true,
+  youtube: true,        // YouTube ad skip/mute (inject + content scripts)
   youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
+  twitch: true, spotify: true, hulu: true, kick: true,
+  paywall: false,       // soft paywall bypass (opt-in)
   annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
-  streaming: true,      // SSAI ad-mute on additional streaming platforms (Max, Disney+, etc.)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
-  paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
   referrerStrip: true,  // strip Referer header on 3rd-party requests
   httpsUpgrade: true,   // upgrade http:// navigations to https://
   timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)
@@ -753,7 +749,7 @@ let _retryQueue = []; // [{ list, limit, reason }]
 // Drop cached per-list rules when the rule ID layout or parser output changes,
 // so the next sync re-fetches and re-stamps every rule with its new ID. Runs
 // from BOTH onStartup and onInstalled — extension updates don't fire onStartup.
-const RULES_LAYOUT_VERSION = 'ranges-2.19'; // two-segment band + exception rules
+const RULES_LAYOUT_VERSION = 'ranges-2.20'; // two-segment band + exception rules + non-colliding static IDs
 async function _migrateRuleLayoutIfNeeded() {
   try {
     const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
@@ -899,6 +895,7 @@ async function _isOnline() {
 
 
 function incrementStat(type, tabId, count = 1, timeSavedOverride = null) {
+  count = Math.max(1, count | 0); // content scripts send the real element count; sanitize
   // Update per-page stats synchronously (in-memory only)
   if (tabId && tabId > 0) {
     const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0 };
@@ -2305,10 +2302,10 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
   const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   try {
     const en = [], dis = [];
-    if (merged.general) en.push('base_rules','extended_rules','hosts_rules','easylist_static');
-    else dis.push('base_rules','extended_rules','hosts_rules','easylist_static');
-    if (merged.tracking) en.push('tracking_rules','easyprivacy_static');
-    else dis.push('tracking_rules','easyprivacy_static');
+    const GENERAL_RULESETS  = ['base_rules','extended_rules','hosts_rules','easylist_static','easylistgermany_static','peterlowe_static'];
+    const TRACKING_RULESETS = ['tracking_rules','easyprivacy_static'];
+    if (merged.general) en.push(...GENERAL_RULESETS); else dis.push(...GENERAL_RULESETS);
+    if (merged.tracking) en.push(...TRACKING_RULESETS); else dis.push(...TRACKING_RULESETS);
     if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
     if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
   } catch (e) {
@@ -2500,7 +2497,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
 
       case 'INCREMENT_STAT':
-        incrementStat(msg.statType ?? 'general', sender?.tab?.id);
+        incrementStat(msg.statType ?? 'general', sender?.tab?.id, msg.count);
         sendResponse({ ok: true });
         break;
       case 'GET_REQUEST_LOG':
@@ -2697,7 +2694,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             cookies:    ps.cookies    ?? 0,
             general:    ps.general    ?? 0,
             annoyances: ps.annoyances ?? 0,
-            streaming:  ps.streaming  ?? 0,
             removeparam: ps.removeparam ?? 0,
           });
         } catch (_) { sendResponse({ total:0, network:0, dom:0 }); }
@@ -2836,24 +2832,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
         } catch (e) { warn('List sync errors', e.message); }
 
-        // 13. YouTube / streaming scripts registered
-        try {
-          const cs = chrome.runtime.getManifest().content_scripts ?? [];
-          const yt = cs.filter(e => e.matches?.some(m => /youtube/.test(m)));
-          const hasInject = yt.some(e => e.js?.includes('src/inject-youtube.js') && e.world === 'MAIN');
-          const hasContent = yt.some(e => e.js?.includes('src/content-youtube.js'));
-          const hasTwitch = cs.some(e => e.js?.includes('src/content-twitch.js'));
-          if (hasInject && hasContent && hasTwitch) {
-            pass('Streaming scripts', 'YouTube MAIN+ISOLATED + Twitch layers registered');
-          } else {
-            const missing = [];
-            if (!hasInject) missing.push('inject-youtube');
-            if (!hasContent) missing.push('content-youtube');
-            if (!hasTwitch) missing.push('content-twitch');
-            fail('Streaming scripts', `Missing: ${missing.join(', ')}`);
-          }
-        } catch (e) { warn('Streaming scripts', e.message); }
-
         // 14. Privacy + procedural engine in manifest
         try {
           const cs = chrome.runtime.getManifest().content_scripts ?? [];
@@ -2870,15 +2848,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             warn('Privacy layer', `Missing: ${miss.join(', ')}`);
           }
         } catch (e) { warn('Privacy layer', e.message); }
-
-        // 15. Benchmark baseline recorded
-        try {
-          const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
-          const recorded = ['d3ward', 'adblockTester', 'eff'].filter(k => benchmarkScores[k]?.score != null);
-          if (recorded.length === 3) pass('Benchmarks', `Scores on file: ${recorded.join(', ')}`);
-          else if (recorded.length > 0) warn('Benchmarks', `${recorded.length}/3 sites scored — finish in Support → Benchmarks`);
-          else warn('Benchmarks', 'No scores yet — open benchmark pages in Support tab');
-        } catch (e) { warn('Benchmarks', e.message); }
 
         // 16. Extension version
         pass('Version', chrome.runtime.getManifest().version);
@@ -3267,43 +3236,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
         break;
       }
-      case 'GET_BENCHMARK_SCORES': {
-        const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
-        sendResponse({ scores: benchmarkScores });
-        break;
-      }
-      case 'SET_BENCHMARK_SCORES': {
-        const incoming = msg.scores ?? {};
-        const { benchmarkScores: prev = {} } = await chrome.storage.local.get('benchmarkScores');
-        const merged = { ...prev };
-        for (const [key, val] of Object.entries(incoming)) {
-          if (val?.score == null || val.score === '') continue;
-          merged[key] = {
-            score: String(val.score).trim(),
-            notes: val.notes ? String(val.notes).trim() : '',
-            date: Date.now(),
-          };
-        }
-        await chrome.storage.local.set({ benchmarkScores: merged });
-        sendResponse({ ok: true, scores: merged });
-        break;
-      }
-      case 'OPEN_BENCHMARK_PAGES': {
-        const BENCHMARK_URLS = [
-          { id: 'd3ward',          url: 'https://d3ward.github.io/toolz/adblock.html', title: 'd3ward adblock test' },
-          { id: 'adblockTester',   url: 'https://adblock-tester.com/',                 title: 'AdBlock Tester' },
-          { id: 'eff',             url: 'https://coveryourtracks.eff.org/',            title: 'EFF Cover Your Tracks' },
-        ];
-        const opened = [];
-        for (const b of BENCHMARK_URLS) {
-          try {
-            const tab = await chrome.tabs.create({ url: b.url, active: opened.length === 0 });
-            opened.push({ id: b.id, tabId: tab.id });
-          } catch (e) { opened.push({ id: b.id, error: e.message }); }
-        }
-        sendResponse({ ok: true, opened });
-        break;
-      }
       case 'EXPORT_DIAGNOSTIC': {
         // Full diagnostic snapshot: settings, stats, filter status, log, list status
         try {
@@ -3390,10 +3322,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const _imp = await getSettings();
           try {
             const en = [], dis = [];
-            if (_imp.general) en.push('base_rules', 'extended_rules', 'hosts_rules', 'easylist_static');
-            else dis.push('base_rules', 'extended_rules', 'hosts_rules', 'easylist_static');
-            if (_imp.tracking) en.push('tracking_rules', 'easyprivacy_static');
-            else dis.push('tracking_rules', 'easyprivacy_static');
+            const genSets = ['base_rules','extended_rules','hosts_rules','easylist_static','easylistgermany_static','peterlowe_static'];
+            const trkSets = ['tracking_rules','easyprivacy_static'];
+            if (_imp.general) en.push(...genSets); else dis.push(...genSets);
+            if (_imp.tracking) en.push(...trkSets); else dis.push(...trkSets);
             if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
             if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
           } catch (_) {}

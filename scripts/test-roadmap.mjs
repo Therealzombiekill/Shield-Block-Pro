@@ -92,17 +92,11 @@ const xhrAssignCount = (scriptSrc.match(/window\.XMLHttpRequest\s*=/g) || []).le
 assert('Single XHR proxy install path', xhrAssignCount === 1, `${xhrAssignCount} assignments`);
 assert('ensureXhrProxy present', scriptSrc.includes('ensureXhrProxy'));
 
-// ── 6. Manifest streaming + privacy scripts ──────────────────────────────────
+// ── 6. Manifest privacy + procedural scripts ─────────────────────────────────
 const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
 const cs = manifest.content_scripts ?? [];
-const ytMain = cs.some(e => e.js?.includes('src/inject-youtube.js') && e.world === 'MAIN');
-const ytIso  = cs.some(e => e.js?.includes('src/content-youtube.js'));
-const twitch = cs.some(e => e.js?.includes('src/content-twitch.js'));
 const proc   = cs.some(e => e.js?.includes('src/content-procedural.js'));
 const privM  = cs.some(e => e.js?.includes('src/inject-privacy.js') && e.world === 'MAIN');
-assert('Manifest: inject-youtube MAIN', ytMain);
-assert('Manifest: content-youtube', ytIso);
-assert('Manifest: content-twitch', twitch);
 assert('Manifest: content-procedural', proc);
 assert('Manifest: inject-privacy MAIN', privM);
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, trackers, cookie banners, and streaming platform ads. There is no build step, no bundler, and no package.json — all source files are loaded directly by the browser. To test changes, load the extension as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked → point at this directory) and reload it after every change.
+ShieldBlock Pro is a Chrome/Firefox MV3 browser extension that blocks ads, trackers, and cookie banners. There is no build step, no bundler, and no package.json — all source files are loaded directly by the browser. To test changes, load the extension as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked → point at this directory) and reload it after every change.
 
 ## How to test
 
@@ -24,21 +24,11 @@ To verify filter parsing changes, open the popup → **Support** tab → "Run ch
 
 The extension runs code in three distinct contexts that cannot directly call each other's APIs:
 
-**MAIN world** (`inject-privacy.js`, `inject-youtube.js`, `inject-twitch.js`, `scriptlets.js`): Runs in the page's JavaScript context. Can access `window`, override native APIs, and intercept fetch. Cannot call `chrome.*` APIs. Must communicate via `window.postMessage`.
+**MAIN world** (`inject-privacy.js`, `scriptlets.js`): Runs in the page's JavaScript context. Can access `window`, override native APIs, and intercept fetch. Cannot call `chrome.*` APIs. Must communicate via `window.postMessage`.
 
 **ISOLATED world** (all `content-*.js` files, `src/browser-compat.js` prepended): Runs in Chrome's isolated content script context. Can call `chrome.runtime.sendMessage` and `chrome.storage`. Cannot access page JS globals. Receives postMessages from MAIN world scripts. Every content script does `GET_SETTINGS` with a 300ms retry guard to handle service worker wake-up race conditions.
 
 **Service worker** (`src/background.js`): Handles all persistent state, filter syncing, DNR rule management, and stat accumulation. Exposes a single `chrome.runtime.onMessage` handler with 54 message type cases. Chrome kills the SW after ~30s idle — `_startKeepAlive()` / `_stopKeepAlive()` ping storage every 20s during long operations (filter sync, safe browsing fetch) to prevent premature termination.
-
-### Two-script pattern for platform-specific blocking
-
-YouTube and Twitch each use two coordinated scripts:
-- `inject-youtube.js` / `inject-twitch.js` — MAIN world, `document_start`: patches native fetch/XHR/globals to strip ad data before the player processes it
-- `content-youtube.js` / `content-twitch.js` — ISOLATED world, `document_idle`: DOM-level fallback (click skip buttons, mute during ads, detect ad state via DOM selectors)
-
-The MAIN world script receives enable/disable signals from the ISOLATED script via `window.postMessage({ type: 'SB_YOUTUBE_DISABLE' })` etc., since MAIN world cannot read settings from storage.
-
-`content-youtube.js` also implements opt-in **YouTube Extras** (`settings.youtubeExtras`, default off): hide Shorts shelves/nav and remove end-screen cards. These run only inside the active ad-blocking path and use narrow, page-level selectors to avoid the player-cosmetic black-screen risk.
 
 ### DNR rule ID space
 
@@ -55,7 +45,7 @@ All Declarative Net Request rules share a single integer ID namespace. Collision
 | 47000–47002 | Privacy/security rules (referrer, HTTPS upgrade, DNT/GPC) |
 | 48000–48998 | Whitelist allow rules |
 | 49999 | Global pause-all allow rule |
-| 100000+ | Compiled static rulesets (`rules/easylist-static.json` at 100000, `rules/easyprivacy-static.json` at 130000) |
+| 100000+ | Compiled static rulesets (easylist 100000, easyprivacy 130000, easylistgermany 140000, peterlowe 150000) |
 
 The dynamic-rule cap is platform-detected (`MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES`): 5,000 on Chrome <121, 30,000 on Chrome 121+. `_allocateFilterRanges()` scales each list's `max` fractionally to fill the budget (~29.3k rules on Chrome 121+) and lays ranges across the two filter segments; `_checkRanges()` self-checks for overlaps and band escapes at startup.
 
@@ -122,14 +112,15 @@ if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 
 ### SSAI streaming platforms
 
-Server-Side Ad Insertion stitches ads into the content stream, so they can't be removed at the network layer. Two layers handle it:
+Server-Side Ad Insertion stitches ads into the content stream, so they can't be removed at the network layer. Dedicated scripts handle the platforms we can actually test:
 - **Dedicated scripts**: `content-twitch.js`, `content-hulu.js`, `content-kick.js`, `content-spotify.js`
-- **Generic handler**: `content-streaming.js` (`settings.streaming`) covers Max, Disney+, Paramount+, Peacock, Pluto TV and Tubi via a per-host config map.
+
+> A generic `content-streaming.js` handler (`settings.streaming`) for Max/Disney+/Paramount+/Peacock/Pluto/Tubi/Roku/Sling/etc. was **removed** — mainstream ad blockers cover those platforms better, and a mute-only fallback on players we can't test carried a real false-mute risk (a stray ad-class element page-wide muted the whole session). The `streaming` setting and `streaming` stat bucket were removed with it.
 
 The strategy:
-1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements) — `content-streaming.js` adds a player-scoped "Ad…" text detector as a durable fallback
+1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements)
 2. Mute the video element (`video.muted = true`) for the ad duration
-3. Remove ad UI overlays from the DOM (the dedicated scripts; `content-streaming.js` is **mute-only** to stay playback-safe on players we can't test)
+3. Remove ad UI overlays from the DOM
 4. Restore original mute state when the ad ends
 
 Spotify additionally attempts a skip (seeks to `audio.duration - 0.1` or clicks the next-track button).
@@ -142,7 +133,7 @@ Spotify additionally attempts a skip (seeks to `audio.duration - 0.1` or clicks 
 
 `src/browser-compat.js` must be the first script loaded in every content script context (it's listed first in every `manifest.json` content_scripts entry). It maps `globalThis.chrome = globalThis.browser` in Firefox so all code can use `chrome.*` uniformly. The background SW imports it at the top: `import './browser-compat.js'`.
 
-`content-privacy.js` is a module content script (`"type": "module"`) that imports `./trusted-sites.js`. ES-module imports in content scripts are fetched over the extension URL, so any imported module **must** be listed in `web_accessible_resources` — `src/trusted-sites.js` is.
+`content-privacy.js` needs the shared helpers in `./trusted-sites.js`, but Chrome loads declarative `content_scripts` as **classic scripts** — `"type": "module"` is not a supported `content_scripts` key and a top-level `import` throws "Cannot use import statement outside a module". So `content-privacy.js` loads the module via dynamic `import(chrome.runtime.getURL('src/trusted-sites.js'))` inside its async IIFE, with a no-op fallback. Any module imported this way **must** be listed in `web_accessible_resources` — `src/trusted-sites.js` is.
 
 Firefox-specific callouts in the codebase:
 - `chrome.declarativeNetRequest.getMatchedRules` is not implemented in Firefox — guarded with `if (!chrome.declarativeNetRequest.getMatchedRules)`
@@ -160,7 +151,7 @@ CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom p
 Two tiers, all always active regardless of filter sync status (gated only by the `general`/`tracking` settings via `updateEnabledRulesets`):
 
 1. **Hand-maintained** — `rules/base.json` (275), `rules/extended.json` (387), `rules/hosts.json` (747), `rules/tracking.json` (2). IDs 1–9999 are reserved for these files (e.g. base.json's Google/DoubleClick redirect rules live at 190–199). When editing them, keep IDs within the 1–9999 static reserve.
-2. **Compiled snapshots** — `rules/easylist-static.json` (20,000 rules, IDs 100000+) and `rules/easyprivacy-static.json` (7,000 rules, IDs 130000+), generated at release time with `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>`. These give full baseline protection from first install, before any dynamic sync completes, and don't consume the dynamic-rule budget (static rules have their own ~30k guaranteed pool — keep the total across all static rulesets ≤ 30,000). Refresh them when cutting a release.
+2. **Compiled snapshots** — `rules/easylist-static.json` (16,800 rules, IDs 100000+), `rules/easyprivacy-static.json` (6,000, IDs 130000+), `rules/easylistgermany-static.json` (~2,200, IDs 140000+), `rules/peterlowe-static.json` (3,300, IDs 150000+), generated at release time with `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>`. These give full baseline protection from first install, before any dynamic sync completes, and don't consume the dynamic-rule budget. Static rules have their own pool with a 30,000-rule guaranteed minimum — keep the total across ALL static rulesets (hand-maintained + compiled) ≤ 30,000, and keep compiled IDs ≥ 100000 so `filterStaticConflicts()` never collides them with dynamic bands. Refresh them when cutting a release.
 
 The 12-hour dynamic sync remains the freshness layer on top of the static snapshots.
 

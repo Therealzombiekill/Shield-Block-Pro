@@ -12,13 +12,40 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BENCHMARK_DOMAINS = {
   audio: [
     'ads.spotify.com', 'adeventtracker.spotify.com', 'megaphone.fm', 'traffic.megaphone.fm',
+    'audio-ad-delivery.spotify.com', 'adstudio.spotify.com', 'pixel.spotify.com', 'ads.tritondigital.com',
+    'ads-fa.spotify.com', 'gabo-receiver-service.spotify.com',
   ],
   mobile: [
     'adsdk.vivo.com.cn', 'adtech.vivoglobal.com', 'lenovoads.com', 'ads.lenovo.com',
+    'tapjoy.com', 'startapp.com', 'startappservice.com',
+    'admob.com', 'mintegral.com', 'rayjump.com', 'mtgglobals.com',
   ],
   social: [
     'advertising.twitter.com', 'widgets.pinterest.com', 'ads-dev.pinterest.com',
     'rereddit.com', 'analytics.facebook.com', 'ads.facebook.com',
+    'adsapi.snapchat.com', 'tr6.snapchat.com', 'log.tiktokv.com', 'mon.tiktokv.com',
+    'pixel.reddit.com', 'alb.reddit.com', 'q.quora.com', 'ads.quora.com',
+  ],
+  amazon: [
+    'advertising-api-eu.amazon.com', 'advertising-api.amazon.com',
+    'advertising-api-fe.amazon.com', 'amazon-adsystem.com', 'aax.amazon.com',
+  ],
+  analytics: [
+    'cloudflareinsights.com', 'cdn.rudderlabs.com', 'cdn.segment.com',
+    'api.segment.io', 'api.mixpanel.com', 'cdn.mxpnl.com', 'api2.amplitude.com',
+    'cdn.amplitude.com', 'static.hotjar.com', 'clarity.ms',
+  ],
+  trackers: [
+    'analytics.x.com', 'qevents.quora.com', 'mcs-va.tiktokv.com',
+    'advertising.apple.com', 'prd.jwpltx.com',
+  ],
+  messaging: [
+    'sdk.iad-01.braze.com', 'cdn.onesignal.com', 'api.onesignal.com',
+    'track.customer.io',
+  ],
+  replay: [
+    'cdn.heapanalytics.com', 'edge.fullstory.com', 'cdn.mouseflow.com',
+    'cdn.logrocket.io', 'jssdkcdns.mparticle.com',
   ],
 };
 

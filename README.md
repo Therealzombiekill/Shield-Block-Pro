@@ -6,8 +6,8 @@ Ads blocked. Privacy secured.
 ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
 
 🛡
-33 Filter Lists + 27,000 built-in rules
-Full EasyList & EasyPrivacy compiled in and active from first install; EasyList, uBlock Filters, uBO Quick Fixes, AdGuard, regional lists, and more refreshed automatically every 12 hours
+33 Filter Lists + 29,000 built-in rules
+Full EasyList, EasyPrivacy, EasyList Germany & Peter Lowe compiled in and active from first install; EasyList, uBlock Filters, uBO Quick Fixes, AdGuard, regional lists, and more refreshed automatically every 12 hours
 🍪
 Cookie Auto-Reject
 60+ consent management platforms handled automatically — banners rejected, not just hidden
@@ -34,8 +34,8 @@ Ads blocked. Privacy secured.
 ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
 
 🛡
-33 Filter Lists + 27,000 built-in rules
-Full EasyList & EasyPrivacy compiled in and active from first install; EasyList, uBlock Filters, uBO Quick Fixes, AdGuard, regional lists, and more refreshed automatically every 12 hours
+33 Filter Lists + 29,000 built-in rules
+Full EasyList, EasyPrivacy, EasyList Germany & Peter Lowe compiled in and active from first install; EasyList, uBlock Filters, uBO Quick Fixes, AdGuard, regional lists, and more refreshed automatically every 12 hours
 🍪
 Cookie Auto-Reject
 60+ consent management platforms handled automatically — banners rejected, not just hidden

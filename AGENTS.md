@@ -96,6 +96,7 @@ google-chrome --user-data-dir=/tmp/chrome-sb-dev --no-first-run --disable-defaul
 - **Background:** reload extension; check service worker console.
 - **Content scripts:** reload the **page** tab.
 - **Popup:** close and reopen after reload.
+- **Static DNR rules (`rules/*.json`):** a full Chrome restart does **not** re-index edited static rulesets for an unpacked extension — the old indexed ruleset is reused. Click **Reload** (↻) on the `chrome://extensions` card (or bump `manifest.json` version) to force a re-index. Verify with `chrome.declarativeNetRequest.testMatchOutcome(...)` in the service worker console. (Dynamic rules update live; only static rulesets are affected.)
 
 ### VM update script (dependency refresh only)
 

@@ -5070,5 +5070,85 @@
         "websocket"
       ]
     }
+  },
+  {
+    "id": 380,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/ads.js^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "media",
+        "ping",
+        "sub_frame",
+        "websocket",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 381,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/pagead.js^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "media",
+        "ping",
+        "sub_frame",
+        "websocket",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 382,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/advertisement.js^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "media",
+        "ping",
+        "sub_frame",
+        "websocket",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 383,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/analytics.js^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "media",
+        "ping",
+        "sub_frame",
+        "websocket",
+        "other"
+      ]
+    }
   }
 ]

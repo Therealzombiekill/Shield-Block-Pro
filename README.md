@@ -119,4 +119,4 @@ If we make material changes to this policy, we will update the "Last updated" da
 10. Contact
 If you have questions about this privacy policy, please open an issue on the Chrome Web Store support page or contact the developer via the link in the store listing.
 
-© 2026 ShieldBlock Pro · Bronson Bissell · Home
+© 2026 ShieldBlock Pro

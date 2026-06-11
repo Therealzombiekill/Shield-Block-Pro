@@ -185,6 +185,13 @@ function parseLine(line, idCounter) {
   if (!urlFilter.startsWith('||') && !urlFilter.startsWith('http')) return null;
 
   if (urlFilter.length < 4 || urlFilter.length > 512) return null;
+  // Chrome DNR rejects any rule whose urlFilter contains non-ASCII characters, and
+  // — critically — updateDynamicRules is atomic, so one bad rule rejects the entire
+  // batch (up to 500 rules), silently dropping large swaths of blocking. IDN domains
+  // from regional lists (e.g. ||пример.рф^) produce such urlFilters. A raw-Unicode
+  // urlFilter would not match real requests anyway (browsers send punycode/xn--), so
+  // dropping it here loses no blocking while protecting the whole batch.
+  if (!/^[\x00-\x7F]*$/.test(urlFilter)) return null;
 
   const condition = {
     urlFilter,

@@ -1693,6 +1693,10 @@ async function syncFilterLists(force = false) {
       if (!r.action?.type || !r.condition?.urlFilter)      return false;
       const len = r.condition.urlFilter.length;
       if (len < 2 || len >= 2048)                          return false;
+      // Chrome DNR rejects non-ASCII urlFilters, and updateDynamicRules is atomic:
+      // a single bad rule rejects the whole batch (and can fail the entire rule swap).
+      // Drop them here as a safety net for any rule source (filter lists, user filters).
+      if (!/^[\x00-\x7F]*$/.test(r.condition.urlFilter)) return false;
       if (seenIds.has(r.id))                               return false;
       // URL dedup: skip if another rule already blocks the exact same pattern
       // for the same set of resource types. Include resource types in the key so

@@ -35,6 +35,33 @@ export function isProceduralCosmetic(selector) {
   return typeof selector === 'string' && PROCEDURAL_MARKERS.some(m => selector.includes(m));
 }
 
+// Split scriptlet arguments on commas, honoring uBO escaping: a literal comma in
+// an argument is written as `\,` or `\x2c` (e.g. a /regex,with,commas/ or cookie
+// value). A naive split(',') corrupts such multi-arg scriptlets. We split on
+// unescaped commas, then unescape the sequences back to a literal comma.
+function splitScriptletArgs(inner) {
+  const parts = [];
+  let cur = '';
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === '\\' && i + 1 < inner.length) { cur += c + inner[i + 1]; i++; continue; }
+    if (c === ',') { parts.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  parts.push(cur);
+  return parts.map(s => s.trim().replace(/\\x2c/gi, ',').replace(/\\,/g, ','));
+}
+
+// Filter lists often use Unicode IDN domains (e.g. пример.рф), but the browser
+// reports location.hostname in punycode (xn--…). Domain-scoped cosmetics/scriptlets
+// keyed by raw Unicode would never match. Convert to punycode so they do. ASCII
+// domains hit the fast path and are returned unchanged (no behavior change).
+function toPunycodeDomain(domain) {
+  if (/^[\x00-\x7F]*$/.test(domain)) return domain;
+  try { return new URL('http://' + domain + '/').hostname || domain; }
+  catch (_) { return domain; }
+}
+
 // Truly unsupported — not yet implemented anywhere
 function hasUnsupportedPseudo(selector) {
   return (
@@ -69,14 +96,14 @@ function parseLine(line, idCounter) {
     // ── Scriptlet: example.com##+js(name, arg1, arg2) ─────────────────────
     if (rawAfter.startsWith('+js(') && rawAfter.endsWith(')')) {
       const inner = rawAfter.slice(4, -1).trim();
-      const parts = inner.split(',').map(s => s.trim());
+      const parts = splitScriptletArgs(inner);
       const [name, ...args] = parts;
       if (!name) return null;
       // '*' means apply to all domains
       const domain = prefix ? prefix.toLowerCase() : '*';
       // Skip exception domains (prefixed with ~) and multi-domain scriptlets
       if (domain.startsWith('~') || domain.includes('|')) return null;
-      return { type: 'scriptlet', domain, name, args };
+      return { type: 'scriptlet', domain: domain === '*' ? '*' : toPunycodeDomain(domain), name, args };
     }
 
     // ── Domain-scoped cosmetic: example.com##.selector ────────────────────
@@ -87,7 +114,7 @@ function parseLine(line, idCounter) {
       if (prefix.includes(',') || prefix.startsWith('~') || prefix.includes('|')) return null;
       if (rawAfter.length < 2 || rawAfter.length > 512) return null;
       if (hasUnsupportedPseudo(rawAfter)) return null;
-      return { type: 'domain-cosmetic', domain: prefix.toLowerCase(), selector: rawAfter };
+      return { type: 'domain-cosmetic', domain: toPunycodeDomain(prefix.toLowerCase()), selector: rawAfter };
     }
 
     // ── Global cosmetic: ##.selector ──────────────────────────────────────

@@ -182,6 +182,8 @@ const FILTER_LISTS = [
   // uBO quick fixes — same-day patches for YouTube/anti-adblock breakage between
   // full list releases. Small, high-churn, highest-value list for staying unbroken.
   { name: 'uBO Quick Fixes',       url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt',                                       key: 'ublock_quick',  max:  120, start: 15200 },
+  // uBO privacy list — first-party trackers and beacon endpoints
+  { name: 'uBO Privacy',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt',                                           key: 'ublock_priv',   max:  100, start: 15330 },
   // Social widget & share-button tracking
   { name: 'Fanboy Social',         url: 'https://easylist.to/easylist/fanboy-social.txt',                                                                              key: 'fanboy_social', max:  120, start: 15500 },
   // Broader ad network coverage
@@ -786,6 +788,7 @@ async function _retryFailedLists() {
     })
   );
   const newRules = [];
+  const retryCosmeticExceptions = [];
   const retryCosmeticsToMerge = [];
   const retryDomCosToMerge = [];
   const retryScriptletsToMerge = [];
@@ -797,7 +800,7 @@ async function _retryFailedLists() {
     }
     const { list, limit, text } = result.value;
     try {
-      const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } =
+      const { rules, cosmetics, domainCosmetics, scriptletRules, cosmeticExceptions, removeParams } =
         parseFilterList(text, list.start, limit);
       newRules.push(...rules);
       retryCosmeticsToMerge.push(...cosmetics);
@@ -810,8 +813,12 @@ async function _retryFailedLists() {
         [`fc_${list.key}`]:  cosmetics,
         [`fd_${list.key}`]:  domainCosmetics,
         [`fs_${list.key}`]:  scriptletRules,
+        [`fx_${list.key}`]:  cosmeticExceptions ?? {},
         [`frp_${list.key}`]: { global: removeParams?.global ?? [], domain: removeParams?.domain ?? [] },
       });
+      if (cosmeticExceptions && Object.keys(cosmeticExceptions).length) {
+        retryCosmeticExceptions.push(cosmeticExceptions);
+      }
       logEvent('filter-sync', 'info', `Retry OK: ${list.name} — ${rules.length} rules`);
     } catch (e) { logEvent('filter-sync', 'warn', `Retry parse failed: ${list.name}`); }
   }
@@ -849,10 +856,18 @@ async function _retryFailedLists() {
           mergedSR[dom].push(...rules);
         }
       }
+      const { cosmeticExceptions: aggExc = {} } =
+        await chrome.storage.local.get('cosmeticExceptions');
+      for (const exc of retryCosmeticExceptions) {
+        for (const [dom, sels] of Object.entries(exc)) {
+          aggExc[dom] = [...new Set([...(aggExc[dom] ?? []), ...sels])].slice(0, 400);
+        }
+      }
       await chrome.storage.local.set({
         cosmeticSelectors: mergedCos,
         domainCosmetics:   mergedDomCos,
         scriptletRules:    mergedSR,
+        cosmeticExceptions: aggExc,
       });
     } catch (e) { logEvent('filter-sync', 'warn', `Retry cosmetics merge failed: ${e.message}`); }
   }
@@ -1906,7 +1921,7 @@ async function syncFilterLists(force = false) {
         }
 
         try {
-          const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } = parseFilterList(val.text, val.list.start, val.limit);
+          const { rules, cosmetics, domainCosmetics, scriptletRules, cosmeticExceptions, removeParams } = parseFilterList(val.text, val.list.start, val.limit);
           allRules.push(...rules);
           allCosmetics.push(...cosmetics);
           // Merge domain cosmetics
@@ -1930,6 +1945,7 @@ async function syncFilterLists(force = false) {
             [`fc_${val.list.key}`]: cosmetics,
             [`fd_${val.list.key}`]: domainCosmetics,
             [`fs_${val.list.key}`]: scriptletRules,
+            [`fx_${val.list.key}`]: cosmeticExceptions ?? {},
             [`frp_${val.list.key}`]: { global: removeParams?.global ?? [], domain: removeParams?.domain ?? [] },
           };
           if (val.etag) updates[`fe_${val.list.key}`] = val.etag;
@@ -2024,11 +2040,29 @@ async function syncFilterLists(force = false) {
     // rules but filterSyncedAt unset and 0 cosmetics (the "Infinityh ago / 0 selectors"
     // health-check state). The final write at the end overwrites this with the built-in
     // + custom cosmetics merged.
+    // Aggregate cosmetic exceptions (#@# unhide rules) from every list's per-list
+    // cache — reading storage (rather than threading a bucket through the
+    // fresh/cached/304/failed paths) means cached lists contribute automatically.
+    let cosmeticExceptionsAgg = {};
+    try {
+      const fxStored = await chrome.storage.local.get(FILTER_LISTS.map(l => `fx_${l.key}`));
+      for (const fx of Object.values(fxStored)) {
+        for (const [dom, sels] of Object.entries(fx ?? {})) {
+          if (!cosmeticExceptionsAgg[dom]) cosmeticExceptionsAgg[dom] = [];
+          cosmeticExceptionsAgg[dom].push(...sels);
+        }
+      }
+      for (const dom of Object.keys(cosmeticExceptionsAgg)) {
+        cosmeticExceptionsAgg[dom] = [...new Set(cosmeticExceptionsAgg[dom])].slice(0, 400);
+      }
+    } catch (_) {}
+
     try {
       await chrome.storage.local.set({
         cosmeticSelectors: cosmeticsDeduped,
         domainCosmetics:   domainCosmeticsFinal,
         scriptletRules:    scriptletRulesFinal,
+        cosmeticExceptions: cosmeticExceptionsAgg,
         filterSyncedAt:    Date.now(),
         filterRuleCount:   deduped.length,
       });
@@ -2043,7 +2077,7 @@ async function syncFilterLists(force = false) {
       if (activeLists.length > 0) {
         // Load cached data for custom lists (separate read to keep main storeKeys simple)
         const customStoreKeys = activeLists.flatMap(l => [
-          `cfc_${l.key}`, `cfdc_${l.key}`, `cfsc_${l.key}`,
+          `cfc_${l.key}`, `cfdc_${l.key}`, `cfsc_${l.key}`, `cfx_${l.key}`,
           `cfm_${l.key}`, `cfe_${l.key}`,
         ]);
         const customStored = await chrome.storage.local.get(customStoreKeys);
@@ -2060,6 +2094,7 @@ async function syncFilterLists(force = false) {
                 cosmetics:       customStored[`cfc_${key}`] ?? [],
                 domainCosmetics: customStored[`cfdc_${key}`] ?? {},
                 scriptletRules:  customStored[`cfsc_${key}`] ?? {},
+                cosmeticExceptions: customStored[`cfx_${key}`] ?? {},
               });
             }
             const controller = new AbortController();
@@ -2075,6 +2110,7 @@ async function syncFilterLists(force = false) {
                   cosmetics:       customStored[`cfc_${key}`] ?? [],
                   domainCosmetics: customStored[`cfdc_${key}`] ?? {},
                   scriptletRules:  customStored[`cfsc_${key}`] ?? {},
+                  cosmeticExceptions: customStored[`cfx_${key}`] ?? {},
                 };
                 if (!res.ok) return Promise.reject(new Error(`HTTP ${res.status}`));
                 const newEtag = res.headers.get('ETag') ?? null;
@@ -2090,6 +2126,10 @@ async function syncFilterLists(force = false) {
 
           if (val.notModified) {
             cosmeticsDeduped.push(...val.cosmetics);
+            for (const [d, sels] of Object.entries(val.cosmeticExceptions ?? {})) {
+              if (!cosmeticExceptionsAgg[d]) cosmeticExceptionsAgg[d] = [];
+              cosmeticExceptionsAgg[d].push(...sels);
+            }
             for (const [d, sels] of Object.entries(val.domainCosmetics)) {
               if (!domainCosmeticsFinal[d]) domainCosmeticsFinal[d] = [];
               domainCosmeticsFinal[d].push(...sels);
@@ -2109,9 +2149,13 @@ async function syncFilterLists(force = false) {
 
           // Freshly fetched — parse cosmetics/scriptlets only (maxRules=0 skips DNR)
           try {
-            const { cosmetics, domainCosmetics, scriptletRules } =
+            const { cosmetics, domainCosmetics, scriptletRules, cosmeticExceptions: cfExc } =
               parseFilterList(val.text, 0, 0);
             cosmeticsDeduped.push(...cosmetics);
+            for (const [d, sels] of Object.entries(cfExc ?? {})) {
+              if (!cosmeticExceptionsAgg[d]) cosmeticExceptionsAgg[d] = [];
+              cosmeticExceptionsAgg[d].push(...sels);
+            }
             for (const [d, sels] of Object.entries(domainCosmetics)) {
               if (!domainCosmeticsFinal[d]) domainCosmeticsFinal[d] = [];
               domainCosmeticsFinal[d].push(...sels);
@@ -2124,6 +2168,7 @@ async function syncFilterLists(force = false) {
               [`cfc_${val.key}`]:  cosmetics,
               [`cfdc_${val.key}`]: domainCosmetics,
               [`cfsc_${val.key}`]: scriptletRules,
+              [`cfx_${val.key}`]:  cfExc ?? {},
               [`cfm_${val.key}`]:  { at: Date.now() },
             };
             if (val.etag) updates[`cfe_${val.key}`] = val.etag;
@@ -2137,10 +2182,14 @@ async function syncFilterLists(force = false) {
     domainCosmeticsFinal = finalizeDomainCosmetics(domainCosmeticsFinal);
 
     // Persist accumulated removeparam data then apply DNR rules
+    for (const dom of Object.keys(cosmeticExceptionsAgg)) {
+      cosmeticExceptionsAgg[dom] = [...new Set(cosmeticExceptionsAgg[dom])].slice(0, 400);
+    }
     await chrome.storage.local.set({
       cosmeticSelectors: cosmeticsDeduped,
       domainCosmetics:   domainCosmeticsFinal,
       scriptletRules:    scriptletRulesFinal,
+      cosmeticExceptions: cosmeticExceptionsAgg,
       filterSyncedAt:    Date.now(),
       filterRuleCount:   deduped.length,
       syncFailures:      syncFailureCount,
@@ -2284,12 +2333,13 @@ async function clearFilterDynamicRules() {
 
 async function parseAndStoreUserFilterText(text) {
   if (typeof text !== 'string') return;
-  const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } =
+  const { rules, cosmetics, domainCosmetics, scriptletRules, cosmeticExceptions, removeParams } =
     parseFilterList(text, USER_DNR_BASE, USER_DNR_END - USER_DNR_BASE + 1);
   await chrome.storage.local.set({
     userCosmetics:        cosmetics,
     userDomainCosmetics:  domainCosmetics,
     userScriptletRules:   scriptletRules,
+    userCosmeticExceptions: cosmeticExceptions ?? {},
     userDnrRules:         rules,
     userRemoveParams:     removeParams,
     userFilterText:       text,
@@ -2379,10 +2429,12 @@ async function injectCosmetics(tabId, tabUrl) {
   // Merge both storage reads into one so all variables are available before use
   const { cosmeticSelectors, domainCosmetics = {}, scriptletRules = {},
           settings: s, whitelist: wl = [], globalPause = false,
-          userCosmetics = [], userDomainCosmetics = {}, userScriptletRules = {} } =
+          userCosmetics = [], userDomainCosmetics = {}, userScriptletRules = {},
+          cosmeticExceptions = {}, userCosmeticExceptions = {} } =
     await chrome.storage.local.get([
       'cosmeticSelectors','domainCosmetics','scriptletRules','settings','whitelist','globalPause',
       'userCosmetics','userDomainCosmetics','userScriptletRules',
+      'cosmeticExceptions','userCosmeticExceptions',
     ]);
   if (globalPause && globalPause.until > Date.now()) return;
   if (!s?.cosmetic) return;
@@ -2453,7 +2505,21 @@ async function injectCosmetics(tabId, tabUrl) {
        .filter(([d]) => domain.endsWith('.' + d))
        .flatMap(([, v]) => v),
   ];
-  const allSelectors = [...(cosmeticSelectors || []), ...userCosmetics, ...domainSpecific];
+  // Subtract cosmetic exceptions (#@# unhide rules) that apply to this domain —
+  // these are how filter lists repair false-positive hides on specific sites.
+  const excludedSelectors = new Set();
+  for (const src of [cosmeticExceptions, userCosmeticExceptions]) {
+    for (const sel of src['*'] ?? []) excludedSelectors.add(sel);
+    for (const sel of src[domain] ?? []) excludedSelectors.add(sel);
+    for (const [d, sels] of Object.entries(src)) {
+      if (d !== '*' && d !== domain && domain.endsWith('.' + d)) {
+        for (const sel of sels) excludedSelectors.add(sel);
+      }
+    }
+  }
+
+  const allSelectors = [...(cosmeticSelectors || []), ...userCosmetics, ...domainSpecific]
+    .filter(sel => !excludedSelectors.has(sel));
   const plainSelectors = allSelectors.filter(sel => !isProceduralCosmetic(sel));
   if (!plainSelectors.length) return;
 
@@ -2540,7 +2606,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'CLEAR_USER_FILTERS': {
         await chrome.storage.local.remove(
           ['userCosmetics','userDomainCosmetics','userScriptletRules','userFilterText',
-           'userDnrRules','userRemoveParams']
+           'userDnrRules','userRemoveParams','userCosmeticExceptions']
         );
         await applyUserFilterRules();
         await applyRemoveParamRules();

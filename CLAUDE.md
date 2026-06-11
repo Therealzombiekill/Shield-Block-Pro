@@ -56,6 +56,9 @@ Filter list text → `parseFilterList()` in `src/filter-parser.js` → four outp
 2. **Global cosmetic selectors** (CSS `##.selector`): Stored in `chrome.storage.local` under `cosmeticSelectors`, injected via `chrome.scripting.insertCSS` on navigation — **one CSS rule per selector**, never comma-joined (one invalid selector would invalidate an entire grouped rule)
 3. **Domain-scoped cosmetics** (`site.com##.selector`, incl. multi-domain `a.com,b.com##…` fan-out): Stored under `domainCosmetics`, injected per-domain
 4. **Scriptlet rules** (`##+js(name, args)`, incl. multi-domain fan-out): Stored under `scriptletRules`, executed via `chrome.scripting.executeScript` calling `globalThis.__sbRunScriptlets()` defined in `src/scriptlets.js`
+5. **Cosmetic exceptions** (`site.com#@#.selector` unhide rules): Stored under `cosmeticExceptions` (`fx_<key>` per list), subtracted from the selector set in `injectCosmetics()` so lists can repair false-positive hides
+
+`$badfilter` rules cancel the matching rule within the same list at parse time (`_ruleSignature` matching).
 
 Untyped network rules omit `resourceTypes` (DNR's default — everything except `main_frame` — matches uBO semantics and keeps rules small). The Google-API initiator guard (`SHARED_GOOGLE_API_EXCLUDED_INITIATORS`) is applied only to generic substring patterns, never to domain-anchored rules or exceptions.
 
@@ -79,11 +82,12 @@ Everything lives in `chrome.storage.local`. Key prefixes:
 - `fc_<key>` — cosmetic selectors for list `key`
 - `fd_<key>` — domain cosmetics for list `key`
 - `fs_<key>` — scriptlet rules for list `key`
+- `fx_<key>` — cosmetic exceptions (`#@#` unhide rules) for list `key`
 - `frp_<key>` — removeparam data for list `key`
 - `fm_<key>` — metadata (fetch timestamp, rule count) for list `key`
 - `cfe_<key>` — ETag for list `key` (HTTP 304 caching)
 - `cf*_<key>` — same prefixes but for custom user-subscribed lists
-- `cosmeticSelectors`, `domainCosmetics`, `scriptletRules` — aggregated post-sync caches
+- `cosmeticSelectors`, `domainCosmetics`, `scriptletRules`, `cosmeticExceptions` — aggregated post-sync caches
 - `removeParamData` — aggregated removeparam data
 - `settings` — user toggle state (see `DEFAULT_SETTINGS` in background.js)
 - `stats` — per-category session block counts (zeroed on every browser launch by `onStartup` — the popup hero is labelled "Session"). Includes `removeparam` (tracking params cleaned), which is excluded from `total`/badge/lifetime
@@ -94,7 +98,7 @@ Everything lives in `chrome.storage.local`. Key prefixes:
 - `filterMatrix` — `{ hostname: { ruleKey: 'allow'|'block'|'default' } }`
 - `persistedLog` — last 100 log entries cached for SW restart recovery
 - `customHideRules` — element picker selections
-- `userCosmetics`, `userDomainCosmetics`, `userScriptletRules`, `userFilterText` — user-typed rules in Filters panel
+- `userCosmetics`, `userDomainCosmetics`, `userScriptletRules`, `userCosmeticExceptions`, `userFilterText` — user-typed rules in Filters panel
 - `customFilterLists` — subscribed external filter lists
 
 The service worker also uses **IndexedDB** (`sbProLog` database, `events` object store) for permanent long-term logging. `chrome.storage.local` only holds a rolling short-term cache (`persistedLog`) for SW-restart recovery.
@@ -153,7 +157,9 @@ Two tiers, all always active regardless of filter sync status (gated only by the
 1. **Hand-maintained** — `rules/base.json` (275), `rules/extended.json` (387), `rules/hosts.json` (747), `rules/tracking.json` (2). IDs 1–9999 are reserved for these files (e.g. base.json's Google/DoubleClick redirect rules live at 190–199). When editing them, keep IDs within the 1–9999 static reserve.
 2. **Compiled snapshots** — `rules/easylist-static.json` (16,800 rules, IDs 100000+), `rules/easyprivacy-static.json` (6,000, IDs 130000+), `rules/easylistgermany-static.json` (~2,200, IDs 140000+), `rules/peterlowe-static.json` (3,300, IDs 150000+), generated at release time with `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>`. These give full baseline protection from first install, before any dynamic sync completes, and don't consume the dynamic-rule budget. Static rules have their own pool with a 30,000-rule guaranteed minimum — keep the total across ALL static rulesets (hand-maintained + compiled) ≤ 30,000, and keep compiled IDs ≥ 100000 so `filterStaticConflicts()` never collides them with dynamic bands. Refresh them when cutting a release.
 
-The 12-hour dynamic sync remains the freshness layer on top of the static snapshots.
+The 12-hour dynamic sync remains the freshness layer on top of the static snapshots. A weekly GitHub Action (`.github/workflows/refresh-static-rules.yml`) recompiles the snapshots and opens a PR; CI (`.github/workflows/ci.yml`) enforces rule-ID uniqueness, ASCII urlFilters, and the 30k static budget.
+
+**Unbreak stubs** (`src/stubs/noop-*.js`): base.json rules 440-447 redirect the major ad/analytics loader scripts (gpt.js, adsbygoogle.js, analytics.js/ga.js, gtag/gtm.js, apstag.js) to neutered API stubs at priority 3 (above block rules at 2) — pages that call `googletag.*`/`ga()` etc. keep working and fire their callbacks instead of erroring when the script is blocked. Stub files must be listed in `web_accessible_resources`.
 
 ### Alarms
 

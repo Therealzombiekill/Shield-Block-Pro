@@ -52,6 +52,8 @@ DevTools: service worker console on the extension card; popup via right-click to
 | JS syntax check | Included in `validate-extension.mjs` |
 | Static rules compile | `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>` — refresh at release time: easylist-static (100000, max 16800), easyprivacy-static (130000, max 6000), easylistgermany-static (140000, max 2200), peterlowe-static (150000, max 3300). Static IDs must stay >=100000 (outside all dynamic bands) and total enabled static rules <=30,000 |
 | Benchmark baseline | Open the adblock test URLs manually (d3ward, adblock-tester, EFF Cover Your Tracks) |
+| Store packaging | `node scripts/package.mjs` → `dist/ShieldBlock-Pro-v<version>.zip` |
+| CI | `.github/workflows/ci.yml` runs syntax checks + validators + static budget on every PR; `refresh-static-rules.yml` recompiles snapshots weekly via PR |
 
 ### Hello-world verification
 

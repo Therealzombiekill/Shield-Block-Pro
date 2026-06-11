@@ -50,7 +50,7 @@ const ALL_RESOURCE_TYPES = [
 // $badfilter negates another rule; the rest rewrite responses/headers.)
 const UNSUPPORTED_OPTION_NAMES = new Set([
   'redirect', 'redirect-rule', 'csp', 'replace', 'rewrite', 'header',
-  'urltransform', 'permissions', 'cookie', 'popup', 'denyallow', 'badfilter',
+  'urltransform', 'permissions', 'cookie', 'popup', 'denyallow',
   'genericblock', 'ghide', 'generichide', 'ehide', 'elemhide', 'shide', 'specifichide',
 ]);
 
@@ -109,12 +109,26 @@ function parseLine(line, idCounter) {
     return null;
   }
 
+  // ── Cosmetic exception (unhide): example.com#@#.selector ───────────────────
+  // Lists ship these to cancel hide rules that break specific sites. Collected
+  // per-domain and subtracted from injected selectors at navigation time.
+  const _unhideIdx = line.indexOf('#@#');
+  if (_unhideIdx !== -1) {
+    const prefix = line.slice(0, _unhideIdx).trim();
+    const sel    = line.slice(_unhideIdx + 3).trim();
+    if (sel.length < 2 || sel.length > 512) return null;
+    if (hasUnsupportedPseudo(sel) || sel.startsWith('+js(')) return null;
+    const domains = (!prefix || prefix === '*') ? ['*'] : splitDomainPrefix(prefix);
+    if (!domains.length) return null;
+    return { type: 'cosmetic-exception', domains, selector: sel };
+  }
+
   // ── Extended cosmetic / snippet syntaxes we don't implement ─────────────────
-  // #@# unhide, #?# extended-css, #$# ABP snippet / AdGuard CSS-inject,
-  // #%# AdGuard JS, $$ AdGuard HTML filtering. Must be skipped BEFORE the
-  // network path — otherwise the generic-pattern fallback would turn them
-  // into garbage substring rules.
-  if (line.includes('#@#') || line.includes('#?#') || line.includes('#$#') ||
+  // #?# extended-css, #$# ABP snippet / AdGuard CSS-inject, #%# AdGuard JS,
+  // $$ AdGuard HTML filtering. Must be skipped BEFORE the network path —
+  // otherwise the generic-pattern fallback would turn them into garbage
+  // substring rules.
+  if (line.includes('#?#') || line.includes('#$#') ||
       line.includes('#%#') || line.includes('$$'))  return null;
 
   // ── Cosmetic / scriptlet filters (## separator) ────────────────────────────
@@ -169,6 +183,7 @@ function parseLine(line, idCounter) {
   const excludedResourceTypes = new Set();
   let domainType = null;
   let important  = false;
+  let isBadfilter  = false; // $badfilter — cancels the matching rule
   let docException = false; // @@…$document → allowAllRequests
   const initiatorDomains = [];
   const excludedInitiatorDomains = [];
@@ -237,6 +252,9 @@ function parseLine(line, idCounter) {
     // legitimate block rules like "$image,domain=cspire.com" (contains "csp")
     // or any domain= value containing "redirect"/"replace".
     const _optNames = opts.split(',').map(o => o.trim().replace(/^~/, '').split('=')[0]);
+    // $badfilter: this line CANCELS the identical rule elsewhere in the list.
+    // Parse it like a normal rule and report it as a cancellation signature.
+    if (_optNames.includes('badfilter')) isBadfilter = true;
     if (_optNames.some(n => UNSUPPORTED_OPTION_NAMES.has(n))) {
       // Exceptions for cosmetic/generic hiding are simply inert for us — but a
       // *block* rule with an unsupported action option must not over-block.
@@ -324,16 +342,19 @@ function parseLine(line, idCounter) {
   // A rule must have some condition besides resourceTypes to be meaningful
   if (!condition.urlFilter && !condition.initiatorDomains) return null;
 
-  return {
-    type: 'dnr',
-    rule: {
-      id: idCounter,
-      priority,
-      action,
-      condition,
-    },
-  };
+  const rule = { id: idCounter, priority, action, condition };
+  if (isBadfilter) return { type: 'badfilter', rule };
+  return { type: 'dnr', rule };
   } catch (_) { return null; }
+}
+
+// Stable identity for a parsed rule — used by $badfilter cancellation (and
+// mirrors the sync-time dedupe key in background.js).
+function _ruleSignature(rule) {
+  const c    = rule.condition ?? {};
+  const rt   = (c.resourceTypes ?? []).slice().sort().join(',');
+  const init = (c.initiatorDomains ?? []).slice().sort().join('|');
+  return `${rule.action?.type}:${rule.priority ?? 0}:${c.urlFilter ?? ''}:${rt}:${init}`;
 }
 
 /**
@@ -348,9 +369,11 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
   const lines          = text.split(/\r?\n/);
   const blockRules     = [];
   const allowRules     = []; // @@ exceptions — never starved out by block volume
+  const badfilterKeys  = new Set(); // $badfilter signatures — cancel matching rules
   const cosmetics      = new Set();
   const domainCosmetics = {};
   const scriptletRules  = {};
+  const cosmeticExceptions = {}; // { domain|'*': [selectors] } — unhide (#@#) rules
   // removeparams: { global: Set<string>, domain: Map<domainKey, Set<string>> }
   const removeParams    = { global: new Set(), domain: new Map() };
 
@@ -380,6 +403,15 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
           if (blockRules.length < maxRules) blockRules.push(result.rule);
         } else if (allowRules.length < maxExceptions) {
           allowRules.push(result.rule);
+        }
+        break;
+      case 'badfilter':
+        badfilterKeys.add(_ruleSignature(result.rule));
+        break;
+      case 'cosmetic-exception':
+        for (const domain of result.domains) {
+          const arr = cosmeticExceptions[domain] ?? (cosmeticExceptions[domain] = []);
+          if (arr.length < 200) arr.push(result.selector);
         }
         break;
       case 'cosmetic':
@@ -423,8 +455,11 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
   }
 
   // Merge: exceptions first (so trimming to budget always drops blocks, never
-  // the rules that unbreak sites), then assign sequential IDs from startId.
-  const rules = [...allowRules, ...blockRules].slice(0, maxRules);
+  // the rules that unbreak sites), then apply $badfilter cancellations, then
+  // assign sequential IDs from startId.
+  let rules = [...allowRules, ...blockRules];
+  if (badfilterKeys.size) rules = rules.filter(r => !badfilterKeys.has(_ruleSignature(r)));
+  rules = rules.slice(0, maxRules);
   let id = startId;
   for (const r of rules) r.id = id++;
 
@@ -433,6 +468,7 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
     cosmetics: [...cosmetics],
     domainCosmetics,
     scriptletRules,
+    cosmeticExceptions,
     removeParams: {
       global: [...removeParams.global],
       domain: [...removeParams.domain.values()].map(e => ({

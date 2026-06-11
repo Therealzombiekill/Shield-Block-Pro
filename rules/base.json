@@ -6302,5 +6302,189 @@
         "websocket"
       ]
     }
+  },
+  {
+    "id": 440,
+    "priority": 3,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "extensionPath": "/src/stubs/noop-adsbygoogle.js"
+      }
+    },
+    "condition": {
+      "urlFilter": "||googlesyndication.com/pagead/js/adsbygoogle.js",
+      "resourceTypes": [
+        "script"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "www.youtube.com",
+        "music.youtube.com",
+        "m.youtube.com",
+        "tv.youtube.com"
+      ]
+    }
+  },
+  {
+    "id": 441,
+    "priority": 3,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "extensionPath": "/src/stubs/noop-gpt.js"
+      }
+    },
+    "condition": {
+      "urlFilter": "||googletagservices.com/tag/js/gpt.js",
+      "resourceTypes": [
+        "script"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "www.youtube.com",
+        "music.youtube.com",
+        "m.youtube.com",
+        "tv.youtube.com"
+      ]
+    }
+  },
+  {
+    "id": 442,
+    "priority": 3,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "extensionPath": "/src/stubs/noop-gpt.js"
+      }
+    },
+    "condition": {
+      "urlFilter": "||securepubads.g.doubleclick.net/tag/js/gpt.js",
+      "resourceTypes": [
+        "script"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "www.youtube.com",
+        "music.youtube.com",
+        "m.youtube.com",
+        "tv.youtube.com"
+      ]
+    }
+  },
+  {
+    "id": 443,
+    "priority": 3,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "extensionPath": "/src/stubs/noop-ga.js"
+      }
+    },
+    "condition": {
+      "urlFilter": "||google-analytics.com/analytics.js",
+      "resourceTypes": [
+        "script"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "www.youtube.com",
+        "music.youtube.com",
+        "m.youtube.com",
+        "tv.youtube.com"
+      ]
+    }
+  },
+  {
+    "id": 444,
+    "priority": 3,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "extensionPath": "/src/stubs/noop-ga.js"
+      }
+    },
+    "condition": {
+      "urlFilter": "||google-analytics.com/ga.js",
+      "resourceTypes": [
+        "script"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "www.youtube.com",
+        "music.youtube.com",
+        "m.youtube.com",
+        "tv.youtube.com"
+      ]
+    }
+  },
+  {
+    "id": 445,
+    "priority": 3,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "extensionPath": "/src/stubs/noop-gtag.js"
+      }
+    },
+    "condition": {
+      "urlFilter": "||googletagmanager.com/gtag/js",
+      "resourceTypes": [
+        "script"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "www.youtube.com",
+        "music.youtube.com",
+        "m.youtube.com",
+        "tv.youtube.com"
+      ]
+    }
+  },
+  {
+    "id": 446,
+    "priority": 3,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "extensionPath": "/src/stubs/noop-gtag.js"
+      }
+    },
+    "condition": {
+      "urlFilter": "||googletagmanager.com/gtm.js",
+      "resourceTypes": [
+        "script"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "www.youtube.com",
+        "music.youtube.com",
+        "m.youtube.com",
+        "tv.youtube.com"
+      ]
+    }
+  },
+  {
+    "id": 447,
+    "priority": 3,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "extensionPath": "/src/stubs/noop-apstag.js"
+      }
+    },
+    "condition": {
+      "urlFilter": "||amazon-adsystem.com/aax2/apstag.js",
+      "resourceTypes": [
+        "script"
+      ],
+      "excludedInitiatorDomains": [
+        "youtube.com",
+        "www.youtube.com",
+        "music.youtube.com",
+        "m.youtube.com",
+        "tv.youtube.com"
+      ]
+    }
   }
 ]

@@ -312,7 +312,12 @@
         "rules/tracking.json",
         "rules/hosts.json",
         "src/filter-catalog.json",
-        "src/trusted-sites.js"
+        "src/trusted-sites.js",
+        "src/stubs/noop-adsbygoogle.js",
+        "src/stubs/noop-gpt.js",
+        "src/stubs/noop-ga.js",
+        "src/stubs/noop-gtag.js",
+        "src/stubs/noop-apstag.js"
       ],
       "matches": [
         "<all_urls>"

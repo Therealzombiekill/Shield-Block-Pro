@@ -313,6 +313,20 @@
     // set-cookie
     // Sets a document cookie — bypasses many CMP systems that check for a
     // consent cookie before showing the banner.
+    // set-cookie-reload — set a cookie then reload once so the site picks it up
+    // (used to persist "consent rejected" / "ads disabled" prefs that only read
+    // at load time). The marker cookie guards against reload loops.
+    'set-cookie-reload': ([name, value, path]) => {
+      try {
+        if (!name) return;
+        if (document.cookie.split(';').some(c => c.trim().startsWith(name + '='))) return;
+        IMPL['set-cookie']([name, value, path]);
+        if (document.cookie.split(';').some(c => c.trim().startsWith(name + '='))) {
+          location.reload();
+        }
+      } catch (_) {}
+    },
+
     'set-cookie': ([name, value, path, domain]) => {
       if (!name) return;
       try {
@@ -844,6 +858,7 @@
   IMPL['sc']   = IMPL['set-constant'];
   IMPL['set']  = IMPL['set-constant'];
   IMPL['trusted-set-constant'] = IMPL['set-constant'];
+  IMPL['trusted-set-cookie-reload'] = (args) => IMPL['set-cookie-reload'](args);
   IMPL['acis'] = IMPL['abort-current-inline-script'];
   IMPL['acs']  = (args) => IMPL['abort-current-inline-script'](args);
   IMPL['nostif'] = (args) => IMPL['prevent-setTimeout'](args);

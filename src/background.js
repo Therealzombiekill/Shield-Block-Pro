@@ -754,7 +754,7 @@ async function _retryFailedLists() {
       await applyRemoveParamRules();
     } catch (e) { logEvent('filter-sync', 'warn', `Retry removeparam merge failed: ${e.message}`); }
   }
-  } finally { _stopKeepAlive(); }
+  } finally { _stopKeepAlive('_retryFailedLists'); }
 }
 
 // ── Network connectivity gate ─────────────────────────────────────────────
@@ -954,16 +954,26 @@ let _syncListStatus = {}; // { [key]: { status:'ok'|'error'|'cached'|'304', rule
 // can't cause it to leak. The interval itself also keeps the SW alive since
 // the callback re-registers the timer.
 let _keepAliveTimer = null;
+// Reference-counted by label so concurrent long operations (e.g. a filter sync and
+// a safe-browsing refresh overlapping on startup) each hold the keep-alive. A single
+// boolean timer let whichever op finished first tear it down while another was still
+// running, risking the SW being killed mid-sync. The timer only stops when the last
+// holder releases it.
+const _keepAliveLabels = new Set();
 
 function _startKeepAlive(label) {
-  if (_keepAliveTimer) return; // already running (nested call guard)
+  _keepAliveLabels.add(label);
+  if (_keepAliveTimer) return; // timer already running for a concurrent holder
   _keepAliveTimer = setInterval(() => {
     chrome.storage.local.get('__ka').catch(() => {}); // reset idle timer
   }, 20000); // 20s < Chrome's 30s idle threshold
   logEvent('system', 'info', `Keep-alive started (${label})`);
 }
 
-function _stopKeepAlive() {
+function _stopKeepAlive(label) {
+  if (label) _keepAliveLabels.delete(label);
+  else _keepAliveLabels.clear();
+  if (_keepAliveLabels.size > 0) return; // another concurrent holder still needs it
   if (!_keepAliveTimer) return;
   clearInterval(_keepAliveTimer);
   _keepAliveTimer = null;
@@ -1259,7 +1269,7 @@ async function fetchSafeBrowsingLists() {
     await chrome.storage.local.set({ sbDomains: cleaned, sbLastFetch: Date.now() });
     logEvent('safe-browsing', 'info', `Updated: ${cleaned.length} malicious domains`);
   }
-  } finally { _stopKeepAlive(); }
+  } finally { _stopKeepAlive('fetchSafeBrowsingLists'); }
 }
 
 function checkSafeBrowsing(url) {
@@ -1908,7 +1918,7 @@ async function syncFilterLists(force = false) {
     // Flush the event log to storage so sync entries survive service worker termination
     await _persistLog();
   } finally {
-    _stopKeepAlive();
+    _stopKeepAlive('syncFilterLists');
     _syncLock = false;
   }
 }

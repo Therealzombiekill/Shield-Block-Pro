@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.18.1",
-  "description": "Block ads, trackers, and cookie banners on YouTube, Twitch, Spotify, Amazon, Hulu, Kick, and the whole web. Privacy protection and fingerprint resistance built in.",
+  "version": "2.20.1",
+  "description": "Block ads, trackers, and cookie banners across the web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
     "tabs",
@@ -42,8 +43,7 @@
         "src/browser-compat.js",
         "src/content-privacy.js"
       ],
-      "run_at": "document_start",
-      "type": "module"
+      "run_at": "document_start"
     },
     {
       "matches": [
@@ -179,29 +179,6 @@
     },
     {
       "matches": [
-        "*://*.max.com/*",
-        "*://*.disneyplus.com/*",
-        "*://*.paramountplus.com/*",
-        "*://*.peacocktv.com/*",
-        "*://*.pluto.tv/*",
-        "*://*.tubitv.com/*",
-        "*://*.roku.com/*",
-        "*://*.sling.com/*",
-        "*://*.fubo.tv/*",
-        "*://*.crackle.com/*",
-        "*://*.discoveryplus.com/*",
-        "*://*.plex.tv/*",
-        "*://*.xumo.com/*",
-        "*://*.vudu.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-streaming.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
         "*://www.youtube.com/*",
         "*://youtube.com/*",
         "*://music.youtube.com/*"
@@ -257,6 +234,26 @@
         "id": "hosts_rules",
         "enabled": true,
         "path": "rules/hosts.json"
+      },
+      {
+        "id": "easylist_static",
+        "enabled": true,
+        "path": "rules/easylist-static.json"
+      },
+      {
+        "id": "easyprivacy_static",
+        "enabled": true,
+        "path": "rules/easyprivacy-static.json"
+      },
+      {
+        "id": "easylistgermany_static",
+        "enabled": true,
+        "path": "rules/easylistgermany-static.json"
+      },
+      {
+        "id": "peterlowe_static",
+        "enabled": true,
+        "path": "rules/peterlowe-static.json"
       }
     ]
   },
@@ -315,7 +312,12 @@
         "rules/tracking.json",
         "rules/hosts.json",
         "src/filter-catalog.json",
-        "src/trusted-sites.js"
+        "src/trusted-sites.js",
+        "src/stubs/noop-adsbygoogle.js",
+        "src/stubs/noop-gpt.js",
+        "src/stubs/noop-ga.js",
+        "src/stubs/noop-gtag.js",
+        "src/stubs/noop-apstag.js"
       ],
       "matches": [
         "<all_urls>"

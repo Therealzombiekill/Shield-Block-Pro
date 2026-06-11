@@ -313,6 +313,20 @@
     // set-cookie
     // Sets a document cookie — bypasses many CMP systems that check for a
     // consent cookie before showing the banner.
+    // set-cookie-reload — set a cookie then reload once so the site picks it up
+    // (used to persist "consent rejected" / "ads disabled" prefs that only read
+    // at load time). The marker cookie guards against reload loops.
+    'set-cookie-reload': ([name, value, path]) => {
+      try {
+        if (!name) return;
+        if (document.cookie.split(';').some(c => c.trim().startsWith(name + '='))) return;
+        IMPL['set-cookie']([name, value, path]);
+        if (document.cookie.split(';').some(c => c.trim().startsWith(name + '='))) {
+          location.reload();
+        }
+      } catch (_) {}
+    },
+
     'set-cookie': ([name, value, path, domain]) => {
       if (!name) return;
       try {
@@ -686,6 +700,57 @@
       };
     },
 
+    // adjust-setInterval (aosi) — retime matching setInterval callbacks
+    'adjust-setInterval': ([pattern, delayMs]) => {
+      const re = toRe(pattern);
+      const bump = Number(delayMs) || 0;
+      const _si = window.setInterval;
+      window.setInterval = function (fn, d, ...rest) {
+        const s = typeof fn === 'function' ? fn.toString() : String(fn ?? '');
+        if (re && re.test(s)) return _si.call(this, fn, bump, ...rest);
+        return _si.call(this, fn, d, ...rest);
+      };
+    },
+
+    // set-attr — force an attribute value on matching elements (uBO: anti-anti-adblock
+    // markers, forced autoplay-off, etc.). Value defaults to empty string.
+    'set-attr': ([selector, attr, value]) => {
+      if (!selector || !attr) return;
+      const val = value === undefined || value === "''" ? '' : String(value);
+      const apply = () => {
+        try {
+          document.querySelectorAll(selector).forEach(el => {
+            if (el.getAttribute(attr) !== val) el.setAttribute(attr, val);
+          });
+        } catch (_) {}
+      };
+      apply();
+      new MutationObserver(apply).observe(document.documentElement,
+        { attributes: true, childList: true, subtree: true });
+    },
+
+    // prevent-refresh — defuse <meta http-equiv="refresh"> / location-based reloads
+    // (sites use forced refreshes to rotate ad impressions). Optional arg pins the
+    // allowed delay: refreshes at or above it are left alone.
+    'prevent-refresh': ([seconds]) => {
+      const minAllowed = seconds === undefined ? null : Number(seconds);
+      const strip = () => {
+        try {
+          document.querySelectorAll('meta[http-equiv="refresh" i]').forEach(meta => {
+            const delay = parseFloat((meta.getAttribute('content') || '').split(/[;,]/)[0]);
+            if (minAllowed !== null && !(delay <= minAllowed)) return;
+            meta.removeAttribute('content');
+          });
+        } catch (_) {}
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', strip, { once: true });
+      }
+      strip();
+      new MutationObserver(strip).observe(document.documentElement,
+        { childList: true, subtree: true });
+    },
+
     // nano-stb / nano-sib — uBO shorthand for setTimeout/setInterval pattern blocking
     'nano-stb': (args) => IMPL['prevent-setTimeout'](args),
     'nano-sib': (args) => IMPL['prevent-setInterval'](args),
@@ -792,17 +857,23 @@
   IMPL['aopw'] = IMPL['abort-on-property-write'];
   IMPL['sc']   = IMPL['set-constant'];
   IMPL['set']  = IMPL['set-constant'];
+  IMPL['trusted-set-constant'] = IMPL['set-constant'];
+  IMPL['trusted-set-cookie-reload'] = (args) => IMPL['set-cookie-reload'](args);
   IMPL['acis'] = IMPL['abort-current-inline-script'];
   IMPL['acs']  = (args) => IMPL['abort-current-inline-script'](args);
   IMPL['nostif'] = (args) => IMPL['prevent-setTimeout'](args);
   IMPL['nowoif'] = (args) => IMPL['prevent-window-open'](args);
+  IMPL['window.open-defuser'] = (args) => IMPL['prevent-window-open'](args);
   IMPL['nosiif'] = (args) => IMPL['prevent-setInterval'](args);
   IMPL['no-xhr-if'] = (args) => IMPL['prevent-xhr'](args);
   IMPL['rpnt'] = (args) => IMPL['replace-node-text'](args);
   IMPL['ra']   = (args) => IMPL['remove-attr'](args);
   IMPL['rmnt'] = (args) => IMPL['remove-node-text'](args);
   IMPL['aost'] = (args) => IMPL['adjust-setTimeout'](args);
+  IMPL['aosi'] = (args) => IMPL['adjust-setInterval'](args);
   IMPL['aeld'] = (args) => IMPL['addEventListener-defuser'](args);
+  IMPL['prevent-addEventListener'] = (args) => IMPL['addEventListener-defuser'](args);
+  IMPL['remove-cookie'] = (args) => IMPL['cookie-remover'](args);
   IMPL['popads'] = () => IMPL['prevent-popads-net']();
 
   // ── Public API ────────────────────────────────────────────────────────────────

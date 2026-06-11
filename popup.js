@@ -160,8 +160,8 @@ async function refreshStats() {
     $('s-ck').textContent = fmt(stats.cookies  || 0);
     $('s-wb').textContent = fmt(stats.general  || 0);
     if ($('s-an')) $('s-an').textContent = fmt(stats.annoyances || 0);
-    if ($('s-st')) $('s-st').textContent = fmt(stats.streaming  || 0);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
+    if ($('stat-cleaned')) $('stat-cleaned').textContent = fmt(stats.removeparam || 0);
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 
     const syncedAt = stored?.filterSyncedAt;
@@ -181,13 +181,13 @@ async function refreshStats() {
     }
 
     const n = page.total ?? 0;
-    if (n > 0) {
+    if (n > 0 || page.removeparam > 0) {
       const parts = [];
       if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
       if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);
       if (page.general > 0) parts.push(`${fmt(page.general)} web`);
       if (page.annoyances > 0) parts.push(`${fmt(page.annoyances)} nags`);
-      if (page.streaming  > 0) parts.push(`${fmt(page.streaming)} stream`);
+      if (page.removeparam > 0) parts.push(`${fmt(page.removeparam)} cleaned`);
       $('stat-page').textContent = parts.length
         ? fmt(n) + ' · ' + parts.join(' · ')
         : fmt(n) + ' blocked';
@@ -480,7 +480,7 @@ async function boot() {
     const _v = chrome.runtime.getManifest().version;
     document.querySelectorAll('.app-ver').forEach(el => { el.textContent = _v; });
   } catch (_) {}
-  await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules(), refreshBenchmarkScores()]);
+  await Promise.all([loadSettings(), refreshStatsPanel(), refreshFilterStatus(), refreshWhitelist(), refreshCustomRules()]);
   moveNavGlider(document.querySelector('.nb.active'));
   $('app').classList.add('ready');
   document.body.classList.add('sb-ready');
@@ -677,62 +677,6 @@ $('run-health-check')?.addEventListener('click', async () => {
   } finally {
     btn.textContent = 'Run check';
     btn.disabled    = false;
-  }
-});
-
-// ── Benchmark baseline ───────────────────────────────────────────────────────
-async function refreshBenchmarkScores() {
-  try {
-    const { scores = {} } = await msg('GET_BENCHMARK_SCORES') ?? {};
-    const set = (id, key) => {
-      const el = $(id);
-      if (el && scores[key]?.score) el.value = scores[key].score;
-    };
-    set('bench-d3ward', 'd3ward');
-    set('bench-adblock', 'adblockTester');
-    set('bench-eff', 'eff');
-    const st = $('benchmark-status');
-    if (st) {
-      const dates = ['d3ward', 'adblockTester', 'eff']
-        .filter(k => scores[k]?.date)
-        .map(k => `${k}: ${new Date(scores[k].date).toLocaleDateString()}`);
-      st.textContent = dates.length ? `Last saved — ${dates.join(' · ')}` : '';
-    }
-  } catch (_) {}
-}
-
-$('open-benchmarks')?.addEventListener('click', async () => {
-  const btn = $('open-benchmarks');
-  if (btn) { btn.textContent = 'Opening…'; btn.disabled = true; }
-  try {
-    await msg('OPEN_BENCHMARK_PAGES');
-    const st = $('benchmark-status');
-    if (st) st.textContent = 'Benchmark tabs opened — score each site, then Save scores.';
-  } catch (e) {
-    const st = $('benchmark-status');
-    if (st) { st.style.color = 'var(--red,#f87171)'; st.textContent = 'Failed: ' + e.message; }
-  } finally {
-    if (btn) { btn.textContent = 'Open tests'; btn.disabled = false; }
-  }
-});
-
-$('save-benchmarks')?.addEventListener('click', async () => {
-  const btn = $('save-benchmarks');
-  const st  = $('benchmark-status');
-  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
-  try {
-    const scores = {
-      d3ward:        { score: $('bench-d3ward')?.value ?? '' },
-      adblockTester: { score: $('bench-adblock')?.value ?? '' },
-      eff:           { score: $('bench-eff')?.value ?? '' },
-    };
-    await msg('SET_BENCHMARK_SCORES', { scores });
-    if (st) { st.style.color = 'var(--green)'; st.textContent = 'Scores saved.'; }
-    await refreshBenchmarkScores();
-  } catch (e) {
-    if (st) { st.style.color = 'var(--red,#f87171)'; st.textContent = 'Save failed: ' + e.message; }
-  } finally {
-    if (btn) { btn.textContent = 'Save scores'; btn.disabled = false; }
   }
 });
 

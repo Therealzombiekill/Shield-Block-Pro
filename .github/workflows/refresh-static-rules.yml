@@ -1,0 +1,60 @@
+name: Refresh static rulesets
+
+# Recompiles the bundled filter-list snapshots weekly so releases always ship
+# near-current EasyList/EasyPrivacy/EasyList Germany/Peter Lowe rules. Opens a
+# PR (never pushes to main directly) so CI validates the result first.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download filter lists
+        run: |
+          set -e
+          curl -sSf --retry 3 -o /tmp/easylist.txt        https://easylist.to/easylist/easylist.txt
+          curl -sSf --retry 3 -o /tmp/easyprivacy.txt     https://easylist.to/easylist/easyprivacy.txt
+          curl -sSf --retry 3 -o /tmp/easylistgermany.txt https://easylist.to/easylistgermany/easylistgermany.txt
+          curl -sSf --retry 3 -o /tmp/peterlowe.txt       'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext'
+
+      - name: Compile static rulesets
+        run: |
+          set -e
+          node scripts/compile-static-rules.mjs /tmp/easylist.txt        --out rules/easylist-static.json        --start-id 100000 --max 16800
+          node scripts/compile-static-rules.mjs /tmp/easyprivacy.txt     --out rules/easyprivacy-static.json     --start-id 130000 --max 6000
+          node scripts/compile-static-rules.mjs /tmp/easylistgermany.txt --out rules/easylistgermany-static.json --start-id 140000 --max 2200
+          node scripts/compile-static-rules.mjs /tmp/peterlowe.txt       --out rules/peterlowe-static.json       --start-id 150000 --max 3300
+
+      - name: Validate
+        run: |
+          node scripts/validate-extension.mjs
+          node scripts/test-roadmap.mjs
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: auto/refresh-static-rules
+          commit-message: 'chore: refresh compiled static rulesets'
+          title: 'chore: weekly static ruleset refresh'
+          body: |
+            Automated recompile of the bundled filter-list snapshots
+            (EasyList, EasyPrivacy, EasyList Germany, Peter Lowe) via
+            `scripts/compile-static-rules.mjs`.
+
+            CI validates rule-ID uniqueness, ASCII urlFilters, and the
+            30k static budget before this can merge.
+          delete-branch: true

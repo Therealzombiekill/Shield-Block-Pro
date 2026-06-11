@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Syntax-check all JavaScript
+        run: |
+          set -e
+          for f in $(find src scripts -name '*.js' -o -name '*.mjs') popup.js; do
+            node --check "$f"
+          done
+
+      - name: Validate extension structure
+        run: node scripts/validate-extension.mjs
+
+      - name: Roadmap verification checks
+        run: node scripts/test-roadmap.mjs
+
+      - name: Static ruleset budget check
+        run: |
+          node -e "
+          const fs = require('fs');
+          const m = JSON.parse(fs.readFileSync('manifest.json','utf8'));
+          let total = 0;
+          for (const rs of m.declarative_net_request.rule_resources) {
+            const rules = JSON.parse(fs.readFileSync(rs.path,'utf8'));
+            const ids = new Set(rules.map(r => r.id));
+            if (ids.size !== rules.length) { console.error(rs.id + ': duplicate rule IDs'); process.exit(1); }
+            for (const r of rules) {
+              const c = r.condition || {};
+              if (c.urlFilter && [...c.urlFilter].some(ch => ch.charCodeAt(0) > 127)) {
+                console.error(rs.id + ': non-ASCII urlFilter in rule ' + r.id); process.exit(1);
+              }
+            }
+            total += rules.length;
+            console.log(rs.id + ': ' + rules.length + ' rules');
+          }
+          console.log('TOTAL static rules: ' + total);
+          if (total > 30000) { console.error('Exceeds the 30,000 guaranteed static rule budget'); process.exit(1); }
+          "

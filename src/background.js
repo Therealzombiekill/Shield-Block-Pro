@@ -12,14 +12,21 @@ import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 // and use it; fall back to 5,000 on older browsers or where the constant is missing.
 const MAX_DYNAMIC_RULES = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest
   && chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES) || 5000;
-// Filter-list budget: leave ~700 rules of headroom for the feature ranges (removeparam,
-// matrix, user, whitelist, privacy, pause) and never spill past the filter ID band
-// (10000-29999). Stays 4300 on the old 5k cap; grows to 19800 on Chrome 121+.
-const MAX_FILTER_RULES = Math.min(MAX_DYNAMIC_RULES - 700, 19800);
 // Dynamic DNR ID ranges. Keep these disjoint from static bundled rules and
 // from each other; Chrome rejects duplicate IDs across active rule pools.
+// Filter lists get TWO ID segments: 10000-29999 plus 33000-46999 (the gap that
+// sat unused between the user band and the privacy rules) — 34,000 IDs total,
+// enough to actually fill Chrome 121+'s 30k dynamic budget.
 const FILTER_DYNAMIC_START = 10000;
 const FILTER_DYNAMIC_END   = 29999;
+const FILTER_BAND2_START   = 33000;
+const FILTER_BAND2_END     = 46999;
+const FILTER_ID_CAPACITY   = (FILTER_DYNAMIC_END - FILTER_DYNAMIC_START + 1)
+                           + (FILTER_BAND2_END - FILTER_BAND2_START + 1);
+// Filter-list budget: leave ~700 rules of headroom for the feature ranges (removeparam,
+// matrix, user, whitelist, privacy, pause). Stays 4300 on the old 5k cap; grows to
+// 29300 on Chrome 121+ (bounded by the 34k ID capacity above).
+const MAX_FILTER_RULES = Math.min(MAX_DYNAMIC_RULES - 700, FILTER_ID_CAPACITY);
 const WHITELIST_BASE       = 48000; // 48000-48998: two allow rules per whitelisted domain
 // ID reserved for the global pause-all DNR allow rule. Must be outside all other ranges.
 const PAUSE_ALL_RULE_ID = 49999;
@@ -96,18 +103,30 @@ const STATIC_REMOVE_PARAMS = new Set([
 
 // ── Time saved estimates (seconds per blocked item by type) ───────────────────
 const TIME_SAVED_SECONDS = {
-  youtube:  15, // avg of 5s skippable + 30s unskippable
-  twitch:   30, // full SSAI ad break
-  spotify:  30, // audio ad segment
-  hulu:     30, // video ad break
-  kick:     30, // video ad break
-  amazon:    3, // page load improvement
-  general:   5, // typical ad script load time
-  social:    2, // skipped sponsored post
-  cookies:   8, // time to find + click "reject all"
-  annoyances: 3, // dismissed nag / widget / banner
-  streaming: 30, // SSAI ad break (additional platforms)
+  youtube:   15, // skippable + unskippable pre/mid-roll avoided
+  twitch:    25, // SSAI ad break
+  spotify:   25, // audio ad segment
+  hulu:      25, // video ad break
+  kick:      25, // video ad break
+  amazon:     1, // blocked sponsored slot — page-load improvement
+  general:    1, // blocked web ad/tracker — load + render time avoided
+  social:     1, // skipped sponsored post
+  cookies:    5, // time to find + click "reject all" by hand
+  annoyances: 2, // dismissed nag / widget / banner
 };
+// A network-level block saves bandwidth + parse/exec time, not a watched ad.
+// 50ms per blocked request is Brave's published per-item estimate — conservative
+// and defensible, vs the per-type DOM estimates above which model skipped ads.
+const NETWORK_TIME_SAVED_SECONDS = 0.05;
+
+// Canonical zero-value stats object. `removeparam` counts stripped tracking
+// params — kept OUT of `total`/lifetime/badge (a cleaned URL is not a blocked ad).
+function emptyStats() {
+  return { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0,
+           general:0, social:0, cookies:0, annoyances:0, removeparam:0 };
+}
+// Stat types excluded from total/lifetime/badge/daily aggregation.
+const NON_BLOCK_STAT_TYPES = new Set(['removeparam']);
 
 // ── Browser detection ─────────────────────────────────────────────────────────
 // Service workers don't have navigator.userAgent in all MV3 builds, so we check
@@ -160,6 +179,11 @@ const FILTER_LISTS = [
   { name: 'uBlock Annoyances',     url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt',                               key: 'ublock_ann',    max:  150, start: 14000 },
   // uBlock Origin main filter list — high-quality, minimal overlap with EasyList
   { name: 'uBlock Filters',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',                                           key: 'ublock_main',   max:  300, start: 14500 },
+  // uBO quick fixes — same-day patches for YouTube/anti-adblock breakage between
+  // full list releases. Small, high-churn, highest-value list for staying unbroken.
+  { name: 'uBO Quick Fixes',       url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt',                                       key: 'ublock_quick',  max:  120, start: 15200 },
+  // uBO privacy list — first-party trackers and beacon endpoints
+  { name: 'uBO Privacy',           url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt',                                           key: 'ublock_priv',   max:  100, start: 15330 },
   // Social widget & share-button tracking
   { name: 'Fanboy Social',         url: 'https://easylist.to/easylist/fanboy-social.txt',                                                                              key: 'fanboy_social', max:  120, start: 15500 },
   // Broader ad network coverage
@@ -201,20 +225,28 @@ const FILTER_LISTS = [
 // list's baseline `max` is scaled to fill the available filter budget. On the old 5,000-
 // rule cap the scale is 1 (counts unchanged); on Chrome 121+'s larger cap it grows so we
 // ship several times more network-blocking rules. Deriving `start` from a running cursor
-// makes ID-range overlaps structurally impossible regardless of the scale.
+// makes ID-range overlaps structurally impossible regardless of the scale. Lists are laid
+// out across the two filter ID segments; a list that would straddle the gap between them
+// hops to the second segment.
 (function _allocateFilterRanges() {
   const baseSum = FILTER_LISTS.reduce((a, l) => a + l.max, 0);
-  // Fill the filter ID band as fully as the budget allows. The cap of 4 keeps the
-  // highest assigned ID inside 10000-29999 (4 * baseSum stays under the 20k band);
-  // going higher would require relocating the feature ranges above 30000.
-  const scale = Math.max(1, Math.min(4, Math.floor(MAX_FILTER_RULES / baseSum)));
+  // Fractional scale fills the budget tightly (integer scaling left ~20% unused).
+  const scale = Math.max(1, Math.min(FILTER_ID_CAPACITY, MAX_FILTER_RULES) / baseSum);
   let cursor = FILTER_DYNAMIC_START;
   for (const l of FILTER_LISTS) {
-    l.max *= scale;
+    l.max = Math.max(1, Math.floor(l.max * scale));
+    if (cursor <= FILTER_DYNAMIC_END && cursor + l.max - 1 > FILTER_DYNAMIC_END) {
+      cursor = FILTER_BAND2_START; // hop the feature-range gap (30000-32999)
+    }
     l.start = cursor;
     cursor += l.max;
   }
 })();
+
+function _idInFilterBands(id) {
+  return (id >= FILTER_DYNAMIC_START && id <= FILTER_DYNAMIC_END) ||
+         (id >= FILTER_BAND2_START   && id <= FILTER_BAND2_END);
+}
 
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
 (function _checkRanges() {
@@ -230,12 +262,16 @@ const FILTER_LISTS = [
     }
   }
   // Warn if the scaled per-list maxes drift past the platform dynamic-rule cap, and
-  // verify the highest assigned ID stays inside the filter band (10000-29999) so it can
-  // never collide with the removeparam/matrix/user/whitelist/pause ranges above 30000.
+  // verify every assigned range sits fully inside one of the two filter ID segments so
+  // it can never collide with the removeparam/matrix/user/whitelist/pause/privacy ranges.
   const sumMax = FILTER_LISTS.reduce((a, l) => a + (l.max | 0), 0);
   if (sumMax > MAX_DYNAMIC_RULES) console.warn(`[SB] FILTER_LISTS max sum ${sumMax} exceeds the dynamic-rule cap ${MAX_DYNAMIC_RULES}`);
-  const lastEnd = Math.max(...FILTER_LISTS.map(l => l.start + l.max - 1));
-  if (lastEnd > FILTER_DYNAMIC_END) console.error(`[SB] filter ranges end at ${lastEnd}, past FILTER_DYNAMIC_END ${FILTER_DYNAMIC_END}`);
+  for (const l of FILTER_LISTS) {
+    const end = l.start + l.max - 1;
+    const inSeg1 = l.start >= FILTER_DYNAMIC_START && end <= FILTER_DYNAMIC_END;
+    const inSeg2 = l.start >= FILTER_BAND2_START   && end <= FILTER_BAND2_END;
+    if (!inSeg1 && !inSeg2) console.error(`[SB] ${l.name} range [${l.start},${end}] escapes the filter ID segments`);
+  }
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
@@ -243,19 +279,16 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 // ── Settings ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
-  twitch: true, general: true,
+  general: true,
   cosmetic: true, social: true, cookies: true,
   privacy: true, tracking: true,
-  spotify: true,
-  hulu: true,
-  kick: true,
-  youtube: true,
+  youtube: true,        // YouTube ad skip/mute (inject + content scripts)
   youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
+  twitch: true, spotify: true, hulu: true, kick: true,
+  paywall: false,       // soft paywall bypass (opt-in)
   annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
-  streaming: true,      // SSAI ad-mute on additional streaming platforms (Max, Disney+, etc.)
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
-  paywall: false,       // soft paywall bypass (opt-in — may break paid subscriptions)
   referrerStrip: true,  // strip Referer header on 3rd-party requests
   httpsUpgrade: true,   // upgrade http:// navigations to https://
   timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)
@@ -274,22 +307,14 @@ let _staticRuleCount = 725; // in-memory fallback until computed
 
 async function computeStaticRuleCount() {
   try {
-    // DNR doesn't expose a direct count of static rules, but we can count them
-    // from the manifest's declared rulesets by fetching the JSON rule files.
-    const manifest    = chrome.runtime.getManifest();
-    const rulesets    = manifest.declarative_net_request?.rule_resources ?? [];
-    let total = 0;
-    for (const rs of rulesets) {
-      try {
-        const res   = await fetch(chrome.runtime.getURL(rs.path));
-        const rules = await res.json();
-        if (Array.isArray(rules)) total += rules.length;
-      } catch (_) {}
-    }
-    if (total > 0) {
-      _staticRuleCount = total;
-      await chrome.storage.local.set({ staticRuleCount: total });
-      logEvent('system', 'info', `Static rule count: ${total}`);
+    // Derived from the same single fetch+parse pass as the rule metadata —
+    // the compiled static rulesets total ~27k rules / 5.4MB of JSON, so this
+    // must not re-read the files separately.
+    await loadStaticRuleIds();
+    if (_staticRuleIds.size > 0) {
+      _staticRuleCount = _staticRuleIds.size;
+      await chrome.storage.local.set({ staticRuleCount: _staticRuleCount });
+      logEvent('system', 'info', `Static rule count: ${_staticRuleCount}`);
     }
   } catch (e) {
     logEvent('system', 'warn', `computeStaticRuleCount failed: ${e.message}`);
@@ -297,7 +322,76 @@ async function computeStaticRuleCount() {
 }
 let _staticRuleIds = new Set();
 
-async function loadStaticRuleIds() {
+// ── Matched-rule classification ────────────────────────────────────────────
+// getMatchedRules() reports EVERY matched rule — including `allow` (whitelist,
+// pause, YouTube-protect), `modifyHeaders` (DNT/GPC fires on every request),
+// `upgradeScheme`, and removeparam redirects. Counting those as "ads blocked"
+// turns the stat into a raw request counter. These maps let the poller count
+// only rules whose action actually neutralized something:
+//   'block'       → block rules + redirect-to-blank (counted as blocked)
+//   'removeparam' → queryTransform redirects (counted as params cleaned)
+//   null          → allow / modifyHeaders / upgradeScheme (never counted)
+const _staticRuleMeta = new Map(); // ruleId → { kind, domain } for bundled rules/*.json
+let _dynRuleMeta      = new Map(); // ruleId → { kind, domain } for dynamic rules
+let _dynRuleMetaAt    = 0;         // built timestamp — refreshed when stale (rules churn on sync)
+
+function _classifyRuleKind(rule) {
+  const t = rule?.action?.type;
+  if (t === 'block') return 'block';
+  if (t === 'redirect') {
+    // queryTransform/transform = tracking-param strip; extensionPath/url = ad neutralized
+    return rule.action.redirect?.transform ? 'removeparam' : 'block';
+  }
+  return null; // allow, allowAllRequests, modifyHeaders, upgradeScheme
+}
+
+// Best-effort human label for the domain a rule targets, for the request-log /
+// top-domains panels. MatchedRuleInfo carries no request URL (that is
+// onRuleMatchedDebug-only, unpacked extensions), so the rule condition is the
+// only honest source of "what got blocked".
+function _ruleDomainLabel(rule) {
+  const c = rule?.condition;
+  if (!c) return null;
+  if (c.requestDomains?.length) return c.requestDomains[0];
+  let f = c.urlFilter;
+  if (typeof f === 'string' && f.length > 1) {
+    f = f.replace(/^\|\|/, '').replace(/^\|/, '').replace(/^https?:\/\//, '');
+    f = f.split(/[/^*|]/)[0];
+    // Only return things that look like a hostname — generic patterns get no label
+    if (f && f.includes('.') && /^[a-z0-9.-]+$/i.test(f)) return f.toLowerCase();
+  }
+  return null;
+}
+
+function _ruleMetaOf(rule) {
+  return { kind: _classifyRuleKind(rule), domain: _ruleDomainLabel(rule) };
+}
+
+async function _refreshDynRuleMeta() {
+  try {
+    const rules = await chrome.declarativeNetRequest.getDynamicRules();
+    const map = new Map();
+    for (const r of rules) map.set(r.id, _ruleMetaOf(r));
+    _dynRuleMeta   = map;
+    _dynRuleMetaAt = Date.now();
+  } catch (_) {}
+}
+
+// Single-flight + memoized: bundled rule files can't change within a SW
+// lifetime, and the compiled rulesets make this a 5.4MB JSON parse — the
+// startup paths (bootstrap IIFE, onStartup, computeStaticRuleCount) must
+// share one load instead of re-reading per caller.
+let _staticRulesLoadPromise = null;
+
+function loadStaticRuleIds() {
+  if (_staticRulesLoadPromise) return _staticRulesLoadPromise;
+  _staticRulesLoadPromise = _loadStaticRuleIdsOnce().catch(() => {
+    _staticRulesLoadPromise = null; // allow retry on failure
+  });
+  return _staticRulesLoadPromise;
+}
+
+async function _loadStaticRuleIdsOnce() {
   try {
     const manifest = chrome.runtime.getManifest();
     const rulesets = manifest.declarative_net_request?.rule_resources ?? [];
@@ -306,7 +400,10 @@ async function loadStaticRuleIds() {
       try {
         const res   = await fetch(chrome.runtime.getURL(rs.path));
         const rules = await res.json();
-        if (Array.isArray(rules)) for (const r of rules) if (r.id) ids.add(r.id);
+        if (Array.isArray(rules)) for (const r of rules) if (r.id) {
+          ids.add(r.id);
+          _staticRuleMeta.set(r.id, _ruleMetaOf(r));
+        }
       } catch (_) {}
     }
     _staticRuleIds = ids;
@@ -443,10 +540,17 @@ let _pendingStats     = {};  // { statType: count }
 let _pendingTimeSaved = 0;   // seconds accumulated since last flush
 let _pendingFlush     = null;
 
+// Local-time day key (YYYY-MM-DD). toISOString() bucketed by UTC day, which
+// shifted evening activity into "tomorrow" for most of the Americas/Asia.
+function _localDayKey(ts = Date.now()) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // Track daily stats for 7-day chart
 async function recordDailyStats(count) {
   try {
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = _localDayKey();
     const { dailyStats = {} } = await chrome.storage.local.get('dailyStats');
     dailyStats[today] = (dailyStats[today] || 0) + count;
     // Keep only last 30 days
@@ -469,20 +573,23 @@ function _flushStats() {
   _pendingTimeSaved = 0;
   if (Object.keys(pending).length === 0 && savedThisFlush === 0) return;
 
-  // Record daily total for 7-day chart (fire-and-forget, non-critical)
-  const pendingTotal = Object.values(pending).reduce((a,b)=>a+b,0);
-  if (pendingTotal > 0) recordDailyStats(pendingTotal);
+  // Blocked total excludes non-block types (param strips) — they get their own counter
+  const blockedTotal = Object.entries(pending)
+    .reduce((a, [type, n]) => a + (NON_BLOCK_STAT_TYPES.has(type) ? 0 : n), 0);
 
-  // Serialise writes — chain onto the queue so concurrent flushes never race
+  // Serialise writes — chain onto the queue so concurrent flushes never race.
+  // recordDailyStats is a read-modify-write too, so it runs inside the queue.
   _flushQueue = _flushQueue.then(async () => {
+    if (blockedTotal > 0) await recordDailyStats(blockedTotal);
     try {
       const { stats, lifetime, timeSaved: prevSaved } =
         await chrome.storage.local.get(['stats','lifetime','timeSaved']);
-      const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
+      const s  = { ...emptyStats(), ...(stats ?? {}) };
       const lt = lifetime ?? { total:0 };
       for (const [type, count] of Object.entries(pending)) {
+        s[type] = (s[type] | 0) + count;
+        if (NON_BLOCK_STAT_TYPES.has(type)) continue;
         s.total  = (s.total  | 0) + count;
-        s[type]  = (s[type]  | 0) + count;
         lt.total = (lt.total | 0) + count;
       }
       await chrome.storage.local.set({
@@ -497,6 +604,7 @@ function _flushStats() {
         if (badgeSettings?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
       } catch (e) { logEvent('badge', 'warn', `Badge update failed: ${e.message}`); }
     } catch (_) {}
+    _saveSessionState(); // keep per-tab page stats alive across SW restarts
   });
 }
 
@@ -631,15 +739,30 @@ function logEvent(source, level, message, data = {}) {
   _schedulePersist();     // short-term cache (chrome.storage for SW restart restore)
 }
 
-// tabId → { total, network, dom, youtube, twitch, amazon, general }
-const _navStart   = new Map(); // tabId → timestamp of last navigation
-const _navCounting = new Set(); // tabIds currently in countNetworkBlocks (prevent concurrent calls)
-const _navCounted  = new Set(); // tabIds already counted this navigation
+// tabId → hostname of the top frame — lets the matched-rule poller attribute
+// network blocks to a platform category without an async tabs.get per match.
+const _tabHost = new Map();
 
 // ── Retry queue for failed filter fetches ─────────────────────────────────
 // Lists that fail during sync are queued for a single retry 5 minutes later.
 // This recovers from transient network blips without waiting 12 hours.
 let _retryQueue = []; // [{ list, limit, reason }]
+
+// Drop cached per-list rules when the rule ID layout or parser output changes,
+// so the next sync re-fetches and re-stamps every rule with its new ID. Runs
+// from BOTH onStartup and onInstalled — extension updates don't fire onStartup.
+const RULES_LAYOUT_VERSION = 'ranges-2.20'; // two-segment band + exception rules + non-colliding static IDs
+async function _migrateRuleLayoutIfNeeded() {
+  try {
+    const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
+    if (sbRulesVersion === RULES_LAYOUT_VERSION) return;
+    const all = await chrome.storage.local.get(null);
+    const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
+    if (stale.length) await chrome.storage.local.remove(stale);
+    await chrome.storage.local.set({ sbRulesVersion: RULES_LAYOUT_VERSION });
+    logEvent('startup', 'info', 'Filter rule layout changed — cleared stale rule cache for a clean resync');
+  } catch (_) {}
+}
 
 async function _retryFailedLists() {
   if (_retryQueue.length === 0) return;
@@ -665,6 +788,7 @@ async function _retryFailedLists() {
     })
   );
   const newRules = [];
+  const retryCosmeticExceptions = [];
   const retryCosmeticsToMerge = [];
   const retryDomCosToMerge = [];
   const retryScriptletsToMerge = [];
@@ -676,7 +800,7 @@ async function _retryFailedLists() {
     }
     const { list, limit, text } = result.value;
     try {
-      const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } =
+      const { rules, cosmetics, domainCosmetics, scriptletRules, cosmeticExceptions, removeParams } =
         parseFilterList(text, list.start, limit);
       newRules.push(...rules);
       retryCosmeticsToMerge.push(...cosmetics);
@@ -689,8 +813,12 @@ async function _retryFailedLists() {
         [`fc_${list.key}`]:  cosmetics,
         [`fd_${list.key}`]:  domainCosmetics,
         [`fs_${list.key}`]:  scriptletRules,
+        [`fx_${list.key}`]:  cosmeticExceptions ?? {},
         [`frp_${list.key}`]: { global: removeParams?.global ?? [], domain: removeParams?.domain ?? [] },
       });
+      if (cosmeticExceptions && Object.keys(cosmeticExceptions).length) {
+        retryCosmeticExceptions.push(cosmeticExceptions);
+      }
       logEvent('filter-sync', 'info', `Retry OK: ${list.name} — ${rules.length} rules`);
     } catch (e) { logEvent('filter-sync', 'warn', `Retry parse failed: ${list.name}`); }
   }
@@ -700,7 +828,7 @@ async function _retryFailedLists() {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set(existing.map(r => r.id));
       const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
-      const budget = 5000 - existing.length;
+      const budget = MAX_DYNAMIC_RULES - existing.length;
       if (budget > 0 && uniqueNew.length > 0) {
         await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
         logEvent('filter-sync', 'info', `Retry: added ${Math.min(uniqueNew.length, budget)} rules`);
@@ -728,10 +856,18 @@ async function _retryFailedLists() {
           mergedSR[dom].push(...rules);
         }
       }
+      const { cosmeticExceptions: aggExc = {} } =
+        await chrome.storage.local.get('cosmeticExceptions');
+      for (const exc of retryCosmeticExceptions) {
+        for (const [dom, sels] of Object.entries(exc)) {
+          aggExc[dom] = [...new Set([...(aggExc[dom] ?? []), ...sels])].slice(0, 400);
+        }
+      }
       await chrome.storage.local.set({
         cosmeticSelectors: mergedCos,
         domainCosmetics:   mergedDomCos,
         scriptletRules:    mergedSR,
+        cosmeticExceptions: aggExc,
       });
     } catch (e) { logEvent('filter-sync', 'warn', `Retry cosmetics merge failed: ${e.message}`); }
   }
@@ -773,19 +909,26 @@ async function _isOnline() {
 }
 
 
-function incrementStat(type, tabId) {
+function incrementStat(type, tabId, count = 1, timeSavedOverride = null) {
+  count = Math.max(1, count | 0); // content scripts send the real element count; sanitize
   // Update per-page stats synchronously (in-memory only)
-  if (tabId) {
-    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, amazon:0, general:0, social:0, cookies:0 };
-    ps.total = (ps.total | 0) + 1;
-    ps.dom   = (ps.dom   | 0) + 1;
+  if (tabId && tabId > 0) {
+    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0 };
     // Record every stat type per-tab so the popup "This page" breakdown is complete
-    ps[type] = (ps[type] | 0) + 1;
+    ps[type] = (ps[type] | 0) + count;
+    if (!NON_BLOCK_STAT_TYPES.has(type)) {
+      ps.total = (ps.total | 0) + count;
+      // DOM/network split: network counts arrive via the matched-rule poller
+      if (timeSavedOverride === null) ps.dom = (ps.dom | 0) + count;
+      else ps.network = (ps.network | 0) + count;
+    }
     _pageStats.set(tabId, ps);
   }
   // Accumulate — flush to storage in a single write after 500ms idle
-  _pendingStats[type] = (_pendingStats[type] ?? 0) + 1;
-  _pendingTimeSaved  += TIME_SAVED_SECONDS[type] ?? 2;
+  _pendingStats[type] = (_pendingStats[type] ?? 0) + count;
+  _pendingTimeSaved  += timeSavedOverride !== null
+    ? timeSavedOverride
+    : (TIME_SAVED_SECONDS[type] ?? 2) * count;
   const pending = Object.values(_pendingStats).reduce((a, b) => a + b, 0);
   if (pending >= 20) {
     clearTimeout(_pendingFlush);
@@ -795,13 +938,16 @@ function incrementStat(type, tabId) {
   }
 }
 
-function logBlockedRequest(url, tabId) {
+// Records one blocked network request for the request-log / top-domains panels.
+// `domain` is derived from the matched rule's condition (the tracker that was
+// blocked) — NOT the page URL, which is what these panels used to show.
+function logBlockedRequest(domain, tabId) {
   try {
-    const hostname = new URL(url).hostname;
-    _requestLog.push({ url: hostname, ts: Date.now(), tabId });
+    if (!domain) return;
+    _requestLog.push({ url: domain, ts: Date.now(), tabId });
     if (_requestLog.length > LOG_MAX) _requestLog.shift();
     // Track domain frequency for the top-blocked-domains panel
-    _domainStats.set(hostname, (_domainStats.get(hostname) || 0) + 1);
+    _domainStats.set(domain, (_domainStats.get(domain) || 0) + 1);
     // Evict lowest-count entries if over limit — keeps high-frequency domains, drops noise
     if (_domainStats.size > DOMAIN_STATS_MAX) {
       const sorted = [..._domainStats.entries()].sort((a, b) => a[1] - b[1]);
@@ -810,71 +956,202 @@ function logBlockedRequest(url, tabId) {
   } catch (_) {}
 }
 
-// NOTE: chrome.declarativeNetRequest.onRuleMatchedDebug is only available to UNPACKED
-// extensions, and where it fires it double-logs every block that countNetworkBlocks()
-// already records via getMatchedRules() — inflating GET_TOP_DOMAINS / GET_PAGE_LOG with
-// duplicate entries. countNetworkBlocks() is the single source of truth for the request log.
+// ── Network block counting — global matched-rule poller ───────────────────────
+//
+// getMatchedRules() is the only MV3 signal for DNR blocks (onRuleMatchedDebug is
+// unpacked-only), and it has two hard constraints that shape this design:
+//   • QUOTA: 20 calls per 10 minutes. The old per-navigation snapshot burned one
+//     call per page load and went silently dark after ~20 pages.
+//   • RETENTION: matches are kept ~5 minutes. Polling globally (no tabId filter)
+//     once a minute therefore sees EVERY match — including lazy-loaded ads, SPA
+//     route changes and long-lived tabs the old one-shot snapshot missed.
+// A timestamp high-water mark dedupes across polls; both it and the quota window
+// are persisted to chrome.storage.session so SW restarts neither double-count
+// nor over-call. Matches are classified via _staticRuleMeta/_dynRuleMeta so only
+// real blocks count — allow/modifyHeaders/upgradeScheme matches are ignored and
+// removeparam matches go to their own "cleaned" counter.
+// Firefox has no getMatchedRules — DOM-level stats still work, network counts skip.
 
-async function countNetworkBlocks(tabId, url) {
-  if (_navCounted.has(tabId) || _navCounting.has(tabId)) return;
+const STATS_POLL_ALARM   = 'statsPoll';
+const GMR_QUOTA_WINDOW   = 10 * 60 * 1000; // Chrome: 20 calls / 10 min
+const GMR_QUOTA_MAX      = 16;             // self-imposed cap, leaves safety margin
+const MATCH_LOOKBACK_MS  = 5 * 60 * 1000;  // getMatchedRules retention window
+
+let _lastMatchTs   = 0;    // high-water mark of counted matches
+let _gmrCalls      = [];   // timestamps of getMatchedRules calls (rolling window)
+let _lastPollAt    = 0;    // throttle gate for event-driven polls
+let _pollInflight  = null; // concurrent pollers share one in-flight promise
+
+function _hostCategory(host) {
+  if (!host) return 'general';
+  if (host === 'youtu.be' || host.endsWith('.youtube.com') || host === 'youtube.com') return 'youtube';
+  if (host === 'twitch.tv'   || host.endsWith('.twitch.tv'))   return 'twitch';
+  if (host === 'spotify.com' || host.endsWith('.spotify.com')) return 'spotify';
+  if (host === 'hulu.com'    || host.endsWith('.hulu.com'))    return 'hulu';
+  if (host === 'kick.com'    || host.endsWith('.kick.com'))    return 'kick';
+  if (/(^|\.)amazon\.[a-z.]{2,6}$/.test(host)) return 'amazon';
+  return 'general';
+}
+
+// Single-flight lock — concurrent polls would read the same watermark and
+// count the same matches twice. All callers go through this.
+function _pollMatchedRules() {
+  if (_pollInflight) return _pollInflight;
+  _pollInflight = _doPollMatchedRules()
+    .catch(() => {})
+    .finally(() => { _pollInflight = null; });
+  return _pollInflight;
+}
+
+async function _doPollMatchedRules() {
   // getMatchedRules is not implemented in Firefox — skip gracefully
-  if (!chrome.declarativeNetRequest.getMatchedRules) {
-    _navCounted.add(tabId);
-    return;
-  }
-  _navCounting.add(tabId);
+  if (!chrome.declarativeNetRequest.getMatchedRules) return;
+  await _restoreSessionState(); // no-op after first call per SW life
+
+  // Quota gate — never exceed our self-imposed call budget
+  const now = Date.now();
+  _gmrCalls = _gmrCalls.filter(t => now - t < GMR_QUOTA_WINDOW);
+  if (_gmrCalls.length >= GMR_QUOTA_MAX) return;
+  _gmrCalls.push(now);
+  _lastPollAt = now;
+
   try {
-    const minTs = _navStart.get(tabId) ?? (Date.now() - 30000);
-    const matched = await chrome.declarativeNetRequest.getMatchedRules({ tabId, minTimeStamp: minTs });
-    const count = matched?.rulesMatchedInfo?.length ?? 0;
-    _navCounted.add(tabId); // only mark as counted after successful API call
-    // Log each matched rule for the request log panel
-    matched?.rulesMatchedInfo?.forEach(m => {
-      try { logBlockedRequest(m.request?.url || url, tabId); } catch(_) {}
-    });
-    if (count === 0) return;
+    const minTimeStamp = _lastMatchTs > 0 ? _lastMatchTs + 1 : now - MATCH_LOOKBACK_MS;
+    const matched = await chrome.declarativeNetRequest.getMatchedRules({ minTimeStamp });
+    const infos = matched?.rulesMatchedInfo ?? [];
+    if (infos.length === 0) { _saveSessionState(); return; }
 
-    const ps = _pageStats.get(tabId) ?? { total:0, network:0, dom:0, youtube:0, twitch:0, amazon:0, general:0, social:0, cookies:0 };
-    ps.total   = (ps.total   | 0) + count;
-    ps.network = (ps.network | 0) + count;
-    const cat = url?.includes('twitch.tv')  ? 'twitch'
-              : url?.includes('amazon.')     ? 'amazon'
-              : 'general';
-    ps[cat] = (ps[cat] | 0) + count;
-    _pageStats.set(tabId, ps);
+    // Resolve metadata for any dynamic rule we haven't seen yet, and rebuild
+    // periodically — filter syncs rewrite the dynamic pool, which can leave an
+    // old ID pointing at a rule with a different condition. One getDynamicRules()
+    // per poll at most.
+    const dynId = chrome.declarativeNetRequest.DYNAMIC_RULESET_ID ?? '_dynamic';
+    const metaStale = now - _dynRuleMetaAt > 10 * 60 * 1000;
+    if (metaStale || infos.some(m => m.rule?.rulesetId === dynId && !_dynRuleMeta.has(m.rule.ruleId))) {
+      await _refreshDynRuleMeta();
+    }
 
-    // Chain onto the SAME queue as _flushStats() so DOM-block and network-block
-    // read-modify-writes of stats/lifetime are serialised against each other and
-    // never clobber one another's increments.
-    _flushQueue = _flushQueue.then(async () => {
-      try {
-        const { stats, lifetime } = await chrome.storage.local.get(['stats','lifetime']);
-        const s  = stats   ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 };
-        const lt = lifetime ?? { total:0 };
-        s.total  = (s.total  | 0) + count;
-        s[cat]   = (s[cat]   | 0) + count;
-        lt.total = (lt.total | 0) + count;
-        await chrome.storage.local.set({ stats: s, lifetime: lt });
-        try {
-          chrome.action.setBadgeText({ text: formatBadge(s.total) });
-          // Honour badgeEnabled — don't re-show the badge if the user turned it off
-          const { settings: _bs } = await chrome.storage.local.get('settings');
-          if (_bs?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
-        } catch (_) {}
-      } catch (_) {}
-    });
-  } catch (_) {}
-  finally { _navCounting.delete(tabId); }
+    const perTab = new Map(); // tabId → { cat → count } ('removeparam' rides along as a cat)
+    for (const m of infos) {
+      if (m.timeStamp > _lastMatchTs) _lastMatchTs = m.timeStamp;
+      const id     = m.rule?.ruleId;
+      const isDyn  = m.rule?.rulesetId === dynId;
+      let meta     = (isDyn ? _dynRuleMeta : _staticRuleMeta).get(id);
+      if (!meta) {
+        // Rule removed between match and poll. Filter-band + user-band dynamic IDs
+        // are overwhelmingly plain blocks; anything else is unknowable — don't count it.
+        const inBlockBand = isDyn &&
+          (_idInFilterBands(id) || (id >= USER_DNR_BASE && id <= USER_DNR_END));
+        if (!inBlockBand) continue;
+        meta = { kind: 'block', domain: null };
+      }
+      if (meta.kind !== 'block' && meta.kind !== 'removeparam') continue;
+      const tabId = m.tabId ?? -1;
+      const cat   = meta.kind === 'removeparam'
+        ? 'removeparam'
+        : _hostCategory(_tabHost.get(tabId));
+      const tabCats = perTab.get(tabId) ?? {};
+      tabCats[cat] = (tabCats[cat] ?? 0) + 1;
+      perTab.set(tabId, tabCats);
+      if (meta.kind === 'block') logBlockedRequest(meta.domain, tabId);
+    }
+
+    for (const [tabId, cats] of perTab) {
+      for (const [cat, n] of Object.entries(cats)) {
+        // Param strips save no watchable time; blocked requests save ~50ms each
+        const saved = cat === 'removeparam' ? 0 : n * NETWORK_TIME_SAVED_SECONDS;
+        incrementStat(cat, tabId, n, saved);
+      }
+    }
+    _saveSessionState();
+  } catch (e) {
+    // Quota errors should be impossible given the gate above — log, don't spam
+    logEvent('stats', 'warn', `getMatchedRules poll failed: ${e.message}`);
+  }
+}
+
+// Throttle wrapper: event-driven triggers (page load, popup open) coalesce into
+// one in-flight poll and respect a minimum gap so they can't drain the quota.
+function pollMatchedRulesSoon(minGapMs = 25000) {
+  if (!chrome.declarativeNetRequest.getMatchedRules) return Promise.resolve();
+  if (_pollInflight) return _pollInflight;
+  if (Date.now() - _lastPollAt < minGapMs) return Promise.resolve();
+  return _pollMatchedRules();
+}
+
+// ── Session-state persistence ─────────────────────────────────────────────────
+// MV3 kills the SW after ~30s idle, wiping in-memory maps — the popup's "This
+// page" / "Top blocked" panels used to reset constantly, and the poller would
+// lose its dedupe watermark (double counts) and quota window (over-calling).
+// chrome.storage.session survives SW restarts and is auto-cleared when the
+// browser closes — exactly the lifetime these session stats need.
+let _sessionRestored = null;
+let _sessSaveTimer   = null;
+
+function _saveSessionState() {
+  if (!chrome.storage.session) return;
+  if (_sessSaveTimer) return;
+  _sessSaveTimer = setTimeout(async () => {
+    _sessSaveTimer = null;
+    try {
+      await chrome.storage.session.set({ sessStats: {
+        lastMatchTs: _lastMatchTs,
+        gmrCalls:    _gmrCalls,
+        pageStats:   [..._pageStats.entries()],
+        tabHost:     [..._tabHost.entries()],
+        requestLog:  _requestLog.slice(-LOG_MAX),
+        domainStats: [..._domainStats.entries()].sort((a,b) => b[1]-a[1]).slice(0, 500),
+      }});
+    } catch (_) {}
+  }, 3000);
+}
+
+function _restoreSessionState() {
+  if (_sessionRestored) return _sessionRestored;
+  _sessionRestored = (async () => {
+    // Seed tab hosts for tabs that existed before this SW instance
+    try {
+      const tabs = await chrome.tabs.query({});
+      for (const t of tabs) {
+        if (t.id != null && t.url?.startsWith('http')) {
+          try { _tabHost.set(t.id, new URL(t.url).hostname); } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    if (!chrome.storage.session) return;
+    try {
+      const { sessStats } = await chrome.storage.session.get('sessStats');
+      if (!sessStats) return;
+      _lastMatchTs = sessStats.lastMatchTs ?? 0;
+      _gmrCalls    = Array.isArray(sessStats.gmrCalls) ? sessStats.gmrCalls : [];
+      // Recover the throttle gate too, so SW wakes don't add an extra poll
+      // right before the alarm's scheduled one.
+      _lastPollAt  = Math.max(_lastPollAt, ..._gmrCalls.map(Number).filter(Number.isFinite), 0);
+      for (const [k, v] of sessStats.pageStats   ?? []) if (!_pageStats.has(k))   _pageStats.set(k, v);
+      for (const [k, v] of sessStats.tabHost     ?? []) if (!_tabHost.has(k))     _tabHost.set(k, v);
+      for (const [k, v] of sessStats.domainStats ?? []) if (!_domainStats.has(k)) _domainStats.set(k, v);
+      if (_requestLog.length === 0 && Array.isArray(sessStats.requestLog)) {
+        _requestLog.push(...sessStats.requestLog);
+      }
+    } catch (_) {}
+  })();
+  return _sessionRestored;
 }
 
 // ── Tab lifecycle ──────────────────────────────────────────────────────────
 
 chrome.webNavigation.onBeforeNavigate.addListener(async ({ tabId, frameId, url }) => {
   if (frameId !== 0) return;
+  // Restore BEFORE resetting this tab's counters — otherwise a later restore
+  // could resurrect the previous page's stats over the fresh navigation.
+  await _restoreSessionState();
   _pageStats.delete(tabId);
-  _navStart.set(tabId, Date.now());
-  _navCounted.delete(tabId);
-  _navCounting.delete(tabId);
+  if (url?.startsWith('http')) {
+    try { _tabHost.set(tabId, new URL(url).hostname); } catch (_) {}
+  } else {
+    _tabHost.delete(tabId);
+  }
+  _saveSessionState();
 
   // ── Safe browsing check ──────────────────────────────────────────────────
   if (!url?.startsWith('http')) return;
@@ -894,15 +1171,15 @@ chrome.webNavigation.onCompleted.addListener(({ tabId, frameId, url }) => {
   if (frameId !== 0) return;
   if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://') ||
       url.startsWith('moz-extension://') || url.startsWith('about:') || url.startsWith('file://')) return;
-  setTimeout(() => countNetworkBlocks(tabId, url), 300);
+  // Pick up the initial request burst promptly; the throttle keeps a navigation
+  // storm from draining the getMatchedRules quota (the 1-min alarm catches up).
+  setTimeout(() => pollMatchedRulesSoon(25000), 1200);
 });
 
 // Clean up Maps when tab is closed (prevent memory leak)
 chrome.tabs.onRemoved.addListener((tabId) => {
   _pageStats.delete(tabId);
-  _navStart.delete(tabId);
-  _navCounted.delete(tabId);
-  _navCounting.delete(tabId);
+  _tabHost.delete(tabId);
 });
 
 // ── Filter Sync ────────────────────────────────────────────────────────────
@@ -1644,7 +1921,7 @@ async function syncFilterLists(force = false) {
         }
 
         try {
-          const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } = parseFilterList(val.text, val.list.start, val.limit);
+          const { rules, cosmetics, domainCosmetics, scriptletRules, cosmeticExceptions, removeParams } = parseFilterList(val.text, val.list.start, val.limit);
           allRules.push(...rules);
           allCosmetics.push(...cosmetics);
           // Merge domain cosmetics
@@ -1668,6 +1945,7 @@ async function syncFilterLists(force = false) {
             [`fc_${val.list.key}`]: cosmetics,
             [`fd_${val.list.key}`]: domainCosmetics,
             [`fs_${val.list.key}`]: scriptletRules,
+            [`fx_${val.list.key}`]: cosmeticExceptions ?? {},
             [`frp_${val.list.key}`]: { global: removeParams?.global ?? [], domain: removeParams?.domain ?? [] },
           };
           if (val.etag) updates[`fe_${val.list.key}`] = val.etag;
@@ -1690,15 +1968,19 @@ async function syncFilterLists(force = false) {
     const seenUrls = new Set();
     let deduped  = allRules.filter(r => {
       if (!Number.isInteger(r.id) || r.id <= 0)           return false;
-      if (!r.action?.type || !r.condition?.urlFilter)      return false;
-      const len = r.condition.urlFilter.length;
-      if (len < 2 || len >= 2048)                          return false;
+      // urlFilter-less rules are valid when scoped by initiatorDomains
+      // (e.g. @@*$document,domain=site.com → allowAllRequests exception)
+      if (!r.action?.type || (!r.condition?.urlFilter && !r.condition?.initiatorDomains?.length)) return false;
+      const len = (r.condition.urlFilter ?? '').length;
+      if (r.condition.urlFilter && (len < 2 || len >= 2048)) return false;
       if (seenIds.has(r.id))                               return false;
       // URL dedup: skip if another rule already blocks the exact same pattern
-      // for the same set of resource types. Include resource types in the key so
-      // type-specific rules (e.g. script-only vs xhr-only for the same URL) are kept.
+      // for the same set of resource types. Include resource types and initiator
+      // domains in the key so type-specific rules (script-only vs xhr-only) and
+      // domain-scoped exceptions for different sites are all kept.
       const rtKey = (r.condition.resourceTypes ?? []).slice().sort().join(',');
-      const urlKey = `${r.action.type}:${r.condition.urlFilter}:${rtKey}`;
+      const initKey = (r.condition.initiatorDomains ?? []).slice().sort().join('|');
+      const urlKey = `${r.action.type}:${r.priority ?? 0}:${r.condition.urlFilter ?? ''}:${rtKey}:${initKey}`;
       if (seenUrls.has(urlKey))                            return false;
       seenIds.add(r.id);
       seenUrls.add(urlKey);
@@ -1758,11 +2040,29 @@ async function syncFilterLists(force = false) {
     // rules but filterSyncedAt unset and 0 cosmetics (the "Infinityh ago / 0 selectors"
     // health-check state). The final write at the end overwrites this with the built-in
     // + custom cosmetics merged.
+    // Aggregate cosmetic exceptions (#@# unhide rules) from every list's per-list
+    // cache — reading storage (rather than threading a bucket through the
+    // fresh/cached/304/failed paths) means cached lists contribute automatically.
+    let cosmeticExceptionsAgg = {};
+    try {
+      const fxStored = await chrome.storage.local.get(FILTER_LISTS.map(l => `fx_${l.key}`));
+      for (const fx of Object.values(fxStored)) {
+        for (const [dom, sels] of Object.entries(fx ?? {})) {
+          if (!cosmeticExceptionsAgg[dom]) cosmeticExceptionsAgg[dom] = [];
+          cosmeticExceptionsAgg[dom].push(...sels);
+        }
+      }
+      for (const dom of Object.keys(cosmeticExceptionsAgg)) {
+        cosmeticExceptionsAgg[dom] = [...new Set(cosmeticExceptionsAgg[dom])].slice(0, 400);
+      }
+    } catch (_) {}
+
     try {
       await chrome.storage.local.set({
         cosmeticSelectors: cosmeticsDeduped,
         domainCosmetics:   domainCosmeticsFinal,
         scriptletRules:    scriptletRulesFinal,
+        cosmeticExceptions: cosmeticExceptionsAgg,
         filterSyncedAt:    Date.now(),
         filterRuleCount:   deduped.length,
       });
@@ -1777,7 +2077,7 @@ async function syncFilterLists(force = false) {
       if (activeLists.length > 0) {
         // Load cached data for custom lists (separate read to keep main storeKeys simple)
         const customStoreKeys = activeLists.flatMap(l => [
-          `cfc_${l.key}`, `cfdc_${l.key}`, `cfsc_${l.key}`,
+          `cfc_${l.key}`, `cfdc_${l.key}`, `cfsc_${l.key}`, `cfx_${l.key}`,
           `cfm_${l.key}`, `cfe_${l.key}`,
         ]);
         const customStored = await chrome.storage.local.get(customStoreKeys);
@@ -1794,6 +2094,7 @@ async function syncFilterLists(force = false) {
                 cosmetics:       customStored[`cfc_${key}`] ?? [],
                 domainCosmetics: customStored[`cfdc_${key}`] ?? {},
                 scriptletRules:  customStored[`cfsc_${key}`] ?? {},
+                cosmeticExceptions: customStored[`cfx_${key}`] ?? {},
               });
             }
             const controller = new AbortController();
@@ -1809,6 +2110,7 @@ async function syncFilterLists(force = false) {
                   cosmetics:       customStored[`cfc_${key}`] ?? [],
                   domainCosmetics: customStored[`cfdc_${key}`] ?? {},
                   scriptletRules:  customStored[`cfsc_${key}`] ?? {},
+                  cosmeticExceptions: customStored[`cfx_${key}`] ?? {},
                 };
                 if (!res.ok) return Promise.reject(new Error(`HTTP ${res.status}`));
                 const newEtag = res.headers.get('ETag') ?? null;
@@ -1824,6 +2126,10 @@ async function syncFilterLists(force = false) {
 
           if (val.notModified) {
             cosmeticsDeduped.push(...val.cosmetics);
+            for (const [d, sels] of Object.entries(val.cosmeticExceptions ?? {})) {
+              if (!cosmeticExceptionsAgg[d]) cosmeticExceptionsAgg[d] = [];
+              cosmeticExceptionsAgg[d].push(...sels);
+            }
             for (const [d, sels] of Object.entries(val.domainCosmetics)) {
               if (!domainCosmeticsFinal[d]) domainCosmeticsFinal[d] = [];
               domainCosmeticsFinal[d].push(...sels);
@@ -1843,9 +2149,13 @@ async function syncFilterLists(force = false) {
 
           // Freshly fetched — parse cosmetics/scriptlets only (maxRules=0 skips DNR)
           try {
-            const { cosmetics, domainCosmetics, scriptletRules } =
+            const { cosmetics, domainCosmetics, scriptletRules, cosmeticExceptions: cfExc } =
               parseFilterList(val.text, 0, 0);
             cosmeticsDeduped.push(...cosmetics);
+            for (const [d, sels] of Object.entries(cfExc ?? {})) {
+              if (!cosmeticExceptionsAgg[d]) cosmeticExceptionsAgg[d] = [];
+              cosmeticExceptionsAgg[d].push(...sels);
+            }
             for (const [d, sels] of Object.entries(domainCosmetics)) {
               if (!domainCosmeticsFinal[d]) domainCosmeticsFinal[d] = [];
               domainCosmeticsFinal[d].push(...sels);
@@ -1858,6 +2168,7 @@ async function syncFilterLists(force = false) {
               [`cfc_${val.key}`]:  cosmetics,
               [`cfdc_${val.key}`]: domainCosmetics,
               [`cfsc_${val.key}`]: scriptletRules,
+              [`cfx_${val.key}`]:  cfExc ?? {},
               [`cfm_${val.key}`]:  { at: Date.now() },
             };
             if (val.etag) updates[`cfe_${val.key}`] = val.etag;
@@ -1871,10 +2182,14 @@ async function syncFilterLists(force = false) {
     domainCosmeticsFinal = finalizeDomainCosmetics(domainCosmeticsFinal);
 
     // Persist accumulated removeparam data then apply DNR rules
+    for (const dom of Object.keys(cosmeticExceptionsAgg)) {
+      cosmeticExceptionsAgg[dom] = [...new Set(cosmeticExceptionsAgg[dom])].slice(0, 400);
+    }
     await chrome.storage.local.set({
       cosmeticSelectors: cosmeticsDeduped,
       domainCosmetics:   domainCosmeticsFinal,
       scriptletRules:    scriptletRulesFinal,
+      cosmeticExceptions: cosmeticExceptionsAgg,
       filterSyncedAt:    Date.now(),
       filterRuleCount:   deduped.length,
       syncFailures:      syncFailureCount,
@@ -2005,7 +2320,7 @@ async function clearFilterDynamicRules() {
   try {
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
     const removeRuleIds = existing
-      .filter(r => r.id >= FILTER_DYNAMIC_START && r.id <= FILTER_DYNAMIC_END)
+      .filter(r => _idInFilterBands(r.id))
       .map(r => r.id);
     if (removeRuleIds.length) {
       await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules: [] });
@@ -2018,12 +2333,13 @@ async function clearFilterDynamicRules() {
 
 async function parseAndStoreUserFilterText(text) {
   if (typeof text !== 'string') return;
-  const { rules, cosmetics, domainCosmetics, scriptletRules, removeParams } =
+  const { rules, cosmetics, domainCosmetics, scriptletRules, cosmeticExceptions, removeParams } =
     parseFilterList(text, USER_DNR_BASE, USER_DNR_END - USER_DNR_BASE + 1);
   await chrome.storage.local.set({
     userCosmetics:        cosmetics,
     userDomainCosmetics:  domainCosmetics,
     userScriptletRules:   scriptletRules,
+    userCosmeticExceptions: cosmeticExceptions ?? {},
     userDnrRules:         rules,
     userRemoveParams:     removeParams,
     userFilterText:       text,
@@ -2036,9 +2352,10 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
   const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   try {
     const en = [], dis = [];
-    if (merged.general) en.push('base_rules','extended_rules','hosts_rules');
-    else dis.push('base_rules','extended_rules','hosts_rules');
-    if (merged.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
+    const GENERAL_RULESETS  = ['base_rules','extended_rules','hosts_rules','easylist_static','easylistgermany_static','peterlowe_static'];
+    const TRACKING_RULESETS = ['tracking_rules','easyprivacy_static'];
+    if (merged.general) en.push(...GENERAL_RULESETS); else dis.push(...GENERAL_RULESETS);
+    if (merged.tracking) en.push(...TRACKING_RULESETS); else dis.push(...TRACKING_RULESETS);
     if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
     if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
   } catch (e) {
@@ -2112,10 +2429,12 @@ async function injectCosmetics(tabId, tabUrl) {
   // Merge both storage reads into one so all variables are available before use
   const { cosmeticSelectors, domainCosmetics = {}, scriptletRules = {},
           settings: s, whitelist: wl = [], globalPause = false,
-          userCosmetics = [], userDomainCosmetics = {}, userScriptletRules = {} } =
+          userCosmetics = [], userDomainCosmetics = {}, userScriptletRules = {},
+          cosmeticExceptions = {}, userCosmeticExceptions = {} } =
     await chrome.storage.local.get([
       'cosmeticSelectors','domainCosmetics','scriptletRules','settings','whitelist','globalPause',
       'userCosmetics','userDomainCosmetics','userScriptletRules',
+      'cosmeticExceptions','userCosmeticExceptions',
     ]);
   if (globalPause && globalPause.until > Date.now()) return;
   if (!s?.cosmetic) return;
@@ -2186,17 +2505,37 @@ async function injectCosmetics(tabId, tabUrl) {
        .filter(([d]) => domain.endsWith('.' + d))
        .flatMap(([, v]) => v),
   ];
-  const allSelectors = [...(cosmeticSelectors || []), ...userCosmetics, ...domainSpecific];
+  // Subtract cosmetic exceptions (#@# unhide rules) that apply to this domain —
+  // these are how filter lists repair false-positive hides on specific sites.
+  const excludedSelectors = new Set();
+  for (const src of [cosmeticExceptions, userCosmeticExceptions]) {
+    for (const sel of src['*'] ?? []) excludedSelectors.add(sel);
+    for (const sel of src[domain] ?? []) excludedSelectors.add(sel);
+    for (const [d, sels] of Object.entries(src)) {
+      if (d !== '*' && d !== domain && domain.endsWith('.' + d)) {
+        for (const sel of sels) excludedSelectors.add(sel);
+      }
+    }
+  }
+
+  const allSelectors = [...(cosmeticSelectors || []), ...userCosmetics, ...domainSpecific]
+    .filter(sel => !excludedSelectors.has(sel));
   const plainSelectors = allSelectors.filter(sel => !isProceduralCosmetic(sel));
   if (!plainSelectors.length) return;
 
-  const safe = plainSelectors
+  const safe = [...new Set(plainSelectors)]
     .slice(0, 5000)
     .filter(sel => sel && typeof sel === 'string' && sel.length < 200 &&
                    !sel.includes('{') && !sel.includes('}') &&
                    !sel.includes('<') && !sel.includes('>'));
 
-  const css = safe.slice(0, 5000).join(',\n') + ' { display:none!important; }';
+  // ONE RULE PER SELECTOR — never comma-join. Per the CSS spec, a single
+  // invalid selector in a grouped selector list invalidates the ENTIRE rule:
+  // one unparseable EasyList selector would silently disable every cosmetic
+  // filter on the page (and insertCSS does not throw on invalid CSS, so the
+  // old chunked fallback never ran). Per-rule emission caps the blast radius
+  // of a bad selector to itself.
+  const css = safe.map(sel => sel + '{display:none!important}').join('\n');
   if (tabState.css && tabState.css !== css) {
     try { await chrome.scripting.removeCSS({ target: { tabId }, css: tabState.css }); } catch (_) {}
   }
@@ -2204,16 +2543,7 @@ async function injectCosmetics(tabId, tabUrl) {
     try {
       await chrome.scripting.insertCSS({ target: { tabId }, css });
       tabState.css = css;
-    } catch (_) {
-      for (let i = 0; i < safe.length; i += 200) {
-        const chunk = safe.slice(i, i + 200);
-        const chunkCss = chunk.join(',\n') + ' { display:none!important; }';
-        try { await chrome.scripting.insertCSS({ target: { tabId }, css: chunkCss }); } catch (_) {}
-      }
-      // Record the intended CSS so a repeat pass with identical selectors won't
-      // re-run the chunked insert and pile up duplicate stylesheets.
-      tabState.css = css;
-    }
+    } catch (_) {}
   }
   _tabCosmeticState.set(tabId, tabState);
 }
@@ -2233,7 +2563,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
 
       case 'INCREMENT_STAT':
-        incrementStat(msg.statType ?? 'general', sender?.tab?.id);
+        incrementStat(msg.statType ?? 'general', sender?.tab?.id, msg.count);
         sendResponse({ ok: true });
         break;
       case 'GET_REQUEST_LOG':
@@ -2276,7 +2606,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'CLEAR_USER_FILTERS': {
         await chrome.storage.local.remove(
           ['userCosmetics','userDomainCosmetics','userScriptletRules','userFilterText',
-           'userDnrRules','userRemoveParams']
+           'userDnrRules','userRemoveParams','userCosmeticExceptions']
         );
         await applyUserFilterRules();
         await applyRemoveParamRules();
@@ -2362,10 +2692,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'GET_DAILY_STATS': {
         const { dailyStats = {} } = await chrome.storage.local.get('dailyStats');
-        // Return last 7 days
+        // Return last 7 days (local-time day buckets, matching recordDailyStats)
         const days = [];
         for (let i = 6; i >= 0; i--) {
-          const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+          const d = _localDayKey(Date.now() - i * 86400000);
           days.push({ date: d, count: dailyStats[d] || 0 });
         }
         sendResponse(days);
@@ -2373,7 +2703,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'GET_STATS': {
         const { stats } = await chrome.storage.local.get('stats');
-        sendResponse(stats ?? { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 });
+        sendResponse({ ...emptyStats(), ...(stats ?? {}) });
         break;
       }
       case 'GET_LIFETIME': {
@@ -2382,7 +2712,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
       case 'RESET_STATS':
-        await chrome.storage.local.set({ stats: { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 } });
+        await chrome.storage.local.set({ stats: emptyStats() });
         try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
         sendResponse({ ok: true });
         break;
@@ -2414,12 +2744,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       case 'GET_PAGE_STATS': {
         try {
+          await _restoreSessionState();
           const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
           if (!tab?.id) { sendResponse({ total:0, network:0, dom:0, amazon:0, social:0, cookies:0, general:0 }); break; }
-          const isWebPage = tab.url?.startsWith('http://') || tab.url?.startsWith('https://');
-          if (!_navCounted.has(tab.id) && isWebPage) {
-            await countNetworkBlocks(tab.id, tab.url);
-          }
+          // Freshen network counts for the popup; throttled so an open popup
+          // (which refreshes every 3s) can't drain the getMatchedRules quota.
+          await pollMatchedRulesSoon(10000);
           const ps = _pageStats.get(tab.id) ?? { total:0, network:0, dom:0 };
           sendResponse({
             total:      ps.total      ?? 0,
@@ -2430,7 +2760,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             cookies:    ps.cookies    ?? 0,
             general:    ps.general    ?? 0,
             annoyances: ps.annoyances ?? 0,
-            streaming:  ps.streaming  ?? 0,
+            removeparam: ps.removeparam ?? 0,
           });
         } catch (_) { sendResponse({ total:0, network:0, dom:0 }); }
         break;
@@ -2568,24 +2898,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           else fail('List sync errors', `${syncFailures} failures — open Stats and force sync`);
         } catch (e) { warn('List sync errors', e.message); }
 
-        // 13. YouTube / streaming scripts registered
-        try {
-          const cs = chrome.runtime.getManifest().content_scripts ?? [];
-          const yt = cs.filter(e => e.matches?.some(m => /youtube/.test(m)));
-          const hasInject = yt.some(e => e.js?.includes('src/inject-youtube.js') && e.world === 'MAIN');
-          const hasContent = yt.some(e => e.js?.includes('src/content-youtube.js'));
-          const hasTwitch = cs.some(e => e.js?.includes('src/content-twitch.js'));
-          if (hasInject && hasContent && hasTwitch) {
-            pass('Streaming scripts', 'YouTube MAIN+ISOLATED + Twitch layers registered');
-          } else {
-            const missing = [];
-            if (!hasInject) missing.push('inject-youtube');
-            if (!hasContent) missing.push('content-youtube');
-            if (!hasTwitch) missing.push('content-twitch');
-            fail('Streaming scripts', `Missing: ${missing.join(', ')}`);
-          }
-        } catch (e) { warn('Streaming scripts', e.message); }
-
         // 14. Privacy + procedural engine in manifest
         try {
           const cs = chrome.runtime.getManifest().content_scripts ?? [];
@@ -2602,15 +2914,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             warn('Privacy layer', `Missing: ${miss.join(', ')}`);
           }
         } catch (e) { warn('Privacy layer', e.message); }
-
-        // 15. Benchmark baseline recorded
-        try {
-          const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
-          const recorded = ['d3ward', 'adblockTester', 'eff'].filter(k => benchmarkScores[k]?.score != null);
-          if (recorded.length === 3) pass('Benchmarks', `Scores on file: ${recorded.join(', ')}`);
-          else if (recorded.length > 0) warn('Benchmarks', `${recorded.length}/3 sites scored — finish in Support → Benchmarks`);
-          else warn('Benchmarks', 'No scores yet — open benchmark pages in Support tab');
-        } catch (e) { warn('Benchmarks', e.message); }
 
         // 16. Extension version
         pass('Version', chrome.runtime.getManifest().version);
@@ -2999,43 +3302,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
         break;
       }
-      case 'GET_BENCHMARK_SCORES': {
-        const { benchmarkScores = {} } = await chrome.storage.local.get('benchmarkScores');
-        sendResponse({ scores: benchmarkScores });
-        break;
-      }
-      case 'SET_BENCHMARK_SCORES': {
-        const incoming = msg.scores ?? {};
-        const { benchmarkScores: prev = {} } = await chrome.storage.local.get('benchmarkScores');
-        const merged = { ...prev };
-        for (const [key, val] of Object.entries(incoming)) {
-          if (val?.score == null || val.score === '') continue;
-          merged[key] = {
-            score: String(val.score).trim(),
-            notes: val.notes ? String(val.notes).trim() : '',
-            date: Date.now(),
-          };
-        }
-        await chrome.storage.local.set({ benchmarkScores: merged });
-        sendResponse({ ok: true, scores: merged });
-        break;
-      }
-      case 'OPEN_BENCHMARK_PAGES': {
-        const BENCHMARK_URLS = [
-          { id: 'd3ward',          url: 'https://d3ward.github.io/toolz/adblock.html', title: 'd3ward adblock test' },
-          { id: 'adblockTester',   url: 'https://adblock-tester.com/',                 title: 'AdBlock Tester' },
-          { id: 'eff',             url: 'https://coveryourtracks.eff.org/',            title: 'EFF Cover Your Tracks' },
-        ];
-        const opened = [];
-        for (const b of BENCHMARK_URLS) {
-          try {
-            const tab = await chrome.tabs.create({ url: b.url, active: opened.length === 0 });
-            opened.push({ id: b.id, tabId: tab.id });
-          } catch (e) { opened.push({ id: b.id, error: e.message }); }
-        }
-        sendResponse({ ok: true, opened });
-        break;
-      }
       case 'EXPORT_DIAGNOSTIC': {
         // Full diagnostic snapshot: settings, stats, filter status, log, list status
         try {
@@ -3122,9 +3388,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const _imp = await getSettings();
           try {
             const en = [], dis = [];
-            if (_imp.general) en.push('base_rules', 'extended_rules', 'hosts_rules');
-            else dis.push('base_rules', 'extended_rules', 'hosts_rules');
-            if (_imp.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
+            const genSets = ['base_rules','extended_rules','hosts_rules','easylist_static','easylistgermany_static','peterlowe_static'];
+            const trkSets = ['tracking_rules','easyprivacy_static'];
+            if (_imp.general) en.push(...genSets); else dis.push(...genSets);
+            if (_imp.tracking) en.push(...trkSets); else dis.push(...trkSets);
             if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
             if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
           } catch (_) {}
@@ -3180,6 +3447,7 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
 // ── Alarms ─────────────────────────────────────────────────────────────────
 
 chrome.alarms.onAlarm.addListener(async ({ name }) => {
+  if (name === STATS_POLL_ALARM) { _pollMatchedRules().catch(() => {}); return; }
   if (name === 'filterSync') { syncFilterLists(false).catch(e => logEvent('filter-sync', 'error', `Sync alarm error: ${e.message}`)); return; }
   if (name === 'retrySync') { await _retryFailedLists().catch(e => logEvent('filter-sync', 'error', `Retry alarm error: ${e.message}`)); return; }
   if (name === 'safeBrowsingRefresh') { fetchSafeBrowsingLists().catch(() => {}); return; }
@@ -3258,7 +3526,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id }).catch(() => {});
-    if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId: tab.id }).catch(() => {});
+    chrome.action.setBadgeBackgroundColor({ color: whitelisted ? '#f59e0b' : null, tabId: tab.id }).catch(() => {});
     return;
   }
 
@@ -3279,7 +3547,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const wl = await getWhitelist();
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId }).catch(() => {});
-    if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId }).catch(() => {});
+    chrome.action.setBadgeBackgroundColor({ color: whitelisted ? '#f59e0b' : null, tabId }).catch(() => {});
   } catch (e) { logEvent('system', 'warn', `Badge restore failed: ${e.message}`); }
 });
 
@@ -3353,7 +3621,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     // Do NOT overwrite settings or whitelist if already restored from cloud sync
     // (cloud restore runs earlier in this handler and writes to local storage).
     const toWrite = {
-      stats:    { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0, general:0, social:0, cookies:0 },
+      stats:    emptyStats(),
       lifetime: { total:0 },
     };
     if (!existingSettings) toWrite.settings  = DEFAULT_SETTINGS;
@@ -3368,6 +3636,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 
   await applySettingsSideEffects(await getSettings(), { syncFilters: false });
   await _invalidateCosmeticCacheIfNeeded();
+  await _migrateRuleLayoutIfNeeded();
 
   // Fetch filter lists immediately — without this, a fresh install or update
   // has NO dynamic rules until the next browser restart triggers onStartup.
@@ -3391,7 +3660,7 @@ chrome.commands.onCommand.addListener(async (command) => {
     pushToCloud().catch(() => {}); // sync whitelist change to cloud (fire-and-forget)
     const whitelisted = domainMatchesWhitelist(domain, wl);
     chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id }).catch(() => {});
-    if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId: tab.id }).catch(() => {});
+    chrome.action.setBadgeBackgroundColor({ color: whitelisted ? '#f59e0b' : null, tabId: tab.id }).catch(() => {});
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
   }
 
@@ -3405,6 +3674,13 @@ chrome.runtime.onStartup.addListener(async () => {
   // Restore persisted log into in-memory buffer so the log panel shows history
   await _restoreLog();
   logEvent('system', 'info', 'Service worker started (onStartup)');
+
+  // The hero stat is labelled "Session ads blocked" — make that true. Zero the
+  // session counter at browser launch; the cumulative count is preserved in
+  // `lifetime` (which has always been incremented in parallel) and shown in the
+  // popup's "Lifetime total" row. storage.session (poller state, per-tab stats)
+  // is cleared by the browser automatically.
+  await chrome.storage.local.set({ stats: emptyStats() });
 
   // Init feature engines on every browser start
   const _ss = await getSettings();
@@ -3432,20 +3708,7 @@ chrome.runtime.onStartup.addListener(async () => {
   const sbAlarm = await chrome.alarms.get('safeBrowsingRefresh');
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   await _invalidateCosmeticCacheIfNeeded();
-  try {
-    const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== 'ranges-2.18') {
-      // The filter-rule ID layout changed (per-list ranges are now computed + scaled to
-      // the larger Chrome 121+ dynamic cap). Drop the cached per-list rules/metadata so the
-      // next sync re-fetches and re-stamps every rule with its new ID — avoids any chance of
-      // a stale cached ID colliding with a different list's new range.
-      const all = await chrome.storage.local.get(null);
-      const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
-      if (stale.length) await chrome.storage.local.remove(stale);
-      await chrome.storage.local.set({ sbRulesVersion: 'ranges-2.18' });
-      logEvent('startup', 'info', 'Filter rule ID layout changed — cleared stale rule cache for a clean resync');
-    }
-  } catch (_) {}
+  await _migrateRuleLayoutIfNeeded();
 
   setTimeout(() => {
     syncFilterLists(false).catch(e => {
@@ -3454,18 +3717,8 @@ chrome.runtime.onStartup.addListener(async () => {
     });
   }, 500);
   await setupContextMenus();
-  try {
-    const { stats } = await chrome.storage.local.get('stats');
-    const total = stats?.total ?? 0;
-    if (total > 0) {
-      chrome.action.setBadgeText({ text: formatBadge(total) });
-      chrome.action.setBadgeBackgroundColor({ color: '#7c6aff' });
-    }
-    try {
-      const { settings: badgeSettings } = await chrome.storage.local.get('settings');
-      if (badgeSettings?.badgeEnabled === false) chrome.action.setBadgeText({ text: '' });
-    } catch (_) {}
-  } catch (_) {}
+  // Session counter starts at zero each browser launch — badge starts empty too
+  try { chrome.action.setBadgeText({ text: '' }); } catch (_) {}
 });
 
 // ── Catch-up sync on plain service-worker wake ──────────────────────────────
@@ -3485,5 +3738,28 @@ chrome.runtime.onStartup.addListener(async () => {
       // lock first on the wakes where those events ARE firing.
       setTimeout(() => syncFilterLists(true).catch(() => {}), 3000);
     }
+  } catch (_) {}
+})();
+
+// ── Stats poller bootstrap — runs on EVERY service-worker evaluation ─────────
+// The 1-minute alarm both drives the matched-rule poll and wakes the SW so no
+// match ages out of getMatchedRules' ~5-minute retention while the SW is dead.
+// Static rule metadata is needed by the poller to classify matches; onStartup
+// loads it too, but plain message/alarm wakes don't run onStartup.
+(async () => {
+  try {
+    _restoreSessionState(); // eager — minimizes the window where panels show empty
+    if (!chrome.declarativeNetRequest.getMatchedRules) return; // Firefox: DOM stats only
+    if (_staticRuleMeta.size === 0) loadStaticRuleIds().catch(() => {});
+    const existing = await chrome.alarms.get(STATS_POLL_ALARM);
+    if (!existing) await chrome.alarms.create(STATS_POLL_ALARM, { periodInMinutes: 1 });
+    // Catch-up poll: counts whatever accumulated since the last poll (the
+    // session watermark dedupes), then steady-state continues on the alarm.
+    // Restore first so the throttle/quota gates see the persisted state.
+    setTimeout(() => {
+      Promise.resolve(_restoreSessionState())
+        .then(() => pollMatchedRulesSoon(30000))
+        .catch(() => {});
+    }, 2500);
   } catch (_) {}
 })();

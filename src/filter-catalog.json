@@ -141,12 +141,6 @@
       "color": "#34d399",
       "lists": [
         {
-          "name": "Bypass Paywalls Clean",
-          "url": "https://raw.githubusercontent.com/bpc-clone/bpc_updates/main/bypass-paywalls-clean-filter.txt",
-          "langs": [],
-          "desc": "Soft paywall bypass filters"
-        },
-        {
           "name": "Anti-Adblock Killer",
           "url": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt",
           "langs": [],

@@ -42,26 +42,32 @@ The MAIN world script receives enable/disable signals from the ISOLATED script v
 
 ### DNR rule ID space
 
-All Declarative Net Request rules share a single integer ID namespace. Collisions cause silent rule drops. The layout is documented in `background.js` lines 13–17 and the filter list table at lines 108–176:
+All Declarative Net Request rules share a single integer ID namespace. Collisions cause silent rule drops. The layout is documented near the top of `background.js` and in the `FILTER_LISTS` table:
 
 | Range | Owner |
 |---|---|
-| 1–9999 | Static bundled rules (`rules/*.json`) |
-| 10000–29999 | Dynamic filter list rules (per-list sub-ranges, see table) |
+| 1–9999 | Hand-maintained static rules (`rules/base.json`, `extended.json`, `hosts.json`, `tracking.json`) |
+| 10000–29999 | Dynamic filter list rules, segment 1 (per-list sub-ranges, computed by `_allocateFilterRanges`) |
 | 30000–30999 | `$removeparam` tracking param rules |
 | 31000–31999 | Per-domain filtering matrix rules |
+| 32000–32499 | User-typed network rules |
+| 33000–46999 | Dynamic filter list rules, segment 2 (overflow band — lists that don't fit segment 1) |
 | 47000–47002 | Privacy/security rules (referrer, HTTPS upgrade, DNT/GPC) |
+| 48000–48998 | Whitelist allow rules |
 | 49999 | Global pause-all allow rule |
+| 100000+ | Compiled static rulesets (`rules/easylist-static.json` at 100000, `rules/easyprivacy-static.json` at 130000) |
 
-Chrome hard-caps `updateDynamicRules` at 5,000 rules total. Each filter list in `FILTER_LISTS` has a `start` and `max` that must not overlap with any other list. When adding a new list entry, verify no overlap using the startup `_checkRanges()` self-check (logged at info level).
+The dynamic-rule cap is platform-detected (`MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES`): 5,000 on Chrome <121, 30,000 on Chrome 121+. `_allocateFilterRanges()` scales each list's `max` fractionally to fill the budget (~29.3k rules on Chrome 121+) and lays ranges across the two filter segments; `_checkRanges()` self-checks for overlaps and band escapes at startup.
 
 ### Filter pipeline
 
 Filter list text → `parseFilterList()` in `src/filter-parser.js` → four output types:
-1. **DNR rules** (`type: 'dnr'`): Applied via `chrome.declarativeNetRequest.updateDynamicRules`
-2. **Global cosmetic selectors** (CSS `##.selector`): Stored in `chrome.storage.local` under `cosmeticSelectors`, injected via `chrome.scripting.insertCSS` on navigation
-3. **Domain-scoped cosmetics** (`site.com##.selector`): Stored under `domainCosmetics`, injected per-domain
-4. **Scriptlet rules** (`##+js(name, args)`): Stored under `scriptletRules`, executed via `chrome.scripting.executeScript` calling `globalThis.__sbRunScriptlets()` defined in `src/scriptlets.js`
+1. **DNR rules** (`type: 'dnr'`): block rules, plus `@@` exception rules compiled to `allow` (or `allowAllRequests` for `$document`) — exceptions are reserved up to ¼ of each list's budget and sorted first so they're never starved by block volume. Generic substring patterns (`/ads/banner/*`) are supported; `$important` maps to priority 3. Applied via `chrome.declarativeNetRequest.updateDynamicRules`
+2. **Global cosmetic selectors** (CSS `##.selector`): Stored in `chrome.storage.local` under `cosmeticSelectors`, injected via `chrome.scripting.insertCSS` on navigation — **one CSS rule per selector**, never comma-joined (one invalid selector would invalidate an entire grouped rule)
+3. **Domain-scoped cosmetics** (`site.com##.selector`, incl. multi-domain `a.com,b.com##…` fan-out): Stored under `domainCosmetics`, injected per-domain
+4. **Scriptlet rules** (`##+js(name, args)`, incl. multi-domain fan-out): Stored under `scriptletRules`, executed via `chrome.scripting.executeScript` calling `globalThis.__sbRunScriptlets()` defined in `src/scriptlets.js`
+
+Untyped network rules omit `resourceTypes` (DNR's default — everything except `main_frame` — matches uBO semantics and keeps rules small). The Google-API initiator guard (`SHARED_GOOGLE_API_EXCLUDED_INITIATORS`) is applied only to generic substring patterns, never to domain-anchored rules or exceptions.
 
 `$removeparam` rules are collected into `removeParamData` and applied by `applyRemoveParamRules()` which merges them with the hardcoded `STATIC_REMOVE_PARAMS` set and emits a single global DNR redirect+queryTransform rule where possible.
 
@@ -151,7 +157,12 @@ CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom p
 
 ### Static bundled rules
 
-`rules/base.json` (261 rules), `rules/extended.json` (387 rules), `rules/hosts.json` (747 rules), `rules/tracking.json` (2 rules) — these ship with the extension and are always active regardless of filter sync status. IDs 1–9999 are reserved for these files (e.g. base.json's Google/DoubleClick redirect rules live at 190–199, not in the 10000–29999 dynamic band). When editing them, keep IDs within the 1–9999 static reserve.
+Two tiers, all always active regardless of filter sync status (gated only by the `general`/`tracking` settings via `updateEnabledRulesets`):
+
+1. **Hand-maintained** — `rules/base.json` (275), `rules/extended.json` (387), `rules/hosts.json` (747), `rules/tracking.json` (2). IDs 1–9999 are reserved for these files (e.g. base.json's Google/DoubleClick redirect rules live at 190–199). When editing them, keep IDs within the 1–9999 static reserve.
+2. **Compiled snapshots** — `rules/easylist-static.json` (20,000 rules, IDs 100000+) and `rules/easyprivacy-static.json` (7,000 rules, IDs 130000+), generated at release time with `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>`. These give full baseline protection from first install, before any dynamic sync completes, and don't consume the dynamic-rule budget (static rules have their own ~30k guaranteed pool — keep the total across all static rulesets ≤ 30,000). Refresh them when cutting a release.
+
+The 12-hour dynamic sync remains the freshness layer on top of the static snapshots.
 
 ### Alarms
 

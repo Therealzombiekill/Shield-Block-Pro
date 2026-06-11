@@ -46,12 +46,15 @@ const { rules, cosmetics, domainCosmetics, scriptletRules } = parseFilterList(te
 
 const outPath = resolve(root, opts.out);
 mkdirSync(dirname(outPath), { recursive: true });
-writeFileSync(outPath, JSON.stringify(rules, null, 2) + '\n');
+// Compact JSON — Chrome compiles static rulesets to an indexed format at install
+// time; pretty-printing only inflates the package (~3x for 20k rules).
+writeFileSync(outPath, JSON.stringify(rules) + '\n');
 
 const procCount = Object.values(domainCosmetics).flat()
   .filter(s => /:has-text\(|:upward\(|:xpath\(|:matches-css\(/.test(s)).length;
 
-console.log(`Wrote ${rules.length} DNR rules → ${opts.out}`);
+const allowCount = rules.filter(r => r.action.type !== 'block').length;
+console.log(`Wrote ${rules.length} DNR rules (${rules.length - allowCount} block, ${allowCount} exception) → ${opts.out}`);
 console.log(`  (also parsed ${cosmetics.length} global cosmetics, ${procCount} procedural domain rules, ${
   Object.values(scriptletRules).flat().length} scriptlets — not embedded in static JSON)`);
 console.log(`ID range: ${rules[0]?.id ?? 'n/a'} – ${rules[rules.length - 1]?.id ?? 'n/a'}`);

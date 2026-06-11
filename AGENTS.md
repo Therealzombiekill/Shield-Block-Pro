@@ -50,12 +50,12 @@ DevTools: service worker console on the extension card; popup via right-click to
 | Roadmap verification | `node scripts/test-roadmap.mjs` (49 factual checks) |
 | Benchmark domains | `node scripts/check-benchmark-domains.mjs` |
 | JS syntax check | Included in `validate-extension.mjs` |
-| Static rules compile | `node scripts/compile-static-rules.mjs easylist.txt --out rules/generated.json` (release-time only) |
+| Static rules compile | `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>` — refresh `rules/easylist-static.json` (100000, max 20000) and `rules/easyprivacy-static.json` (130000, max 7000) at release time |
 | Benchmark baseline | Support tab → Blocking Benchmarks; see `docs/benchmarks.md` |
 
 ### Hello-world verification
 
-1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.18.0).
+1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.19.0).
 2. Open the extension popup from the toolbar.
 3. Go to the **Support** tab → **Extension Health** → click **Run check**.
 4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.

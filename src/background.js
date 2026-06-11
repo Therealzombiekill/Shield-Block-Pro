@@ -12,14 +12,21 @@ import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 // and use it; fall back to 5,000 on older browsers or where the constant is missing.
 const MAX_DYNAMIC_RULES = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest
   && chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES) || 5000;
-// Filter-list budget: leave ~700 rules of headroom for the feature ranges (removeparam,
-// matrix, user, whitelist, privacy, pause) and never spill past the filter ID band
-// (10000-29999). Stays 4300 on the old 5k cap; grows to 19800 on Chrome 121+.
-const MAX_FILTER_RULES = Math.min(MAX_DYNAMIC_RULES - 700, 19800);
 // Dynamic DNR ID ranges. Keep these disjoint from static bundled rules and
 // from each other; Chrome rejects duplicate IDs across active rule pools.
+// Filter lists get TWO ID segments: 10000-29999 plus 33000-46999 (the gap that
+// sat unused between the user band and the privacy rules) — 34,000 IDs total,
+// enough to actually fill Chrome 121+'s 30k dynamic budget.
 const FILTER_DYNAMIC_START = 10000;
 const FILTER_DYNAMIC_END   = 29999;
+const FILTER_BAND2_START   = 33000;
+const FILTER_BAND2_END     = 46999;
+const FILTER_ID_CAPACITY   = (FILTER_DYNAMIC_END - FILTER_DYNAMIC_START + 1)
+                           + (FILTER_BAND2_END - FILTER_BAND2_START + 1);
+// Filter-list budget: leave ~700 rules of headroom for the feature ranges (removeparam,
+// matrix, user, whitelist, privacy, pause). Stays 4300 on the old 5k cap; grows to
+// 29300 on Chrome 121+ (bounded by the 34k ID capacity above).
+const MAX_FILTER_RULES = Math.min(MAX_DYNAMIC_RULES - 700, FILTER_ID_CAPACITY);
 const WHITELIST_BASE       = 48000; // 48000-48998: two allow rules per whitelisted domain
 // ID reserved for the global pause-all DNR allow rule. Must be outside all other ranges.
 const PAUSE_ALL_RULE_ID = 49999;
@@ -173,6 +180,9 @@ const FILTER_LISTS = [
   { name: 'uBlock Annoyances',     url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt',                               key: 'ublock_ann',    max:  150, start: 14000 },
   // uBlock Origin main filter list — high-quality, minimal overlap with EasyList
   { name: 'uBlock Filters',        url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',                                           key: 'ublock_main',   max:  300, start: 14500 },
+  // uBO quick fixes — same-day patches for YouTube/anti-adblock breakage between
+  // full list releases. Small, high-churn, highest-value list for staying unbroken.
+  { name: 'uBO Quick Fixes',       url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt',                                       key: 'ublock_quick',  max:  120, start: 15200 },
   // Social widget & share-button tracking
   { name: 'Fanboy Social',         url: 'https://easylist.to/easylist/fanboy-social.txt',                                                                              key: 'fanboy_social', max:  120, start: 15500 },
   // Broader ad network coverage
@@ -214,20 +224,28 @@ const FILTER_LISTS = [
 // list's baseline `max` is scaled to fill the available filter budget. On the old 5,000-
 // rule cap the scale is 1 (counts unchanged); on Chrome 121+'s larger cap it grows so we
 // ship several times more network-blocking rules. Deriving `start` from a running cursor
-// makes ID-range overlaps structurally impossible regardless of the scale.
+// makes ID-range overlaps structurally impossible regardless of the scale. Lists are laid
+// out across the two filter ID segments; a list that would straddle the gap between them
+// hops to the second segment.
 (function _allocateFilterRanges() {
   const baseSum = FILTER_LISTS.reduce((a, l) => a + l.max, 0);
-  // Fill the filter ID band as fully as the budget allows. The cap of 4 keeps the
-  // highest assigned ID inside 10000-29999 (4 * baseSum stays under the 20k band);
-  // going higher would require relocating the feature ranges above 30000.
-  const scale = Math.max(1, Math.min(4, Math.floor(MAX_FILTER_RULES / baseSum)));
+  // Fractional scale fills the budget tightly (integer scaling left ~20% unused).
+  const scale = Math.max(1, Math.min(FILTER_ID_CAPACITY, MAX_FILTER_RULES) / baseSum);
   let cursor = FILTER_DYNAMIC_START;
   for (const l of FILTER_LISTS) {
-    l.max *= scale;
+    l.max = Math.max(1, Math.floor(l.max * scale));
+    if (cursor <= FILTER_DYNAMIC_END && cursor + l.max - 1 > FILTER_DYNAMIC_END) {
+      cursor = FILTER_BAND2_START; // hop the feature-range gap (30000-32999)
+    }
     l.start = cursor;
     cursor += l.max;
   }
 })();
+
+function _idInFilterBands(id) {
+  return (id >= FILTER_DYNAMIC_START && id <= FILTER_DYNAMIC_END) ||
+         (id >= FILTER_BAND2_START   && id <= FILTER_BAND2_END);
+}
 
 // Sanity-check: verify no ID range overlaps (logged to console in dev)
 (function _checkRanges() {
@@ -243,12 +261,16 @@ const FILTER_LISTS = [
     }
   }
   // Warn if the scaled per-list maxes drift past the platform dynamic-rule cap, and
-  // verify the highest assigned ID stays inside the filter band (10000-29999) so it can
-  // never collide with the removeparam/matrix/user/whitelist/pause ranges above 30000.
+  // verify every assigned range sits fully inside one of the two filter ID segments so
+  // it can never collide with the removeparam/matrix/user/whitelist/pause/privacy ranges.
   const sumMax = FILTER_LISTS.reduce((a, l) => a + (l.max | 0), 0);
   if (sumMax > MAX_DYNAMIC_RULES) console.warn(`[SB] FILTER_LISTS max sum ${sumMax} exceeds the dynamic-rule cap ${MAX_DYNAMIC_RULES}`);
-  const lastEnd = Math.max(...FILTER_LISTS.map(l => l.start + l.max - 1));
-  if (lastEnd > FILTER_DYNAMIC_END) console.error(`[SB] filter ranges end at ${lastEnd}, past FILTER_DYNAMIC_END ${FILTER_DYNAMIC_END}`);
+  for (const l of FILTER_LISTS) {
+    const end = l.start + l.max - 1;
+    const inSeg1 = l.start >= FILTER_DYNAMIC_START && end <= FILTER_DYNAMIC_END;
+    const inSeg2 = l.start >= FILTER_BAND2_START   && end <= FILTER_BAND2_END;
+    if (!inSeg1 && !inSeg2) console.error(`[SB] ${l.name} range [${l.start},${end}] escapes the filter ID segments`);
+  }
 })();
 
 const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
@@ -287,22 +309,14 @@ let _staticRuleCount = 725; // in-memory fallback until computed
 
 async function computeStaticRuleCount() {
   try {
-    // DNR doesn't expose a direct count of static rules, but we can count them
-    // from the manifest's declared rulesets by fetching the JSON rule files.
-    const manifest    = chrome.runtime.getManifest();
-    const rulesets    = manifest.declarative_net_request?.rule_resources ?? [];
-    let total = 0;
-    for (const rs of rulesets) {
-      try {
-        const res   = await fetch(chrome.runtime.getURL(rs.path));
-        const rules = await res.json();
-        if (Array.isArray(rules)) total += rules.length;
-      } catch (_) {}
-    }
-    if (total > 0) {
-      _staticRuleCount = total;
-      await chrome.storage.local.set({ staticRuleCount: total });
-      logEvent('system', 'info', `Static rule count: ${total}`);
+    // Derived from the same single fetch+parse pass as the rule metadata —
+    // the compiled static rulesets total ~27k rules / 5.4MB of JSON, so this
+    // must not re-read the files separately.
+    await loadStaticRuleIds();
+    if (_staticRuleIds.size > 0) {
+      _staticRuleCount = _staticRuleIds.size;
+      await chrome.storage.local.set({ staticRuleCount: _staticRuleCount });
+      logEvent('system', 'info', `Static rule count: ${_staticRuleCount}`);
     }
   } catch (e) {
     logEvent('system', 'warn', `computeStaticRuleCount failed: ${e.message}`);
@@ -365,7 +379,21 @@ async function _refreshDynRuleMeta() {
   } catch (_) {}
 }
 
-async function loadStaticRuleIds() {
+// Single-flight + memoized: bundled rule files can't change within a SW
+// lifetime, and the compiled rulesets make this a 5.4MB JSON parse — the
+// startup paths (bootstrap IIFE, onStartup, computeStaticRuleCount) must
+// share one load instead of re-reading per caller.
+let _staticRulesLoadPromise = null;
+
+function loadStaticRuleIds() {
+  if (_staticRulesLoadPromise) return _staticRulesLoadPromise;
+  _staticRulesLoadPromise = _loadStaticRuleIdsOnce().catch(() => {
+    _staticRulesLoadPromise = null; // allow retry on failure
+  });
+  return _staticRulesLoadPromise;
+}
+
+async function _loadStaticRuleIdsOnce() {
   try {
     const manifest = chrome.runtime.getManifest();
     const rulesets = manifest.declarative_net_request?.rule_resources ?? [];
@@ -722,6 +750,22 @@ const _tabHost = new Map();
 // This recovers from transient network blips without waiting 12 hours.
 let _retryQueue = []; // [{ list, limit, reason }]
 
+// Drop cached per-list rules when the rule ID layout or parser output changes,
+// so the next sync re-fetches and re-stamps every rule with its new ID. Runs
+// from BOTH onStartup and onInstalled — extension updates don't fire onStartup.
+const RULES_LAYOUT_VERSION = 'ranges-2.19'; // two-segment band + exception rules
+async function _migrateRuleLayoutIfNeeded() {
+  try {
+    const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
+    if (sbRulesVersion === RULES_LAYOUT_VERSION) return;
+    const all = await chrome.storage.local.get(null);
+    const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
+    if (stale.length) await chrome.storage.local.remove(stale);
+    await chrome.storage.local.set({ sbRulesVersion: RULES_LAYOUT_VERSION });
+    logEvent('startup', 'info', 'Filter rule layout changed — cleared stale rule cache for a clean resync');
+  } catch (_) {}
+}
+
 async function _retryFailedLists() {
   if (_retryQueue.length === 0) return;
   // Don't run concurrently with a full sync — both update DNR rules and can
@@ -781,7 +825,7 @@ async function _retryFailedLists() {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set(existing.map(r => r.id));
       const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
-      const budget = 5000 - existing.length;
+      const budget = MAX_DYNAMIC_RULES - existing.length;
       if (budget > 0 && uniqueNew.length > 0) {
         await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
         logEvent('filter-sync', 'info', `Retry: added ${Math.min(uniqueNew.length, budget)} rules`);
@@ -983,10 +1027,9 @@ async function _doPollMatchedRules() {
       let meta     = (isDyn ? _dynRuleMeta : _staticRuleMeta).get(id);
       if (!meta) {
         // Rule removed between match and poll. Filter-band + user-band dynamic IDs
-        // are always plain blocks; anything else is unknowable — don't count it.
+        // are overwhelmingly plain blocks; anything else is unknowable — don't count it.
         const inBlockBand = isDyn &&
-          ((id >= FILTER_DYNAMIC_START && id <= FILTER_DYNAMIC_END) ||
-           (id >= USER_DNR_BASE && id <= USER_DNR_END));
+          (_idInFilterBands(id) || (id >= USER_DNR_BASE && id <= USER_DNR_END));
         if (!inBlockBand) continue;
         meta = { kind: 'block', domain: null };
       }
@@ -1912,15 +1955,19 @@ async function syncFilterLists(force = false) {
     const seenUrls = new Set();
     let deduped  = allRules.filter(r => {
       if (!Number.isInteger(r.id) || r.id <= 0)           return false;
-      if (!r.action?.type || !r.condition?.urlFilter)      return false;
-      const len = r.condition.urlFilter.length;
-      if (len < 2 || len >= 2048)                          return false;
+      // urlFilter-less rules are valid when scoped by initiatorDomains
+      // (e.g. @@*$document,domain=site.com → allowAllRequests exception)
+      if (!r.action?.type || (!r.condition?.urlFilter && !r.condition?.initiatorDomains?.length)) return false;
+      const len = (r.condition.urlFilter ?? '').length;
+      if (r.condition.urlFilter && (len < 2 || len >= 2048)) return false;
       if (seenIds.has(r.id))                               return false;
       // URL dedup: skip if another rule already blocks the exact same pattern
-      // for the same set of resource types. Include resource types in the key so
-      // type-specific rules (e.g. script-only vs xhr-only for the same URL) are kept.
+      // for the same set of resource types. Include resource types and initiator
+      // domains in the key so type-specific rules (script-only vs xhr-only) and
+      // domain-scoped exceptions for different sites are all kept.
       const rtKey = (r.condition.resourceTypes ?? []).slice().sort().join(',');
-      const urlKey = `${r.action.type}:${r.condition.urlFilter}:${rtKey}`;
+      const initKey = (r.condition.initiatorDomains ?? []).slice().sort().join('|');
+      const urlKey = `${r.action.type}:${r.priority ?? 0}:${r.condition.urlFilter ?? ''}:${rtKey}:${initKey}`;
       if (seenUrls.has(urlKey))                            return false;
       seenIds.add(r.id);
       seenUrls.add(urlKey);
@@ -2227,7 +2274,7 @@ async function clearFilterDynamicRules() {
   try {
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
     const removeRuleIds = existing
-      .filter(r => r.id >= FILTER_DYNAMIC_START && r.id <= FILTER_DYNAMIC_END)
+      .filter(r => _idInFilterBands(r.id))
       .map(r => r.id);
     if (removeRuleIds.length) {
       await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules: [] });
@@ -2258,9 +2305,10 @@ async function applySettingsSideEffects(settings, { syncFilters = false } = {}) 
   const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   try {
     const en = [], dis = [];
-    if (merged.general) en.push('base_rules','extended_rules','hosts_rules');
-    else dis.push('base_rules','extended_rules','hosts_rules');
-    if (merged.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
+    if (merged.general) en.push('base_rules','extended_rules','hosts_rules','easylist_static');
+    else dis.push('base_rules','extended_rules','hosts_rules','easylist_static');
+    if (merged.tracking) en.push('tracking_rules','easyprivacy_static');
+    else dis.push('tracking_rules','easyprivacy_static');
     if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
     if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
   } catch (e) {
@@ -2412,13 +2460,19 @@ async function injectCosmetics(tabId, tabUrl) {
   const plainSelectors = allSelectors.filter(sel => !isProceduralCosmetic(sel));
   if (!plainSelectors.length) return;
 
-  const safe = plainSelectors
+  const safe = [...new Set(plainSelectors)]
     .slice(0, 5000)
     .filter(sel => sel && typeof sel === 'string' && sel.length < 200 &&
                    !sel.includes('{') && !sel.includes('}') &&
                    !sel.includes('<') && !sel.includes('>'));
 
-  const css = safe.slice(0, 5000).join(',\n') + ' { display:none!important; }';
+  // ONE RULE PER SELECTOR — never comma-join. Per the CSS spec, a single
+  // invalid selector in a grouped selector list invalidates the ENTIRE rule:
+  // one unparseable EasyList selector would silently disable every cosmetic
+  // filter on the page (and insertCSS does not throw on invalid CSS, so the
+  // old chunked fallback never ran). Per-rule emission caps the blast radius
+  // of a bad selector to itself.
+  const css = safe.map(sel => sel + '{display:none!important}').join('\n');
   if (tabState.css && tabState.css !== css) {
     try { await chrome.scripting.removeCSS({ target: { tabId }, css: tabState.css }); } catch (_) {}
   }
@@ -2426,16 +2480,7 @@ async function injectCosmetics(tabId, tabUrl) {
     try {
       await chrome.scripting.insertCSS({ target: { tabId }, css });
       tabState.css = css;
-    } catch (_) {
-      for (let i = 0; i < safe.length; i += 200) {
-        const chunk = safe.slice(i, i + 200);
-        const chunkCss = chunk.join(',\n') + ' { display:none!important; }';
-        try { await chrome.scripting.insertCSS({ target: { tabId }, css: chunkCss }); } catch (_) {}
-      }
-      // Record the intended CSS so a repeat pass with identical selectors won't
-      // re-run the chunked insert and pile up duplicate stylesheets.
-      tabState.css = css;
-    }
+    } catch (_) {}
   }
   _tabCosmeticState.set(tabId, tabState);
 }
@@ -3345,9 +3390,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const _imp = await getSettings();
           try {
             const en = [], dis = [];
-            if (_imp.general) en.push('base_rules', 'extended_rules', 'hosts_rules');
-            else dis.push('base_rules', 'extended_rules', 'hosts_rules');
-            if (_imp.tracking) en.push('tracking_rules'); else dis.push('tracking_rules');
+            if (_imp.general) en.push('base_rules', 'extended_rules', 'hosts_rules', 'easylist_static');
+            else dis.push('base_rules', 'extended_rules', 'hosts_rules', 'easylist_static');
+            if (_imp.tracking) en.push('tracking_rules', 'easyprivacy_static');
+            else dis.push('tracking_rules', 'easyprivacy_static');
             if (en.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: en });
             if (dis.length) await chrome.declarativeNetRequest.updateEnabledRulesets({ disableRulesetIds: dis });
           } catch (_) {}
@@ -3592,6 +3638,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 
   await applySettingsSideEffects(await getSettings(), { syncFilters: false });
   await _invalidateCosmeticCacheIfNeeded();
+  await _migrateRuleLayoutIfNeeded();
 
   // Fetch filter lists immediately — without this, a fresh install or update
   // has NO dynamic rules until the next browser restart triggers onStartup.
@@ -3663,20 +3710,7 @@ chrome.runtime.onStartup.addListener(async () => {
   const sbAlarm = await chrome.alarms.get('safeBrowsingRefresh');
   if (!sbAlarm) chrome.alarms.create('safeBrowsingRefresh', { periodInMinutes: 360 });
   await _invalidateCosmeticCacheIfNeeded();
-  try {
-    const { sbRulesVersion } = await chrome.storage.local.get('sbRulesVersion');
-    if (sbRulesVersion !== 'ranges-2.18') {
-      // The filter-rule ID layout changed (per-list ranges are now computed + scaled to
-      // the larger Chrome 121+ dynamic cap). Drop the cached per-list rules/metadata so the
-      // next sync re-fetches and re-stamps every rule with its new ID — avoids any chance of
-      // a stale cached ID colliding with a different list's new range.
-      const all = await chrome.storage.local.get(null);
-      const stale = Object.keys(all).filter(k => k.startsWith('fr_') || k.startsWith('fm_'));
-      if (stale.length) await chrome.storage.local.remove(stale);
-      await chrome.storage.local.set({ sbRulesVersion: 'ranges-2.18' });
-      logEvent('startup', 'info', 'Filter rule ID layout changed — cleared stale rule cache for a clean resync');
-    }
-  } catch (_) {}
+  await _migrateRuleLayoutIfNeeded();
 
   setTimeout(() => {
     syncFilterLists(false).catch(e => {

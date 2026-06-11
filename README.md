@@ -1,13 +1,13 @@
 SHIELDBLOCK PRO
-v2.9.0 · Free forever
+v2.19.0 · Free forever
 ACTIVE & BLOCKING
 You're protected.
 Ads blocked. Privacy secured.
 ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
 
 🛡
-22 Filter Lists
-EasyList, uBlock Filters, AdGuard, regional lists, and more — updated automatically every 12 hours
+33 Filter Lists + 27,000 built-in rules
+Full EasyList & EasyPrivacy compiled in and active from first install; EasyList, uBlock Filters, uBO Quick Fixes, AdGuard, regional lists, and more refreshed automatically every 12 hours
 🍪
 Cookie Auto-Reject
 60+ consent management platforms handled automatically — banners rejected, not just hidden
@@ -22,20 +22,20 @@ URL Cleaning
 80+ tracking parameters stripped from every URL — fbclid, utm_*, ttclid, gclid, and more
 ⚡
 Scriptlet Injection
-38 anti-adblock bypass scripts defuse detection on sites that fight back
+40+ anti-adblock bypass scriptlets defuse detection on sites that fight back
 Keyboard shortcuts
 Open ShieldBlock
 Alt + Shift + S
 TogSHIELDBLOCK PRO
-v2.9.0 · Free forever
+v2.19.0 · Free forever
 ACTIVE & BLOCKING
 You're protected.
 Ads blocked. Privacy secured.
 ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
 
 🛡
-22 Filter Lists
-EasyList, uBlock Filters, AdGuard, regional lists, and more — updated automatically every 12 hours
+33 Filter Lists + 27,000 built-in rules
+Full EasyList & EasyPrivacy compiled in and active from first install; EasyList, uBlock Filters, uBO Quick Fixes, AdGuard, regional lists, and more refreshed automatically every 12 hours
 🍪
 Cookie Auto-Reject
 60+ consent management platforms handled automatically — banners rejected, not just hidden
@@ -50,7 +50,7 @@ URL Cleaning
 80+ tracking parameters stripped from every URL — fbclid, utm_*, ttclid, gclid, and more
 ⚡
 Scriptlet Injection
-38 anti-adblock bypass scripts defuse detection on sites that fight back
+40+ anti-adblock bypass scriptlets defuse detection on sites that fight back
 Keyboard shortcuts
 Open ShieldBlock
 Alt + Shift + S

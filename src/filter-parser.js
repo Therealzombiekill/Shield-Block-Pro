@@ -1,11 +1,17 @@
 /**
- * ShieldBlock Pro — Filter List Parser v2.0
+ * ShieldBlock Pro — Filter List Parser v3.0
  *
  * Now parses:
- *   - DNR network rules (||domain.com^)
+ *   - DNR network block rules (||domain.com^, |http://…, and generic substring
+ *     patterns like /ads/banner/* or -ad-300x250.)
+ *   - DNR exception rules (@@…) → `allow` / `allowAllRequests` rules, so filter
+ *     lists can unbreak sites the same way uBO honors them
+ *   - $important → higher-priority block (beats same-band exceptions)
  *   - Global cosmetic rules (##.selector)
- *   - Domain-scoped cosmetic rules (example.com##.selector)
- *   - Scriptlet rules (example.com##+js(name, arg))
+ *   - Domain-scoped cosmetic rules (example.com##.selector — incl. multi-domain
+ *     a.com,b.com##.selector, fanned out per domain)
+ *   - Scriptlet rules (example.com##+js(name, arg), incl. multi-domain)
+ *   - $removeparam tracking-param strips
  */
 
 import { isDomainProtected, SHARED_GOOGLE_API_EXCLUDED_INITIATORS } from './trusted-sites.js';
@@ -14,19 +20,39 @@ const RESOURCE_TYPE_MAP = {
   'script':         'script',
   'image':          'image',
   'stylesheet':     'stylesheet',
+  'css':            'stylesheet',
   'xmlhttprequest': 'xmlhttprequest',
   'xhr':            'xmlhttprequest',
   'subdocument':    'sub_frame',
+  'frame':          'sub_frame',
+  'document':       'main_frame',
+  'doc':            'main_frame',
   'media':          'media',
   'font':           'font',
   'websocket':      'websocket',
   'other':          'other',
   'ping':           'ping',
+  'beacon':         'ping',
 };
 
 const DEFAULT_RESOURCE_TYPES = [
   'script', 'image', 'xmlhttprequest', 'sub_frame', 'media', 'font', 'stylesheet', 'other', 'ping',
 ];
+
+const ALL_RESOURCE_TYPES = [
+  'main_frame', 'sub_frame', 'script', 'image', 'stylesheet', 'object',
+  'xmlhttprequest', 'ping', 'media', 'websocket', 'font', 'other',
+];
+
+// Options that change action semantics in ways we don't implement — a rule
+// carrying one of these must be dropped, not silently broadened.
+// ($popup needs window-open interception; $denyallow inverts initiator logic;
+// $badfilter negates another rule; the rest rewrite responses/headers.)
+const UNSUPPORTED_OPTION_NAMES = new Set([
+  'redirect', 'redirect-rule', 'csp', 'replace', 'rewrite', 'header',
+  'urltransform', 'permissions', 'cookie', 'popup', 'denyallow', 'badfilter',
+  'genericblock', 'ghide', 'generichide', 'ehide', 'elemhide', 'shide', 'specifichide',
+]);
 
 // Procedural pseudo-classes handled by content-procedural.js (not insertCSS)
 const PROCEDURAL_MARKERS = [':has-text(', ':matches-css(', ':upward(', ':xpath('];
@@ -35,13 +61,45 @@ export function isProceduralCosmetic(selector) {
   return typeof selector === 'string' && PROCEDURAL_MARKERS.some(m => selector.includes(m));
 }
 
-// Truly unsupported — not yet implemented anywhere
+// Truly unsupported — not implemented in insertCSS *or* the procedural engine.
+// These must never reach the CSS path: one invalid selector can invalidate an
+// entire injected stylesheet rule.
 function hasUnsupportedPseudo(selector) {
   return (
-    selector.includes(':nth-ancestor(') ||
-    selector.includes(':watch-attr(') ||
+    selector.includes(':nth-ancestor(')    ||
+    selector.includes(':watch-attr(')      ||
+    selector.includes(':style(')           ||
+    selector.includes(':remove(')          ||
+    selector.includes(':remove-attr(')     ||
+    selector.includes(':remove-class(')    ||
+    selector.includes(':matches-path(')    ||
+    selector.includes(':matches-attr(')    ||
+    selector.includes(':matches-prop(')    ||
+    selector.includes(':min-text-length(') ||
+    selector.includes(':others(')          ||
+    selector.includes(':shadow(')          ||
+    selector.includes('-abp-')             ||
     selector.includes('{ ')
   );
+}
+
+// Split an ABP domain prefix ("a.com,b.com,~c.com") into positive domains.
+// Returns [] when nothing usable remains (pure negations, pipes, wildcards TLD).
+function splitDomainPrefix(prefix, cap = 10) {
+  const out = [];
+  for (const raw of prefix.split(',')) {
+    const d = raw.trim().toLowerCase();
+    if (!d || d.startsWith('~') || d.includes('|') || d.includes('*')) continue;
+    out.push(d);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
+// Looks like an ABP/uBO regex filter (/…/), not a literal path pattern.
+function looksLikeRegexFilter(f) {
+  return f.length > 2 && f.startsWith('/') && f.endsWith('/') &&
+         /[\\()\[\]+?{}]|\.\*/.test(f);
 }
 
 function parseLine(line, idCounter) {
@@ -51,8 +109,13 @@ function parseLine(line, idCounter) {
     return null;
   }
 
-  // ── Exception cosmetic (#@#) — skip before ## check ──────────────────────────
-  if (line.includes('#@#')) return null;
+  // ── Extended cosmetic / snippet syntaxes we don't implement ─────────────────
+  // #@# unhide, #?# extended-css, #$# ABP snippet / AdGuard CSS-inject,
+  // #%# AdGuard JS, $$ AdGuard HTML filtering. Must be skipped BEFORE the
+  // network path — otherwise the generic-pattern fallback would turn them
+  // into garbage substring rules.
+  if (line.includes('#@#') || line.includes('#?#') || line.includes('#$#') ||
+      line.includes('#%#') || line.includes('$$'))  return null;
 
   // ── Cosmetic / scriptlet filters (## separator) ────────────────────────────
   // BUG FIX: `!line.includes('$')` was too broad — it dropped valid cosmetic rules
@@ -72,22 +135,21 @@ function parseLine(line, idCounter) {
       const parts = inner.split(',').map(s => s.trim());
       const [name, ...args] = parts;
       if (!name) return null;
-      // '*' means apply to all domains
-      const domain = prefix ? prefix.toLowerCase() : '*';
-      // Skip exception domains (prefixed with ~) and multi-domain scriptlets
-      if (domain.startsWith('~') || domain.includes('|')) return null;
-      return { type: 'scriptlet', domain, name, args };
+      // '*' means apply to all domains; multi-domain prefixes fan out per domain
+      const domains = (!prefix || prefix === '*') ? ['*'] : splitDomainPrefix(prefix);
+      if (!domains.length) return null;
+      return { type: 'scriptlet', domains, name, args };
     }
 
     // ── Domain-scoped cosmetic: example.com##.selector ────────────────────
     if (prefix && prefix !== '*') {
-      // Skip multi-domain rules (comma-separated), exception prefixes, and
-      // pipe-separated alternates — these produce composite keys that never
-      // match any real hostname.
-      if (prefix.includes(',') || prefix.startsWith('~') || prefix.includes('|')) return null;
       if (rawAfter.length < 2 || rawAfter.length > 512) return null;
       if (hasUnsupportedPseudo(rawAfter)) return null;
-      return { type: 'domain-cosmetic', domain: prefix.toLowerCase(), selector: rawAfter };
+      // Multi-domain rules (a.com,b.com##.sel) fan out one entry per domain;
+      // negated (~) and pipe/wildcard alternates are skipped.
+      const domains = splitDomainPrefix(prefix);
+      if (!domains.length) return null;
+      return { type: 'domain-cosmetic', domains, selector: rawAfter };
     }
 
     // ── Global cosmetic: ##.selector ──────────────────────────────────────
@@ -95,22 +157,21 @@ function parseLine(line, idCounter) {
     if (hasUnsupportedPseudo(rawAfter)) return null;
     // Global procedural rules → domainCosmetics['*'] for content-procedural.js
     if (isProceduralCosmetic(rawAfter)) {
-      return { type: 'domain-cosmetic', domain: '*', selector: rawAfter };
+      return { type: 'domain-cosmetic', domains: ['*'], selector: rawAfter };
     }
     return { type: 'cosmetic', selector: rawAfter };
   }
 
-  // ── Exception rules — skip ─────────────────────────────────────────────────
-  if (line.startsWith('@@')) return null;
-  if (!line.startsWith('||') && !line.startsWith('http')) return null;
-
-  // ── Network (DNR) rules ────────────────────────────────────────────────────
-  let filter = line;
+  // ── Network (DNR) rules — block and @@ exception ───────────────────────────
+  const isException = line.startsWith('@@');
+  let filter = isException ? line.slice(2) : line;
   let resourceTypes = null;
   const excludedResourceTypes = new Set();
   let domainType = null;
+  let important  = false;
+  let docException = false; // @@…$document → allowAllRequests
   const initiatorDomains = [];
-  const excludedInitiatorDomains = [...SHARED_GOOGLE_API_EXCLUDED_INITIATORS];
+  const excludedInitiatorDomains = [];
 
   const optIdx = filter.lastIndexOf('$');
   if (optIdx !== -1) {
@@ -120,23 +181,30 @@ function parseLine(line, idCounter) {
     for (const rawOpt of opts.split(',')) {
       const opt = rawOpt.trim();
       const negated = opt.startsWith('~');
-      const optName = opt.replace(/^~/, '');
+      const optName = opt.replace(/^~/, '').split('=')[0];
       const t = RESOURCE_TYPE_MAP[optName];
       if (t && !negated) types.push(t);
       if (t && negated) excludedResourceTypes.add(t);
-      if (optName === 'third-party') domainType = negated ? 'firstParty' : 'thirdParty';
+      if (optName === 'third-party' || optName === '3p') domainType = negated ? 'firstParty' : 'thirdParty';
+      if (optName === 'first-party' || optName === '1p') domainType = negated ? 'thirdParty' : 'firstParty';
+      if (optName === 'important') important = true;
+      if (optName === 'all') {
+        if (isException) docException = true;
+        else types.push(...ALL_RESOURCE_TYPES);
+      }
+      if (isException && (optName === 'document' || optName === 'doc')) docException = true;
       if (opt.startsWith('domain=')) {
         for (const d of opt.slice(7).split('|')) {
           const rawDomain = d.trim();
           const negatedDomain = rawDomain.startsWith('~');
           const domain = (negatedDomain ? rawDomain.slice(1) : rawDomain).replace(/^www\./, '');
-          if (!domain) continue;
+          if (!domain || domain.includes('*')) continue;
           if (negatedDomain) excludedInitiatorDomains.push(domain);
           else initiatorDomains.push(domain);
         }
       }
     }
-    if (types.length) resourceTypes = types;
+    if (types.length) resourceTypes = [...new Set(types)];
     else if (excludedResourceTypes.size) {
       resourceTypes = DEFAULT_RESOURCE_TYPES.filter(t => !excludedResourceTypes.has(t));
       if (!resourceTypes.length) return null;
@@ -145,6 +213,7 @@ function parseLine(line, idCounter) {
     // Format: $removeparam=paramname or $removeparam=paramname,domain=x.com
     const rpOpt = opts.split(',').find(o => o.trim().startsWith('removeparam'));
     if (rpOpt !== undefined) {
+      if (isException) return null; // removeparam exceptions not supported
       const paramPart = rpOpt.trim();
       const eqIdx = paramPart.indexOf('=');
       const paramName = eqIdx !== -1 ? paramPart.slice(eqIdx + 1).trim() : '';
@@ -163,44 +232,104 @@ function parseLine(line, idCounter) {
       }
       return { type: 'removeparam', param: paramName, initDomains, exclDomains };
     }
-    // Skip other unsupported option types that would change the action semantics.
-    // Match option *names* (token before '='), not substrings — a naive includes()
-    // would drop legitimate block rules like "$image,domain=cspire.com" (contains "csp")
+    // Skip option types that would change the action semantics. Match option
+    // *names* (token before '='), not substrings — a naive includes() would drop
+    // legitimate block rules like "$image,domain=cspire.com" (contains "csp")
     // or any domain= value containing "redirect"/"replace".
-    const _optNames = opts.split(',').map(o => o.trim().split('=')[0]);
-    if (_optNames.includes('redirect') || _optNames.includes('redirect-rule') ||
-        _optNames.includes('csp') || _optNames.includes('replace')) return null;
+    const _optNames = opts.split(',').map(o => o.trim().replace(/^~/, '').split('=')[0]);
+    if (_optNames.some(n => UNSUPPORTED_OPTION_NAMES.has(n))) {
+      // Exceptions for cosmetic/generic hiding are simply inert for us — but a
+      // *block* rule with an unsupported action option must not over-block.
+      if (!isException) return null;
+      // @@…$elemhide-style lines carry no network meaning either — drop unless
+      // they also carry a document scope (handled below via docException).
+      if (!docException) return null;
+    }
   }
 
   // Clean up the filter
   filter = filter.replace(/\^$/, '').replace(/\*$/, '');
-  const bare = filter.replace(/^\|\|/, '').replace(/[/?^*].*/, '').toLowerCase();
 
-  if (bare.length < 4) return null;
-  if (filter === '*' || filter === '||*') return null;
-  if (isDomainProtected(filter)) return null;
+  if (filter === '*' || filter === '||*') {
+    // "@@*$document,domain=…" style: a real allow-everything-on-domain rule
+    if (!(isException && docException && initiatorDomains.length)) return null;
+    filter = '';
+  }
+  if (looksLikeRegexFilter(filter)) return null; // regex filters unsupported in urlFilter
 
-  // Convert to DNR urlFilter
-  let urlFilter = filter;
-  if (!urlFilter.startsWith('||') && !urlFilter.startsWith('http')) return null;
+  let urlFilter = null;
+  let anchored  = false;
+  if (filter.startsWith('||') || filter.startsWith('http') || filter.startsWith('|http')) {
+    // Domain-anchored or absolute-URL pattern
+    const bare = filter.replace(/^\|+/, '').replace(/^https?:\/\//, '').replace(/[/?^*].*/, '').toLowerCase();
+    if (bare.length < 4) return null;
+    urlFilter = filter;
+    anchored  = true;
+  } else if (filter.length >= 5) {
+    // Generic substring pattern (/ads/banner/*, -ad-300x250., &ad_type=…).
+    // EasyList ships thousands of these; DNR urlFilter matches substrings
+    // natively. Guards: ≥5 chars, ≥3 alphanumerics, no '|' mid-pattern
+    // (a literal pipe never appears in URLs — the rule would match nothing).
+    const alnum = (filter.match(/[a-z0-9]/gi) ?? []).length;
+    if (alnum < 3) return null;
+    if (filter.includes('|')) return null;
+    urlFilter = filter;
+  } else if (!(isException && docException && (filter.length === 0 || initiatorDomains.length))) {
+    return null;
+  }
 
-  if (urlFilter.length < 4 || urlFilter.length > 512) return null;
+  if (urlFilter !== null && (urlFilter.length < 4 || urlFilter.length > 512)) return null;
+  // Never emit BLOCK rules against protected/critical domains. Exceptions are
+  // exempt — allowing a protected domain is harmless (and usually the point).
+  if (!isException && isDomainProtected(filter)) return null;
 
-  const condition = {
-    urlFilter,
-    resourceTypes: resourceTypes ?? DEFAULT_RESOURCE_TYPES,
-    // Never block resources when the initiator is YouTube
-    excludedInitiatorDomains: [...new Set(excludedInitiatorDomains)],
-  };
+  // The Google-API initiator guard prevents GENERIC patterns from breaking
+  // Google/GitHub apps. Domain-anchored block rules target specific ad hosts and
+  // don't need it — and at 27 entries per rule it would dominate storage/ruleset
+  // size if applied to everything. Never applied to exceptions (it would invert
+  // into over-blocking).
+  if (!isException && !anchored) {
+    excludedInitiatorDomains.push(...SHARED_GOOGLE_API_EXCLUDED_INITIATORS);
+  }
+
+  const condition = {};
+  // Omit resourceTypes when the filter carries no type options: DNR's default
+  // (all types except main_frame) is a superset of DEFAULT_RESOURCE_TYPES and
+  // matches uBO's untyped-rule semantics, while keeping rules ~120 bytes smaller.
+  if (resourceTypes) condition.resourceTypes = resourceTypes;
+  if (urlFilter !== null && urlFilter !== '') condition.urlFilter = urlFilter;
+  if (excludedInitiatorDomains.length) condition.excludedInitiatorDomains = [...new Set(excludedInitiatorDomains)];
   if (initiatorDomains.length) condition.initiatorDomains = [...new Set(initiatorDomains)];
   if (domainType) condition.domainType = domainType;
+
+  let action;
+  let priority = 2;
+  if (isException) {
+    if (docException) {
+      // @@…$document — exempt the whole page: allowAllRequests applies to the
+      // navigation and every request made by the resulting frame tree.
+      action = { type: 'allowAllRequests' };
+      condition.resourceTypes = ['main_frame', 'sub_frame'];
+      priority = 5; // beat block(2/3), removeparam redirect(3/4)
+    } else {
+      // Plain network exception. Same priority as blocks — DNR breaks ties by
+      // action precedence (allow > block), matching ABP exception semantics.
+      action = { type: 'allow' };
+    }
+  } else {
+    action = { type: 'block' };
+    // $important blocks beat same-priority exceptions (uBO semantics)
+    if (important) priority = 3;
+  }
+  // A rule must have some condition besides resourceTypes to be meaningful
+  if (!condition.urlFilter && !condition.initiatorDomains) return null;
 
   return {
     type: 'dnr',
     rule: {
       id: idCounter,
-      priority: 2,
-      action: { type: 'block' },
+      priority,
+      action,
       condition,
     },
   };
@@ -210,14 +339,15 @@ function parseLine(line, idCounter) {
 /**
  * Parse a filter list text.
  * Returns:
- *   rules          — DNR network blocking rules
+ *   rules          — DNR network rules (block + allow/allowAllRequests exceptions)
  *   cosmetics      — global CSS selectors (array)
  *   domainCosmetics — { 'domain.com': ['.sel1', '.sel2'] }
  *   scriptletRules  — { 'domain.com': [{name, args}], '*': [...] }
  */
 export function parseFilterList(text, startId = 1000, maxRules = 4500) {
   const lines          = text.split(/\r?\n/);
-  const rules          = [];
+  const blockRules     = [];
+  const allowRules     = []; // @@ exceptions — never starved out by block volume
   const cosmetics      = new Set();
   const domainCosmetics = {};
   const scriptletRules  = {};
@@ -227,39 +357,47 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
   const MAX_COSMETICS        = 8000;
   const MAX_DOMAIN_COSMETICS = 15000;
   const MAX_SCRIPTLETS       = 3000;
+  // Exceptions are what keep aggressive blocking from breaking sites — reserve
+  // up to a quarter of the rule budget for them regardless of where they appear
+  // in the file (EasyList puts them after tens of thousands of block lines).
+  const maxExceptions        = Math.max(50, Math.floor(maxRules / 4));
   let domainCosmeticCount    = 0;
   let scriptletCount         = 0;
-  let id = startId;
 
   for (const line of lines) {
-    if (rules.length >= maxRules &&
+    if (blockRules.length >= maxRules &&
+        allowRules.length >= maxExceptions &&
         cosmetics.size >= MAX_COSMETICS &&
         domainCosmeticCount >= MAX_DOMAIN_COSMETICS &&
         scriptletCount >= MAX_SCRIPTLETS) break;
 
-    const result = parseLine(line, id);
+    const result = parseLine(line, 0); // real IDs assigned after the parse
     if (!result) continue;
 
     switch (result.type) {
       case 'dnr':
-        if (rules.length < maxRules) { rules.push(result.rule); id++; }
+        if (result.rule.action.type === 'block') {
+          if (blockRules.length < maxRules) blockRules.push(result.rule);
+        } else if (allowRules.length < maxExceptions) {
+          allowRules.push(result.rule);
+        }
         break;
       case 'cosmetic':
         if (cosmetics.size < MAX_COSMETICS) cosmetics.add(result.selector);
         break;
       case 'domain-cosmetic':
-        if (domainCosmeticCount < MAX_DOMAIN_COSMETICS) {
-          const { domain, selector } = result;
+        for (const domain of result.domains) {
+          if (domainCosmeticCount >= MAX_DOMAIN_COSMETICS) break;
           if (!domainCosmetics[domain]) domainCosmetics[domain] = [];
-          domainCosmetics[domain].push(selector);
+          domainCosmetics[domain].push(result.selector);
           domainCosmeticCount++;
         }
         break;
       case 'scriptlet':
-        if (scriptletCount < MAX_SCRIPTLETS) {
-          const { domain, name, args } = result;
+        for (const domain of result.domains) {
+          if (scriptletCount >= MAX_SCRIPTLETS) break;
           if (!scriptletRules[domain]) scriptletRules[domain] = [];
-          scriptletRules[domain].push({ name, args });
+          scriptletRules[domain].push({ name: result.name, args: result.args });
           scriptletCount++;
         }
         break;
@@ -283,6 +421,12 @@ export function parseFilterList(text, startId = 1000, maxRules = 4500) {
       }
     }
   }
+
+  // Merge: exceptions first (so trimming to budget always drops blocks, never
+  // the rules that unbreak sites), then assign sequential IDs from startId.
+  const rules = [...allowRules, ...blockRules].slice(0, maxRules);
+  let id = startId;
+  for (const r of rules) r.id = id++;
 
   return {
     rules,

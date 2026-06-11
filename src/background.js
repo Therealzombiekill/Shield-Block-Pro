@@ -3440,7 +3440,7 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
     // cached injection state so injectCosmetics re-inserts the base + selector CSS for
     // the new document (otherwise cosmetic filtering silently stops after in-tab nav).
     _tabCosmeticState.delete(tabId);
-    injectCosmetics(tabId, url);
+    injectCosmetics(tabId, url).catch(() => {});
   }
 });
 
@@ -3525,8 +3525,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     pushToCloud().catch(() => {}); // keep cloud in sync (fire-and-forget)
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
     const whitelisted = domainMatchesWhitelist(domain, wl);
-    chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
-    if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId: tab.id });
+    chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id }).catch(() => {});
+    chrome.action.setBadgeBackgroundColor({ color: whitelisted ? '#f59e0b' : null, tabId: tab.id }).catch(() => {});
     return;
   }
 
@@ -3546,8 +3546,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const domain = new URL(tab.url).hostname.replace(/^www\./, '');
     const wl = await getWhitelist();
     const whitelisted = domainMatchesWhitelist(domain, wl);
-    chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId });
-    if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId });
+    chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId }).catch(() => {});
+    chrome.action.setBadgeBackgroundColor({ color: whitelisted ? '#f59e0b' : null, tabId }).catch(() => {});
   } catch (e) { logEvent('system', 'warn', `Badge restore failed: ${e.message}`); }
 });
 
@@ -3659,8 +3659,8 @@ chrome.commands.onCommand.addListener(async (command) => {
     await notifyCompleteTabs({ type: 'WHITELIST_CHANGED', whitelist: wl });
     pushToCloud().catch(() => {}); // sync whitelist change to cloud (fire-and-forget)
     const whitelisted = domainMatchesWhitelist(domain, wl);
-    chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id });
-    if (whitelisted) chrome.action.setBadgeBackgroundColor({ color: '#f59e0b', tabId: tab.id });
+    chrome.action.setBadgeText({ text: whitelisted ? '⏸' : '', tabId: tab.id }).catch(() => {});
+    chrome.action.setBadgeBackgroundColor({ color: whitelisted ? '#f59e0b' : null, tabId: tab.id }).catch(() => {});
     try { await chrome.tabs.reload(tab.id); } catch (_) {}
   }
 

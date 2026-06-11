@@ -15,6 +15,7 @@ There are no automated tests. Manual testing workflow:
 3. For background.js changes, the service worker restarts automatically on reload
 4. Check `chrome://extensions` → "Inspect views: service worker" for background console output
 5. For popup changes, right-click the extension icon → "Inspect Popup" opens DevTools on the popup
+6. If `chrome://extensions` shows **"Service worker registration failed. Status code: 10"**, Chrome could not fetch a file in `src/background.js`'s ES-module import graph (`browser-compat.js`, `filter-parser.js`, `cosmetic-utils.js`, `trusted-sites.js`). That means the loaded folder is incomplete or stale (e.g. files copied over an old install so a newly added module is missing) or Chrome's service-worker cache is corrupt — not a problem in the committed source. Fix: run `node scripts/validate-extension.mjs` to confirm the tree is intact, then **Remove** the extension and Load unpacked again from the full repo directory (a plain Reload does not always clear a failed registration). The version on the extension card must match `manifest.json` — if it doesn't, the wrong folder is loaded.
 
 To verify filter parsing changes, open the popup → **Support** tab → "Run check" health check, or check the Log tab for sync errors.
 
@@ -176,3 +177,7 @@ The 12-hour dynamic sync remains the freshness layer on top of the static snapsh
 - **5,000 dynamic rule cap**: Chrome enforces this hard. The sum of all `max` values in `FILTER_LISTS` must stay ≤ 5,000. The startup `_checkRanges()` check verifies this.
 - **No content scripts on YouTube cosmetics**: `content-general.js` and `content-procedural.js` explicitly skip `youtube.com` — cosmetic selectors can match player elements and cause black screens.
 - **CSP**: `"extension_pages": "script-src 'self'; object-src 'self'"` — no inline scripts, no remote scripts. The popup cannot fetch cross-origin URLs directly; it sends `FETCH_FILTER_URL` to the background which does the fetch and enforces a 512KB size limit.
+
+## Maintainer workflow
+
+- Standing instruction from the maintainer (2026-06-11): after completing a change in a Claude Code session, push the working branch, open a PR, and **merge it to `main` automatically** once `node scripts/validate-extension.mjs` and `node scripts/test-roadmap.mjs` pass — do not leave the PR waiting for manual review. Skip the auto-merge only if validation fails or the change is risky, and say so in the session.

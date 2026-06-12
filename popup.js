@@ -624,6 +624,41 @@ $('support-force-sync')?.addEventListener('click', () => {
   triggerForceSync($('health-summary'));
 });
 
+// ── Backup & restore ───────────────────────────────────────────────────────
+$('backup-export')?.addEventListener('click', async () => {
+  const status = $('backup-status');
+  const data = await msg('EXPORT_USER_DATA');
+  if (!data?.app) { status.textContent = 'Export failed — try again'; return; }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `shieldblock-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  status.textContent = 'Backup downloaded ✓';
+});
+
+$('backup-import')?.addEventListener('click', () => $('backup-file')?.click());
+
+$('backup-file')?.addEventListener('change', async (ev) => {
+  const status = $('backup-status');
+  const file = ev.target.files?.[0];
+  ev.target.value = ''; // allow re-selecting the same file
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { status.textContent = 'File too large (max 2 MB)'; return; }
+  status.textContent = 'Restoring…';
+  let payload;
+  try { payload = JSON.parse(await file.text()); }
+  catch (_) { status.textContent = 'Not a valid backup file'; return; }
+  const res = await msg('IMPORT_USER_DATA', { payload });
+  if (res?.ok) {
+    status.textContent = `Restored: ${res.restored.join(', ')} ✓`;
+    setTimeout(() => location.reload(), 1600); // refresh all panels with restored state
+  } else {
+    status.textContent = res?.error ?? 'Import failed — try again';
+  }
+});
+
 $('run-health-check')?.addEventListener('click', async () => {
   const btn     = $('run-health-check');
   const summary = $('health-summary');

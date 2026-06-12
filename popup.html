@@ -954,6 +954,19 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div id="health-checks"></div>
       </div>
 
+      <!-- ── Backup & Restore ─────────────────────────────────────────── -->
+      <div class="sup-card sup-card-sm">
+        <div class="sup-hd">
+          <div class="sup-label">Backup &amp; Restore</div>
+          <div class="sup-btn-row" style="gap:4px;margin:0">
+            <button class="ghost sup-ghost-sm" id="backup-export">⬇ Export</button>
+            <button class="ghost sup-ghost-sm" id="backup-import">⬆ Import</button>
+          </div>
+        </div>
+        <div id="backup-status">Settings, whitelist, filters, picker rules &amp; stats — one file</div>
+        <input type="file" id="backup-file" accept=".json,application/json" style="display:none">
+      </div>
+
 
       <div class="sup-card">
         <div class="sup-label">Free Software</div>

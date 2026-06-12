@@ -110,7 +110,6 @@ const TIME_SAVED_SECONDS = {
   kick:      25, // video ad break
   amazon:     1, // blocked sponsored slot — page-load improvement
   general:    1, // blocked web ad/tracker — load + render time avoided
-  social:     1, // skipped sponsored post
   cookies:    5, // time to find + click "reject all" by hand
   annoyances: 2, // dismissed nag / widget / banner
 };
@@ -123,7 +122,7 @@ const NETWORK_TIME_SAVED_SECONDS = 0.05;
 // params — kept OUT of `total`/lifetime/badge (a cleaned URL is not a blocked ad).
 function emptyStats() {
   return { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0,
-           general:0, social:0, cookies:0, annoyances:0, removeparam:0 };
+           general:0, cookies:0, annoyances:0, removeparam:0 };
 }
 // Stat types excluded from total/lifetime/badge/daily aggregation.
 const NON_BLOCK_STAT_TYPES = new Set(['removeparam']);
@@ -280,12 +279,11 @@ const FILTER_TTL = 12 * 60 * 60 * 1000; // 12 hours
 
 const DEFAULT_SETTINGS = {
   general: true,
-  cosmetic: true, social: true, cookies: true,
+  cosmetic: true, cookies: true,
   privacy: true, tracking: true,
   youtube: true,        // YouTube ad skip/mute (inject + content scripts)
   youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
   twitch: true, spotify: true, hulu: true, kick: true,
-  paywall: false,       // soft paywall bypass (opt-in)
   annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
@@ -2761,7 +2759,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           await _restoreSessionState();
           const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-          if (!tab?.id) { sendResponse({ total:0, network:0, dom:0, amazon:0, social:0, cookies:0, general:0 }); break; }
+          if (!tab?.id) { sendResponse({ total:0, network:0, dom:0, amazon:0, cookies:0, general:0 }); break; }
           // Freshen network counts for the popup; throttled so an open popup
           // (which refreshes every 3s) can't drain the getMatchedRules quota.
           await pollMatchedRulesSoon(10000);
@@ -2771,7 +2769,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             network:    ps.network    ?? 0,
             dom:        ps.dom        ?? 0,
             amazon:     ps.amazon     ?? 0,
-            social:     ps.social     ?? 0,
             cookies:    ps.cookies    ?? 0,
             general:    ps.general    ?? 0,
             annoyances: ps.annoyances ?? 0,

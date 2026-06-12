@@ -14,9 +14,6 @@ Cookie Auto-Reject
 👁
 Anti-Fingerprinting
 Canvas, WebGL, AudioContext, Battery API, and Screen all spoofed to prevent tracking
-📱
-Social Media
-Sponsored posts removed from your social media feeds in 30+ languages
 🔗
 URL Cleaning
 80+ tracking parameters stripped from every URL — fbclid, utm_*, ttclid, gclid, and more
@@ -42,9 +39,6 @@ Cookie Auto-Reject
 👁
 Anti-Fingerprinting
 Canvas, WebGL, AudioContext, Battery API, and Screen all spoofed to prevent tracking
-📱
-Social Media
-Sponsored posts removed from your social media feeds in 30+ languages
 🔗
 URL Cleaning
 80+ tracking parameters stripped from every URL — fbclid, utm_*, ttclid, gclid, and more

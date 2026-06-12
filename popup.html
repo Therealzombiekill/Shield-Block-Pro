@@ -11,7 +11,7 @@
   --border:#4a4d64;--border2:#5c6080;
   --accent:#8f7fff;--accent2:#b8a4ff;--glow:rgba(143,127,255,.28);
   --green:#12e890;--red:#ff6b85;--yellow:#ffd45a;
-  --amzn:#ffb020;--social:#f472b6;--cookie:#3ee8a8;
+  --amzn:#ffb020;--cookie:#3ee8a8;
   --text:#fafaff;--sub:#d8d8ec;--muted:#b4b4cc;--faint:#8888a8;
   --glass:rgba(40,42,58,.94);
   --mono:'JetBrains Mono','Fira Code','Consolas',monospace;
@@ -185,7 +185,6 @@ body.sb-ready .sc:nth-child(9){animation-delay:.28s}
 .sc-l{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;
   letter-spacing:.05em;margin-top:3px}
 .sc.az .sc-n{color:var(--amzn)}
-.sc.sc .sc-n{color:var(--social)}
 .sc.ck .sc-n{color:var(--cookie)}
 .sc.wb .sc-n{color:var(--accent2)}
 .sc.yt .sc-n{color:#ff4444}
@@ -367,7 +366,6 @@ letter-spacing:.05em;margin-right:4px;flex-shrink:0}
 .src-network{background:rgba(124,106,255,.15);color:var(--accent2)}
 .src-general{background:rgba(79,195,247,.12);color:#4fc3f7}
 .src-cookies{background:rgba(52,211,153,.12);color:var(--cookie)}
-.src-social{background:rgba(236,72,153,.12);color:var(--social)}
 .src-amazon{background:rgba(240,165,0,.12);color:var(--amzn)}
 .src-picker,.src-report{background:rgba(0,217,126,.1);color:var(--green)}
 .src-scriptlet{background:rgba(255,77,109,.1);color:var(--red)}
@@ -376,7 +374,6 @@ letter-spacing:.05em;margin-right:4px;flex-shrink:0}
 .src-spotify{background:rgba(29,185,84,.12);color:#1db954}
 .src-hulu{background:rgba(28,231,131,.12);color:#1ce783}
 .src-kick{background:rgba(83,252,24,.12);color:#53fc18}
-.src-paywall{background:rgba(245,158,11,.12);color:#f59e0b}
 .log-empty{text-align:center;color:var(--muted);padding:24px;font-size:11px;font-family:var(--sans)}
 textarea:focus{border-color:var(--accent)!important}
 .pause-active { color: var(--yellow) !important; border-color: var(--yellow) !important; }
@@ -656,10 +653,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <span class="sc-n" id="s-kk">0</span>
           <span class="sc-l">Kick</span>
         </div>
-        <div class="sc sc">
-          <span class="sc-n" id="s-sc">0</span>
-          <span class="sc-l">Social</span>
-        </div>
         <div class="sc ck">
           <span class="sc-n" id="s-ck">0</span>
           <span class="sc-l">Cookies</span>
@@ -768,15 +761,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div class="sw"><input type="checkbox" id="t-wb" data-s="general" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
 
-      <label class="tr" for="t-sm">
-        <div class="tr-info">
-          <div class="ti ti-soc">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ec4899"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Social Media</strong><span>Sponsored &amp; promoted posts removed</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-sm" data-s="social" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
       <label class="tr" for="t-ck">
         <div class="tr-info">
           <div class="ti ti-cks">
@@ -931,15 +915,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div class="sw"><input type="checkbox" id="t-tz" data-s="timezoneSpoof"><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
 
-      <label class="tr" for="t-pw">
-        <div class="tr-info">
-          <div class="ti ti-pw">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#fbbf24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Soft Paywall Bypass</strong><span>Remove blur overlays (opt-in)</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-pw" data-s="paywall"><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
 
     </div>
   </div>
@@ -1140,7 +1115,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <button class="log-ftag" data-src="network">net</button>
         <button class="log-ftag" data-src="general">web</button>
         <button class="log-ftag" data-src="cookies">🍪</button>
-        <button class="log-ftag" data-src="social">📱</button>
         <button class="log-ftag" data-src="picker">🎯</button>
       </div>
       <div class="log-hdr-btns">

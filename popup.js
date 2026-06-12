@@ -136,7 +136,7 @@ async function refreshStats() {
       msg('GET_STATS'), msg('GET_LIFETIME'), msg('GET_PAGE_STATS'),
       chrome.storage.local.get(['timeSaved','filterSyncedAt']),
     ]);
-    const stats = s  ?? { total:0, amazon:0, general:0, social:0, cookies:0 };
+    const stats = s  ?? { total:0, amazon:0, general:0, cookies:0 };
     const life  = lt ?? { total:0 };
     const page  = ps ?? { total:0 };
 
@@ -156,7 +156,6 @@ async function refreshStats() {
     $('s-sp').textContent = fmt(stats.spotify  || 0);
     $('s-hl').textContent = fmt(stats.hulu     || 0);
     $('s-kk').textContent = fmt(stats.kick     || 0);
-    $('s-sc').textContent = fmt(stats.social   || 0);
     $('s-ck').textContent = fmt(stats.cookies  || 0);
     $('s-wb').textContent = fmt(stats.general  || 0);
     if ($('s-an')) $('s-an').textContent = fmt(stats.annoyances || 0);
@@ -183,7 +182,6 @@ async function refreshStats() {
     const n = page.total ?? 0;
     if (n > 0 || page.removeparam > 0) {
       const parts = [];
-      if (page.social  > 0) parts.push(`${fmt(page.social)} social`);
       if (page.cookies > 0) parts.push(`${fmt(page.cookies)} 🍪`);
       if (page.general > 0) parts.push(`${fmt(page.general)} web`);
       if (page.annoyances > 0) parts.push(`${fmt(page.annoyances)} nags`);
@@ -715,7 +713,6 @@ $('export-stats-csv')?.addEventListener('click', async () => {
       ['Spotify',     stats.spotify  ?? 0],
       ['Hulu',        stats.hulu     ?? 0],
       ['Kick',        stats.kick     ?? 0],
-      ['Social',      stats.social   ?? 0],
       ['Cookies',     stats.cookies  ?? 0],
       ['General',     stats.general  ?? 0],
       [],

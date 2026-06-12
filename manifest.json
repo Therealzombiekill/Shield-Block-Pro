@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.20.2",
+  "version": "2.20.3",
   "description": "Block ads, trackers, and cookie banners across the web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
@@ -80,23 +80,6 @@
         "src/content-general.js"
       ],
       "run_at": "document_start"
-    },
-    {
-      "matches": [
-        "*://*.facebook.com/*",
-        "*://*.instagram.com/*",
-        "*://*.reddit.com/*",
-        "*://*.old.reddit.com/*",
-        "*://*.twitter.com/*",
-        "*://*.x.com/*",
-        "*://*.linkedin.com/*",
-        "*://*.tiktok.com/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-social.js"
-      ],
-      "run_at": "document_idle"
     },
     {
       "matches": [
@@ -200,17 +183,6 @@
         "src/content-youtube.js"
       ],
       "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "*://*/*"
-      ],
-      "js": [
-        "src/browser-compat.js",
-        "src/content-paywall.js"
-      ],
-      "run_at": "document_idle",
-      "match_about_blank": false
     }
   ],
   "declarative_net_request": {

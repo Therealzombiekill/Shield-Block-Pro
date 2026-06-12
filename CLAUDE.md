@@ -104,6 +104,8 @@ Everything lives in `chrome.storage.local`. Key prefixes:
 - `userCosmetics`, `userDomainCosmetics`, `userScriptletRules`, `userCosmeticExceptions`, `userFilterText` — user-typed rules in Filters panel
 - `customFilterLists` — subscribed external filter lists
 
+All user-owned state (settings, whitelist, user filters, custom lists, picker rules, filter matrix, lifetime stats) exports to a versioned JSON file and restores via `EXPORT_USER_DATA` / `IMPORT_USER_DATA` (popup → Support → Backup & Restore). Import is type-checked and size-capped per field; lifetime counters merge upward only; restoring re-derives DNR/cosmetic state and triggers a sync for restored custom lists.
+
 The service worker also uses **IndexedDB** (`sbProLog` database, `events` object store) for permanent long-term logging. `chrome.storage.local` only holds a rolling short-term cache (`persistedLog`) for SW-restart recovery.
 
 ### Settings and the settings cache
@@ -160,7 +162,7 @@ Two tiers, all always active regardless of filter sync status (gated only by the
 1. **Hand-maintained** — `rules/base.json` (275), `rules/extended.json` (387), `rules/hosts.json` (747), `rules/tracking.json` (2). IDs 1–9999 are reserved for these files (e.g. base.json's Google/DoubleClick redirect rules live at 190–199). When editing them, keep IDs within the 1–9999 static reserve.
 2. **Compiled snapshots** — `rules/easylist-static.json` (16,800 rules, IDs 100000+), `rules/easyprivacy-static.json` (6,000, IDs 130000+), `rules/easylistgermany-static.json` (~2,200, IDs 140000+), `rules/peterlowe-static.json` (3,300, IDs 150000+), generated at release time with `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>`. These give full baseline protection from first install, before any dynamic sync completes, and don't consume the dynamic-rule budget. Static rules have their own pool with a 30,000-rule guaranteed minimum — keep the total across ALL static rulesets (hand-maintained + compiled) ≤ 30,000, and keep compiled IDs ≥ 100000 so `filterStaticConflicts()` never collides them with dynamic bands. Refresh them when cutting a release.
 
-The 12-hour dynamic sync remains the freshness layer on top of the static snapshots. A weekly GitHub Action (`.github/workflows/refresh-static-rules.yml`) recompiles the snapshots and opens a PR; CI (`.github/workflows/ci.yml`) enforces rule-ID uniqueness, ASCII urlFilters, and the 30k static budget.
+The 12-hour dynamic sync remains the freshness layer on top of the static snapshots. A weekly GitHub Action (`.github/workflows/refresh-static-rules.yml`) recompiles the snapshots and opens a PR; CI (`.github/workflows/ci.yml`) enforces rule-ID uniqueness, ASCII urlFilters, the 30k static budget, and the parser regression suite (`scripts/test-parser.mjs` — IDN/punycode, non-ASCII drops, scriptlet-arg escaping).
 
 **Unbreak stubs** (`src/stubs/noop-*.js`): base.json rules 440-447 redirect the major ad/analytics loader scripts (gpt.js, adsbygoogle.js, analytics.js/ga.js, gtag/gtm.js, apstag.js) to neutered API stubs at priority 3 (above block rules at 2) — pages that call `googletag.*`/`ga()` etc. keep working and fire their callbacks instead of erroring when the script is blocked. Stub files must be listed in `web_accessible_resources`.
 

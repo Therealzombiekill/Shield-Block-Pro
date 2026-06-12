@@ -28,6 +28,9 @@ jobs:
       - name: Roadmap verification checks
         run: node scripts/test-roadmap.mjs
 
+      - name: Parser regression checks
+        run: node scripts/test-parser.mjs
+
       - name: Static ruleset budget check
         run: |
           node -e "

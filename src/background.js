@@ -2361,6 +2361,162 @@ async function parseAndStoreUserFilterText(text) {
   await applyRemoveParamRules();
 }
 
+// ── Backup & Restore ────────────────────────────────────────────────────────
+// Everything a user can lose on reinstall, exported as one JSON file from the
+// popup Support tab. Import is defensive: every field is type-checked and
+// size-capped, settings are filtered to known DEFAULT_SETTINGS keys, and
+// lifetime counters only ever merge upward (a restore can't shrink them).
+
+const _BACKUP_KEYS = ['settings', 'whitelist', 'userFilterText', 'customFilterLists',
+                      'customHideRules', 'filterMatrix', 'lifetime', 'timeSaved', 'dailyStats'];
+
+async function exportUserData() {
+  const d = await chrome.storage.local.get(_BACKUP_KEYS);
+  return {
+    app: 'ShieldBlock Pro',
+    backupVersion: 1,
+    appVersion: chrome.runtime.getManifest().version,
+    exportedAt: new Date().toISOString(),
+    data: {
+      settings:          d.settings ?? {},
+      whitelist:         d.whitelist ?? [],
+      userFilterText:    d.userFilterText ?? '',
+      customFilterLists: (d.customFilterLists ?? []).map(l => ({
+        url: l.url, name: l.name, enabled: l.enabled !== false,
+      })),
+      customHideRules:   d.customHideRules ?? [],
+      filterMatrix:      d.filterMatrix ?? {},
+      lifetime:          d.lifetime ?? { total: 0 },
+      timeSaved:         d.timeSaved ?? 0,
+      dailyStats:        d.dailyStats ?? {},
+    },
+  };
+}
+
+function _isBackupHostname(h) {
+  return typeof h === 'string' && h.length > 0 && h.length <= 253 && /^[a-z0-9.*-]+$/i.test(h);
+}
+
+// Same slug+hash key scheme as ADD_CUSTOM_LIST so restored lists reuse the
+// exact storage prefixes a live subscription would get.
+function _customListKey(url) {
+  const u = new URL(url);
+  const slug = (u.hostname + u.pathname).replace(/[^a-z0-9]/gi, '_').slice(0, 24);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < url.length; i++) h = Math.imul(h ^ url.charCodeAt(i), 0x01000193) >>> 0;
+  return slug + '_' + h.toString(16).slice(0, 6);
+}
+
+async function importUserData(payload) {
+  if (!payload || typeof payload !== 'object' ||
+      payload.app !== 'ShieldBlock Pro' || typeof payload.data !== 'object' || !payload.data) {
+    return { ok: false, error: 'Not a ShieldBlock Pro backup file' };
+  }
+  if ((payload.backupVersion ?? 0) > 1) {
+    return { ok: false, error: 'Backup is from a newer version — update the extension first' };
+  }
+  const d = payload.data;
+  const out = {};
+  const restored = [];
+
+  if (d.settings && typeof d.settings === 'object') {
+    const next = { ...(await getSettings()) };
+    let n = 0;
+    for (const k of Object.keys(DEFAULT_SETTINGS)) {
+      if (k in d.settings && typeof d.settings[k] === typeof DEFAULT_SETTINGS[k]) {
+        next[k] = d.settings[k]; n++;
+      }
+    }
+    if (n) { out.settings = next; restored.push(`${n} settings`); }
+  }
+  if (Array.isArray(d.whitelist)) {
+    // IDN hosts are stored/matched in punycode (location.hostname form) —
+    // convert hand-edited Unicode entries instead of dropping them.
+    const toAsciiHost = (h) => {
+      if (typeof h !== 'string' || /^[\x00-\x7F]*$/.test(h)) return h;
+      try { return new URL('http://' + h + '/').hostname || h; } catch (_) { return h; }
+    };
+    out.whitelist = [...new Set(
+      d.whitelist.filter(h => typeof h === 'string' && h.length <= 253)
+        .map(toAsciiHost).filter(_isBackupHostname)
+    )].slice(0, 900);
+    restored.push(`${out.whitelist.length} whitelisted sites`);
+  }
+  if (typeof d.userFilterText === 'string' && d.userFilterText.length <= 512 * 1024) {
+    out.userFilterText = d.userFilterText;
+    restored.push('my filters');
+  }
+  if (Array.isArray(d.customFilterLists)) {
+    const lists = [];
+    for (const l of d.customFilterLists.slice(0, 30)) {
+      if (!l || typeof l.url !== 'string' || l.url.length > 2048) continue;
+      try {
+        const proto = new URL(l.url).protocol;
+        if (proto !== 'https:' && proto !== 'http:') continue;
+        lists.push({
+          url: l.url,
+          name: typeof l.name === 'string' ? l.name.slice(0, 100) : l.url,
+          key: _customListKey(l.url),
+          enabled: l.enabled !== false,
+        });
+      } catch (_) { /* invalid URL — skip */ }
+    }
+    out.customFilterLists = lists;
+    restored.push(`${lists.length} subscribed lists`);
+  }
+  if (Array.isArray(d.customHideRules)) {
+    out.customHideRules = d.customHideRules
+      .filter(s => typeof s === 'string' && s.length > 0 && s.length <= 512).slice(0, 2000);
+    restored.push(`${out.customHideRules.length} picker rules`);
+  }
+  if (d.filterMatrix && typeof d.filterMatrix === 'object') {
+    const fm = {};
+    for (const [host, rules] of Object.entries(d.filterMatrix).slice(0, 500)) {
+      if (!_isBackupHostname(host) || !rules || typeof rules !== 'object') continue;
+      const rs = {};
+      for (const [rk, v] of Object.entries(rules).slice(0, 50)) {
+        if (v === 'allow' || v === 'block' || v === 'default') rs[rk] = v;
+      }
+      if (Object.keys(rs).length) fm[host] = rs;
+    }
+    out.filterMatrix = fm;
+    restored.push(`${Object.keys(fm).length} matrix sites`);
+  }
+  const cur = await chrome.storage.local.get(['lifetime', 'timeSaved']);
+  if (d.lifetime && typeof d.lifetime === 'object') {
+    const merged = { ...(cur.lifetime ?? {}) };
+    for (const [k, v] of Object.entries(d.lifetime)) {
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0) merged[k] = Math.max(merged[k] ?? 0, v);
+    }
+    out.lifetime = merged;
+  }
+  if (typeof d.timeSaved === 'number' && Number.isFinite(d.timeSaved) && d.timeSaved >= 0) {
+    out.timeSaved = Math.max(cur.timeSaved ?? 0, d.timeSaved);
+  }
+  if (d.dailyStats && typeof d.dailyStats === 'object') {
+    const ds = {};
+    for (const [k, v] of Object.entries(d.dailyStats).slice(0, 60)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && typeof v === 'number' && Number.isFinite(v) && v >= 0) ds[k] = v;
+    }
+    out.dailyStats = ds;
+  }
+
+  if (!restored.length) return { ok: false, error: 'Backup contained no usable data' };
+
+  await chrome.storage.local.set(out);
+  invalidateSettingsCache();
+  // Re-derive everything that flows from the restored state: user filter text
+  // recompiles to DNR/cosmetics, matrix rules rebuild, and the settings side
+  // effects re-apply rulesets/whitelist/privacy rules and kick off a sync so
+  // restored custom lists are fetched.
+  if ('userFilterText' in out) await parseAndStoreUserFilterText(out.userFilterText);
+  if ('filterMatrix' in out) await applyMatrixRules();
+  await applySettingsSideEffects(out.settings ?? await getSettings(), { syncFilters: true });
+  pushToCloud().catch(() => {});
+  logEvent('system', 'info', `Backup restored: ${restored.join(', ')}`);
+  return { ok: true, restored };
+}
+
 async function applySettingsSideEffects(settings, { syncFilters = false } = {}) {
   const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   try {
@@ -2778,17 +2934,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
 
+      case 'EXPORT_USER_DATA':
+        sendResponse(await exportUserData());
+        break;
+
+      case 'IMPORT_USER_DATA':
+        sendResponse(await importUserData(msg.payload));
+        break;
+
       case 'CHECK_UPDATE': {
         try {
           const manifest = chrome.runtime.getManifest();
+          // Read the repo's manifest directly — self-maintaining, no separate
+          // version file that can drift from reality.
           const res = await fetch(
-            'https://raw.githubusercontent.com/shieldblock/shieldblock/main/version.json',
+            'https://raw.githubusercontent.com/Therealzombiekill/Shield-Block-Pro/main/manifest.json',
             { cache: 'no-cache' }
           );
           if (res.ok) {
             const { version: latest } = await res.json();
             const current = manifest.version;
-            sendResponse({ current, latest, hasUpdate: latest !== current });
+            const isNewer = (a, b) => { // a > b, numeric dotted compare
+              const pa = String(a).split('.'), pb = String(b).split('.');
+              for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                const x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0;
+                if (x !== y) return x > y;
+              }
+              return false;
+            };
+            sendResponse({ current, latest, hasUpdate: !!latest && isNewer(latest, current) });
           } else {
             sendResponse({ current: manifest.version, latest: null, hasUpdate: false });
           }

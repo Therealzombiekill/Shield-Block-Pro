@@ -1230,10 +1230,18 @@ let _syncListStatus = {}; // { [key]: { status:'ok'|'error'|'cached'|'304', rule
 // the interval is cleared in a finally block, so a crash or early return
 // can't cause it to leak. The interval itself also keeps the SW alive since
 // the callback re-registers the timer.
+// Reference-counted: long operations can overlap (filter sync and safe-browsing
+// refresh both run on startup), and with a single boolean whichever finished
+// first would kill the keep-alive out from under the other, letting Chrome
+// terminate the SW mid-operation. Each _startKeepAlive must be paired with a
+// _stopKeepAlive in a finally block; the interval is only cleared when the
+// last holder releases it.
 let _keepAliveTimer = null;
+let _keepAliveHolders = 0;
 
 function _startKeepAlive(label) {
-  if (_keepAliveTimer) return; // already running (nested call guard)
+  _keepAliveHolders++;
+  if (_keepAliveTimer) return; // already running — this holder is now counted
   _keepAliveTimer = setInterval(() => {
     chrome.storage.local.get('__ka').catch(() => {}); // reset idle timer
   }, 20000); // 20s < Chrome's 30s idle threshold
@@ -1241,7 +1249,8 @@ function _startKeepAlive(label) {
 }
 
 function _stopKeepAlive() {
-  if (!_keepAliveTimer) return;
+  if (_keepAliveHolders > 0) _keepAliveHolders--;
+  if (_keepAliveHolders > 0 || !_keepAliveTimer) return;
   clearInterval(_keepAliveTimer);
   _keepAliveTimer = null;
 }
@@ -1973,6 +1982,12 @@ async function syncFilterLists(force = false) {
       if (!r.action?.type || (!r.condition?.urlFilter && !r.condition?.initiatorDomains?.length)) return false;
       const len = (r.condition.urlFilter ?? '').length;
       if (r.condition.urlFilter && (len < 2 || len >= 2048)) return false;
+      // Chrome DNR rejects non-ASCII urlFilters, and updateDynamicRules is
+      // atomic per batch — one bad rule rejects every rule in its batch (up to
+      // 500), silently collapsing blocking. The parser converts IDN hosts to
+      // punycode; this is the safety net for every other rule source
+      // (user-typed filters, custom lists).
+      if (r.condition.urlFilter && !/^[\x00-\x7F]*$/.test(r.condition.urlFilter)) return false;
       if (seenIds.has(r.id))                               return false;
       // URL dedup: skip if another rule already blocks the exact same pattern
       // for the same set of resource types. Include resource types and initiator

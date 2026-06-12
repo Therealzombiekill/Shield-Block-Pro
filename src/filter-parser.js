@@ -83,6 +83,34 @@ function hasUnsupportedPseudo(selector) {
   );
 }
 
+// Filter lists ship Unicode IDN domains (e.g. пример.рф), but the browser
+// reports location.hostname — and matches DNR conditions — in punycode (xn--…).
+// A rule keyed by the raw Unicode form would never match. ASCII domains return
+// unchanged (fast path, no behavior change); conversion failures fall back to
+// the original string so the caller's other guards still apply.
+function toPunycodeDomain(domain) {
+  if (/^[\x00-\x7F]*$/.test(domain)) return domain;
+  try { return new URL('http://' + domain + '/').hostname || domain; }
+  catch (_) { return domain; }
+}
+
+// Split scriptlet arguments on commas, honoring uBO escaping: a literal comma
+// inside an argument is written as `\,` or `\x2c` (e.g. a /regex,with,commas/
+// or a cookie value). A naive split(',') corrupts such multi-arg scriptlets.
+// Split on unescaped commas only, then unescape back to literal commas.
+function splitScriptletArgs(inner) {
+  const parts = [];
+  let cur = '';
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === '\\' && i + 1 < inner.length) { cur += c + inner[i + 1]; i++; continue; }
+    if (c === ',') { parts.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  parts.push(cur);
+  return parts.map(s => s.trim().replace(/\\x2c/gi, ',').replace(/\\,/g, ','));
+}
+
 // Split an ABP domain prefix ("a.com,b.com,~c.com") into positive domains.
 // Returns [] when nothing usable remains (pure negations, pipes, wildcards TLD).
 function splitDomainPrefix(prefix, cap = 10) {
@@ -90,7 +118,7 @@ function splitDomainPrefix(prefix, cap = 10) {
   for (const raw of prefix.split(',')) {
     const d = raw.trim().toLowerCase();
     if (!d || d.startsWith('~') || d.includes('|') || d.includes('*')) continue;
-    out.push(d);
+    out.push(toPunycodeDomain(d));
     if (out.length >= cap) break;
   }
   return out;
@@ -146,7 +174,7 @@ function parseLine(line, idCounter) {
     // ── Scriptlet: example.com##+js(name, arg1, arg2) ─────────────────────
     if (rawAfter.startsWith('+js(') && rawAfter.endsWith(')')) {
       const inner = rawAfter.slice(4, -1).trim();
-      const parts = inner.split(',').map(s => s.trim());
+      const parts = splitScriptletArgs(inner);
       const [name, ...args] = parts;
       if (!name) return null;
       // '*' means apply to all domains; multi-domain prefixes fan out per domain
@@ -214,8 +242,9 @@ function parseLine(line, idCounter) {
           const negatedDomain = rawDomain.startsWith('~');
           const domain = (negatedDomain ? rawDomain.slice(1) : rawDomain).replace(/^www\./, '');
           if (!domain || domain.includes('*')) continue;
-          if (negatedDomain) excludedInitiatorDomains.push(domain);
-          else initiatorDomains.push(domain);
+          // DNR initiatorDomains must be ASCII (canonicalized) — punycode IDNs
+          if (negatedDomain) excludedInitiatorDomains.push(toPunycodeDomain(domain.toLowerCase()));
+          else initiatorDomains.push(toPunycodeDomain(domain.toLowerCase()));
         }
       }
     }
@@ -294,6 +323,19 @@ function parseLine(line, idCounter) {
     urlFilter = filter;
   } else if (!(isException && docException && (filter.length === 0 || initiatorDomains.length))) {
     return null;
+  }
+
+  // Chrome DNR rejects any rule whose urlFilter contains non-ASCII characters,
+  // and updateDynamicRules is atomic per batch — one bad rule rejects the whole
+  // batch (up to 500 rules), silently collapsing blocking. Regional lists ship
+  // IDN domains (||пример.рф^); browsers put punycode on the wire, so a pure
+  // ||host^ pattern is converted to punycode (keeps the blocking) and anything
+  // else still non-ASCII is dropped — a raw-Unicode urlFilter never matches a
+  // real request anyway, so the drop loses nothing while protecting the batch.
+  if (urlFilter !== null && !/^[\x00-\x7F]*$/.test(urlFilter)) {
+    const m = urlFilter.match(/^\|\|([^/^*|]+)([\^/]?)$/);
+    if (m) urlFilter = '||' + toPunycodeDomain(m[1].toLowerCase()) + m[2];
+    if (!/^[\x00-\x7F]*$/.test(urlFilter)) return null;
   }
 
   if (urlFilter !== null && (urlFilter.length < 4 || urlFilter.length > 512)) return null;

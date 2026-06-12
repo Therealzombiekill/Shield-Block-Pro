@@ -61,6 +61,8 @@ Filter list text → `parseFilterList()` in `src/filter-parser.js` → four outp
 
 `$badfilter` rules cancel the matching rule within the same list at parse time (`_ruleSignature` matching).
 
+**ASCII/IDN invariant**: Chrome DNR rejects non-ASCII `urlFilter`s and `updateDynamicRules` is atomic per batch — one bad rule kills the whole batch. The parser converts IDN domains to punycode everywhere they appear (cosmetic/scriptlet domain prefixes, `$domain=` initiator domains, pure `||host^` patterns) via `toPunycodeDomain()`, drops any other non-ASCII `urlFilter`, and honors uBO's `\,`/`\x2c` escapes in scriptlet args (`splitScriptletArgs()`). `syncFilterLists()` re-checks urlFilter ASCII at the dedup choke point as a safety net for user-typed rules and custom lists. `_startKeepAlive()`/`_stopKeepAlive()` are reference-counted — overlapping long operations (sync + safe-browsing refresh) must each hold/release, always pairing the stop in a `finally`.
+
 Untyped network rules omit `resourceTypes` (DNR's default — everything except `main_frame` — matches uBO semantics and keeps rules small). The Google-API initiator guard (`SHARED_GOOGLE_API_EXCLUDED_INITIATORS`) is applied only to generic substring patterns, never to domain-anchored rules or exceptions.
 
 `$removeparam` rules are collected into `removeParamData` and applied by `applyRemoveParamRules()` which merges them with the hardcoded `STATIC_REMOVE_PARAMS` set and emits a single global DNR redirect+queryTransform rule where possible.

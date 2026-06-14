@@ -57,33 +57,19 @@ DevTools: service worker console on the extension card; popup via right-click to
 
 ### Hello-world verification
 
-1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.20.0).
+1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.22.0).
 2. Open the extension popup from the toolbar.
 3. Go to the **Support** tab → **Extension Health** → click **Run check**.
 4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.
 
-### Regression checklist (before merging YouTube / DNR / privacy changes)
+### Regression checklist (before merging DNR / privacy changes)
 
 | Site / feature | How to verify |
 |----------------|---------------|
-| YouTube playback | Video plays; no error **282054944**; log tag `2.11.1-playfirst` |
-| YouTube ads | DOM skip/mute works; **no** `InnerTube fetch: stripped` in logs |
 | GitHub | Sign-in, repo browse, assets load |
 | Google Drive / Docs | Open files, edit |
 | GA dashboard | `analytics.google.com` loads reports (third-party trackers still blocked elsewhere) |
 | Safe browsing | Health: GitHub/Drive/GA not in malware cache |
-
-### YouTube — play-first (v2.11.1+)
-
-**Let the player start, then block ads.** Do **not** re-add `fetch`/`XHR` `Response` rewriting (black screen + 282054944).
-
-| Phase | Behavior |
-|-------|----------|
-| Until `playing` | No overlay removal, no skip/mute, no `ytInitial` prune |
-| After playback + ~2s grace | `SB_YT_PLAYBACK_READY` → DOM ad handling + optional `ytInitial` prune on later SPA sets |
-| Browse / no video | After 12s, feed-only overlay cleanup (no in-player touches) |
-
-Log tag: `2.11.1-playfirst`. Never remove all `tp-yt-iron-overlay-backdrop` nodes.
 
 ### Chrome on cloud VMs
 

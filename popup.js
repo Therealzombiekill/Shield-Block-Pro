@@ -151,11 +151,6 @@ async function refreshStats() {
     }
     _lastTotal = total;
 
-    $('s-yt').textContent = fmt(stats.youtube  || 0);
-    $('s-tw').textContent = fmt(stats.twitch   || 0);
-    $('s-sp').textContent = fmt(stats.spotify  || 0);
-    $('s-hl').textContent = fmt(stats.hulu     || 0);
-    $('s-kk').textContent = fmt(stats.kick     || 0);
     $('s-ck').textContent = fmt(stats.cookies  || 0);
     $('s-wb').textContent = fmt(stats.general  || 0);
     if ($('s-an')) $('s-an').textContent = fmt(stats.annoyances || 0);
@@ -743,11 +738,6 @@ $('export-stats-csv')?.addEventListener('click', async () => {
       [],
       ['=== SESSION BREAKDOWN ==='],
       ['Category',    'Count'],
-      ['YouTube',     stats.youtube  ?? 0],
-      ['Twitch',      stats.twitch   ?? 0],
-      ['Spotify',     stats.spotify  ?? 0],
-      ['Hulu',        stats.hulu     ?? 0],
-      ['Kick',        stats.kick     ?? 0],
       ['Cookies',     stats.cookies  ?? 0],
       ['General',     stats.general  ?? 0],
       [],

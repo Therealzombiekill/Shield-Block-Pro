@@ -19,23 +19,6 @@
   }
   const _genWl = settings?.whitelist ?? [];
 
-  // Signal inject-privacy.js (MAIN world) to activate timezone spoofing if enabled.
-  // Can't read storage in MAIN world, so isolated world posts the signal.
-  let _timezoneEnabled = !!settings?.timezoneSpoof;
-  let _globalPaused = !!settings?.globalPause;
-  window.postMessage({ type: 'SB_TIMEZONE_SPOOF', enabled: _timezoneEnabled && !_globalPaused }, '*');
-  chrome.storage.onChanged.addListener((changes) => {
-    if ('settings' in changes || 'globalPause' in changes) {
-      if (changes.settings?.newValue && 'timezoneSpoof' in changes.settings.newValue) {
-        _timezoneEnabled = !!changes.settings.newValue.timezoneSpoof;
-      }
-      if ('globalPause' in changes) {
-        _globalPaused = !!(changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now());
-      }
-      window.postMessage({ type: 'SB_TIMEZONE_SPOOF', enabled: _timezoneEnabled && !_globalPaused }, '*');
-    }
-  });
-
   if (settings?.globalPause) return; // global pause active — skip all processing
   if (!settings?.cosmetic) return;
 

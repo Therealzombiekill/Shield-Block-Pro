@@ -103,11 +103,6 @@ const STATIC_REMOVE_PARAMS = new Set([
 
 // ── Time saved estimates (seconds per blocked item by type) ───────────────────
 const TIME_SAVED_SECONDS = {
-  youtube:   15, // skippable + unskippable pre/mid-roll avoided
-  twitch:    25, // SSAI ad break
-  spotify:   25, // audio ad segment
-  hulu:      25, // video ad break
-  kick:      25, // video ad break
   amazon:     1, // blocked sponsored slot — page-load improvement
   general:    1, // blocked web ad/tracker — load + render time avoided
   cookies:    5, // time to find + click "reject all" by hand
@@ -121,8 +116,7 @@ const NETWORK_TIME_SAVED_SECONDS = 0.05;
 // Canonical zero-value stats object. `removeparam` counts stripped tracking
 // params — kept OUT of `total`/lifetime/badge (a cleaned URL is not a blocked ad).
 function emptyStats() {
-  return { total:0, youtube:0, twitch:0, spotify:0, hulu:0, kick:0, amazon:0,
-           general:0, cookies:0, annoyances:0, removeparam:0 };
+  return { total:0, amazon:0, general:0, cookies:0, annoyances:0, removeparam:0 };
 }
 // Stat types excluded from total/lifetime/badge/daily aggregation.
 const NON_BLOCK_STAT_TYPES = new Set(['removeparam']);
@@ -281,15 +275,11 @@ const DEFAULT_SETTINGS = {
   general: true,
   cosmetic: true, cookies: true,
   privacy: true, tracking: true,
-  youtube: true,        // YouTube ad skip/mute (inject + content scripts)
-  youtubeExtras: false, // opt-in: hide Shorts + remove end-screen cards
-  twitch: true, spotify: true, hulu: true, kick: true,
   annoyances: true,     // chat widgets, push pre-prompts, app/install banners, surveys, share bars
   badgeEnabled: true,
   safeBrowsing: true,   // phishing / malware URL checking
   referrerStrip: true,  // strip Referer header on 3rd-party requests
   httpsUpgrade: true,   // upgrade http:// navigations to https://
-  timezoneSpoof: false, // spoof timezone to UTC (opt-in — breaks calendar apps)
   privacyHeaders: true, // send DNT: 1 and Sec-GPC: 1 on every request
 };
 
@@ -982,11 +972,6 @@ let _pollInflight  = null; // concurrent pollers share one in-flight promise
 
 function _hostCategory(host) {
   if (!host) return 'general';
-  if (host === 'youtu.be' || host.endsWith('.youtube.com') || host === 'youtube.com') return 'youtube';
-  if (host === 'twitch.tv'   || host.endsWith('.twitch.tv'))   return 'twitch';
-  if (host === 'spotify.com' || host.endsWith('.spotify.com')) return 'spotify';
-  if (host === 'hulu.com'    || host.endsWith('.hulu.com'))    return 'hulu';
-  if (host === 'kick.com'    || host.endsWith('.kick.com'))    return 'kick';
   if (/(^|\.)amazon\.[a-z.]{2,6}$/.test(host)) return 'amazon';
   return 'general';
 }

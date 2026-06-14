@@ -284,6 +284,7 @@
         "rules/tracking.json",
         "rules/hosts.json",
         "src/filter-catalog.json",
+        "src/cosmetic.css",
         "src/trusted-sites.js",
         "src/stubs/noop-adsbygoogle.js",
         "src/stubs/noop-gpt.js",

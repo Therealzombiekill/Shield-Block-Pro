@@ -1,5 +1,5 @@
 SHIELDBLOCK PRO
-v2.19.0 · Free forever
+v2.21.1 · Free forever
 ACTIVE & BLOCKING
 You're protected.
 Ads blocked. Privacy secured.
@@ -24,7 +24,7 @@ Keyboard shortcuts
 Open ShieldBlock
 Alt + Shift + S
 TogSHIELDBLOCK PRO
-v2.19.0 · Free forever
+v2.21.1 · Free forever
 ACTIVE & BLOCKING
 You're protected.
 Ads blocked. Privacy secured.
@@ -90,12 +90,14 @@ No other network requests are made. The Extension does not connect to any Shield
 
 5. Permissions and why we need them
 declarativeNetRequest — to block ads and trackers at the network level without reading page content.
+declarativeNetRequestFeedback — to count how many requests were blocked for the stats shown in the popup, without recording which sites you visit.
 storage — to save your settings and statistics locally.
+unlimitedStorage — to cache the ~30,000 built-in filter rules and the local diagnostic log without hitting the browser's small default storage quota.
 tabs / webNavigation — to detect navigation events so the extension can apply rules per-page and update the popup badge count.
-scripting — to inject ad-removal scripts into YouTube, Twitch, Spotify, Hulu, and Kick pages.
+scripting — to inject cosmetic ad-hiding CSS, anti-adblock scriptlets, and the streaming-platform ad skippers into pages.
 alarms — to schedule periodic filter list refreshes.
 contextMenus — to provide the right-click "Hide this element" picker.
-host_permissions (<all_urls>) — required so declarativeNetRequest rules can apply to any website and so content scripts can run on streaming platforms.
+host_permissions (<all_urls>) — required so declarativeNetRequest rules can apply to any website and so content scripts can run wherever ads or trackers appear.
 6. Data sharing and third parties
 We do not share, sell, rent, or trade any data with any third party. The Extension has no backend server and no telemetry pipeline. The only external parties involved are the operators of the public filter list repositories the Extension downloads from (EasyList, uBlock, AdGuard), and those downloads carry no user-identifying information.
 

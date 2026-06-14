@@ -57,7 +57,7 @@ DevTools: service worker console on the extension card; popup via right-click to
 
 ### Hello-world verification
 
-1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.22.0).
+1. Confirm **ShieldBlock Pro** appears enabled on `chrome://extensions` (currently v2.22.1).
 2. Open the extension popup from the toolbar.
 3. Go to the **Support** tab → **Extension Health** → click **Run check**.
 4. Expect mostly passing checks; a fresh install may show a "working but not optimal" warning until filter lists finish syncing.

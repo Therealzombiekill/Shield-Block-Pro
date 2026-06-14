@@ -52,7 +52,12 @@ const BENCHMARK_DOMAINS = {
   ],
   replay: [
     'cdn.heapanalytics.com', 'edge.fullstory.com', 'cdn.mouseflow.com',
-    'cdn.logrocket.io', 'jssdkcdns.mparticle.com',
+    'cdn.logrocket.io', 'jssdkcdns.mparticle.com', 'sentry.io',
+  ],
+  regional: [
+    'analytics.query.yahoo.com', 'udcm.yahoo.com', 'log.fc.yahoo.com', 'gemini.yahoo.com',
+    'adfstat.yandex.ru', 'appmetrica.yandex.ru', 'adfox.yandex.ru', 'metrika.yandex.ru',
+    'atanx.alicdn.com',
   ],
 };
 

@@ -6766,5 +6766,143 @@
     "condition": {
       "urlFilter": "||snap.licdn.com^"
     }
+  },
+  {
+    "id": 6028,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||analytics.query.yahoo.com^"
+    }
+  },
+  {
+    "id": 6029,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||udcm.yahoo.com^"
+    }
+  },
+  {
+    "id": 6030,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||log.fc.yahoo.com^"
+    }
+  },
+  {
+    "id": 6031,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||gemini.yahoo.com^"
+    }
+  },
+  {
+    "id": 6032,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adfstat.yandex.ru^"
+    }
+  },
+  {
+    "id": 6033,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||appmetrica.yandex.ru^"
+    }
+  },
+  {
+    "id": 6034,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adfox.yandex.ru^"
+    }
+  },
+  {
+    "id": 6035,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||metrika.yandex.ru^"
+    }
+  },
+  {
+    "id": 6036,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||atanx.alicdn.com^"
+    }
+  },
+  {
+    "id": 6037,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||www.facebook.com^",
+      "domainType": "thirdParty"
+    }
+  },
+  {
+    "id": 6038,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||sentry.io^",
+      "domainType": "thirdParty"
+    }
+  },
+  {
+    "id": 6039,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/advertisement.js^",
+      "resourceTypes": [
+        "script"
+      ]
+    }
+  },
+  {
+    "id": 6040,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/analytics.js^",
+      "resourceTypes": [
+        "script"
+      ]
+    }
   }
 ]

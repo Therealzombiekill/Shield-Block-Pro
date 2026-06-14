@@ -142,12 +142,13 @@ async function refreshStats() {
 
     const total = stats.total || 0;
     const el = $('stat-total');
-    animateCount(el, total, el.dataset.count ? 500 : 750);
-
-    // Flash accent color when count increases
-    if (total > _lastTotal && _lastTotal > 0) {
-      el.classList.add('flash');
-      setTimeout(() => el.classList.remove('flash'), 600);
+    if (el) {
+      animateCount(el, total, el.dataset.count ? 500 : 750);
+      // Flash accent color when count increases
+      if (total > _lastTotal && _lastTotal > 0) {
+        el.classList.add('flash');
+        setTimeout(() => el.classList.remove('flash'), 600);
+      }
     }
     _lastTotal = total;
 
@@ -191,7 +192,7 @@ async function refreshStats() {
     // Also draw the sparkline when stats refresh
     drawSparkline();
   } catch (_) {
-    $('stat-total').textContent = '—';
+    const _t = $('stat-total'); if (_t) _t.textContent = '—';
   }
 }
 
@@ -276,6 +277,7 @@ async function refreshFilterStatus() {
     const active = (s?.activeRules || 0) + staticRules;
     const dot  = $('fdot');
     const text = $('ftext');
+    if (!dot || !text) return;
     if (s?.syncError) {
       dot.className = 'fdot';
       dot.style.background = 'var(--red)';

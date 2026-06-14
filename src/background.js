@@ -702,12 +702,19 @@ function _schedulePersist() {
   }
 }
 
-// Restore persisted log into in-memory buffer on startup
-async function _restoreLog() {
-  try {
-    const { persistedLog = [] } = await chrome.storage.local.get('persistedLog');
-    for (const entry of persistedLog.slice(-EVENT_MAX)) _eventLog.push(entry);
-  } catch (_) {}
+// Restore persisted log into in-memory buffer on startup. Single-flight (like
+// _restoreSessionState) so it can be called from onInstalled, onStartup, AND the
+// always-run bootstrap without double-seeding _eventLog on the same SW evaluation.
+let _logRestored = null;
+function _restoreLog() {
+  if (_logRestored) return _logRestored;
+  _logRestored = (async () => {
+    try {
+      const { persistedLog = [] } = await chrome.storage.local.get('persistedLog');
+      for (const entry of persistedLog.slice(-EVENT_MAX)) _eventLog.push(entry);
+    } catch (_) {}
+  })();
+  return _logRestored;
 }
 
 function logEvent(source, level, message, data = {}) {
@@ -3539,7 +3546,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             } else if (k === 'stats') {
               if (data[k] && typeof data[k] === 'object' && !Array.isArray(data[k])) {
                 const numeric = {};
-                for (const [sk, sv] of Object.entries(data[k])) if (typeof sv === 'number' && Number.isFinite(sv)) numeric[sk] = sv;
+                const _statKeys = new Set(Object.keys(emptyStats()));
+                for (const [sk, sv] of Object.entries(data[k])) if (_statKeys.has(sk) && typeof sv === 'number' && Number.isFinite(sv)) numeric[sk] = sv;
                 if (Object.keys(numeric).length) safe[k] = numeric;
               }
             } else if (k === 'lifetime') {
@@ -3918,6 +3926,10 @@ chrome.runtime.onStartup.addListener(async () => {
 (async () => {
   try {
     _restoreSessionState(); // eager — minimizes the window where panels show empty
+    _restoreLog();          // re-seed _eventLog on every SW wake — message/alarm wakes
+                            // don't run onStartup/onInstalled, so without this the Log
+                            // tab is empty until IndexedDB catches up. Before the
+                            // Firefox early-return so it restores there too.
     if (!chrome.declarativeNetRequest.getMatchedRules) return; // Firefox: DOM stats only
     if (_staticRuleMeta.size === 0) loadStaticRuleIds().catch(() => {});
     const existing = await chrome.alarms.get(STATS_POLL_ALARM);

@@ -14,17 +14,24 @@ const BENCHMARK_DOMAINS = {
     'ads.spotify.com', 'adeventtracker.spotify.com', 'megaphone.fm', 'traffic.megaphone.fm',
     'audio-ad-delivery.spotify.com', 'adstudio.spotify.com', 'pixel.spotify.com', 'ads.tritondigital.com',
     'ads-fa.spotify.com', 'gabo-receiver-service.spotify.com',
+    'adswizz.com', 'adcolony.com', 'unityads.unity3d.com', 'targetspot.com',
   ],
   mobile: [
     'adsdk.vivo.com.cn', 'adtech.vivoglobal.com', 'lenovoads.com', 'ads.lenovo.com',
     'tapjoy.com', 'startapp.com', 'startappservice.com',
     'admob.com', 'mintegral.com', 'rayjump.com', 'mtgglobals.com',
+    'applovin.com', 'applvn.com', 'ironsrc.com', 'supersonicads.com', 'vungle.com',
+    'chartboost.com', 'inmobi.com', 'fyber.com',
+    'ad.xiaomi.com', 'tracking.miui.com', 'adv.sec.miui.com', 'ads.oppomobile.com',
+    'adsfs.oppomobile.com', 'samsungads.com', 'smetrics.samsung.com',
+    'open.oneplus.net', 'click.oneplus.cn', 'metrics2.data.hicloud.com', 'grs.hicloud.com',
   ],
   social: [
     'advertising.twitter.com', 'widgets.pinterest.com', 'ads-dev.pinterest.com',
     'rereddit.com', 'analytics.facebook.com', 'ads.facebook.com',
     'adsapi.snapchat.com', 'tr6.snapchat.com', 'log.tiktokv.com', 'mon.tiktokv.com',
     'pixel.reddit.com', 'alb.reddit.com', 'q.quora.com', 'ads.quora.com',
+    'ads.linkedin.com', 'px.ads.linkedin.com', 'analytics.pointdrive.linkedin.com', 'snap.licdn.com',
   ],
   amazon: [
     'advertising-api-eu.amazon.com', 'advertising-api.amazon.com',
@@ -45,7 +52,12 @@ const BENCHMARK_DOMAINS = {
   ],
   replay: [
     'cdn.heapanalytics.com', 'edge.fullstory.com', 'cdn.mouseflow.com',
-    'cdn.logrocket.io', 'jssdkcdns.mparticle.com',
+    'cdn.logrocket.io', 'jssdkcdns.mparticle.com', 'sentry.io',
+  ],
+  regional: [
+    'analytics.query.yahoo.com', 'udcm.yahoo.com', 'log.fc.yahoo.com', 'gemini.yahoo.com',
+    'adfstat.yandex.ru', 'appmetrica.yandex.ru', 'adfox.yandex.ru', 'metrika.yandex.ru',
+    'atanx.alicdn.com',
   ],
 };
 

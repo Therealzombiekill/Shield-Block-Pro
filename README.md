@@ -1,5 +1,5 @@
 SHIELDBLOCK PRO
-v2.22.0 · Free forever
+v2.22.1 · Free forever
 ACTIVE & BLOCKING
 You're protected.
 Ads blocked. Privacy secured.
@@ -24,7 +24,7 @@ Keyboard shortcuts
 Open ShieldBlock
 Alt + Shift + S
 TogSHIELDBLOCK PRO
-v2.22.0 · Free forever
+v2.22.1 · Free forever
 ACTIVE & BLOCKING
 You're protected.
 Ads blocked. Privacy secured.

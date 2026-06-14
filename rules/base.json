@@ -6486,5 +6486,423 @@
         "tv.youtube.com"
       ]
     }
+  },
+  {
+    "id": 6000,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adswizz.com^"
+    }
+  },
+  {
+    "id": 6001,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adcolony.com^"
+    }
+  },
+  {
+    "id": 6002,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||unityads.unity3d.com^"
+    }
+  },
+  {
+    "id": 6003,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||targetspot.com^"
+    }
+  },
+  {
+    "id": 6004,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ads.tritondigital.com^"
+    }
+  },
+  {
+    "id": 6005,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||applovin.com^"
+    }
+  },
+  {
+    "id": 6006,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||applvn.com^"
+    }
+  },
+  {
+    "id": 6007,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ironsrc.com^"
+    }
+  },
+  {
+    "id": 6008,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||supersonicads.com^"
+    }
+  },
+  {
+    "id": 6009,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||vungle.com^"
+    }
+  },
+  {
+    "id": 6010,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||chartboost.com^"
+    }
+  },
+  {
+    "id": 6011,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||inmobi.com^"
+    }
+  },
+  {
+    "id": 6012,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||fyber.com^"
+    }
+  },
+  {
+    "id": 6013,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ad.xiaomi.com^"
+    }
+  },
+  {
+    "id": 6014,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||tracking.miui.com^"
+    }
+  },
+  {
+    "id": 6015,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adv.sec.miui.com^"
+    }
+  },
+  {
+    "id": 6016,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ads.oppomobile.com^"
+    }
+  },
+  {
+    "id": 6017,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adsfs.oppomobile.com^"
+    }
+  },
+  {
+    "id": 6018,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||samsungads.com^"
+    }
+  },
+  {
+    "id": 6019,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||smetrics.samsung.com^"
+    }
+  },
+  {
+    "id": 6020,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||open.oneplus.net^"
+    }
+  },
+  {
+    "id": 6021,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||click.oneplus.cn^"
+    }
+  },
+  {
+    "id": 6022,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||metrics2.data.hicloud.com^"
+    }
+  },
+  {
+    "id": 6023,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||grs.hicloud.com^"
+    }
+  },
+  {
+    "id": 6024,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ads.linkedin.com^"
+    }
+  },
+  {
+    "id": 6025,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||px.ads.linkedin.com^"
+    }
+  },
+  {
+    "id": 6026,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||analytics.pointdrive.linkedin.com^"
+    }
+  },
+  {
+    "id": 6027,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||snap.licdn.com^"
+    }
+  },
+  {
+    "id": 6028,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||analytics.query.yahoo.com^"
+    }
+  },
+  {
+    "id": 6029,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||udcm.yahoo.com^"
+    }
+  },
+  {
+    "id": 6030,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||log.fc.yahoo.com^"
+    }
+  },
+  {
+    "id": 6031,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||gemini.yahoo.com^"
+    }
+  },
+  {
+    "id": 6032,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adfstat.yandex.ru^"
+    }
+  },
+  {
+    "id": 6033,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||appmetrica.yandex.ru^"
+    }
+  },
+  {
+    "id": 6034,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adfox.yandex.ru^"
+    }
+  },
+  {
+    "id": 6035,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||metrika.yandex.ru^"
+    }
+  },
+  {
+    "id": 6036,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||atanx.alicdn.com^"
+    }
+  },
+  {
+    "id": 6037,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||www.facebook.com^",
+      "domainType": "thirdParty"
+    }
+  },
+  {
+    "id": 6038,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||sentry.io^",
+      "domainType": "thirdParty"
+    }
+  },
+  {
+    "id": 6039,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/advertisement.js^",
+      "resourceTypes": [
+        "script"
+      ]
+    }
+  },
+  {
+    "id": 6040,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/analytics.js^",
+      "resourceTypes": [
+        "script"
+      ]
+    }
   }
 ]

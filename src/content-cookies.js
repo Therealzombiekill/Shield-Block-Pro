@@ -329,17 +329,27 @@
             continue;
           }
 
-          // Fall back to accept (better than blocking the page indefinitely)
-          const acceptBtn = findButton(banner, ACCEPT_PATTERNS, ACCEPT_SELECTORS, doc);
-          if (acceptBtn) {
-            acceptBtn.click();
-            handled.add(banner);
-            anyAction = true;
-            continue;
+          // Accept is a LAST resort, and only after reject has had every retry to
+          // render. CMPs commonly paint "Reject All" 300–800ms after "Accept All",
+          // so clicking accept early would opt the user INTO tracking — the opposite
+          // of this tool's job. Hold off until the final attempt; if no reject ever
+          // appears the banner is removed next tick anyway, so accept stays a narrow
+          // fallback only for CMPs that lock the page and expose no reject control.
+          if (attemptCount >= MAX_RETRIES - 1) {
+            const acceptBtn = findButton(banner, ACCEPT_PATTERNS, ACCEPT_SELECTORS, doc);
+            if (acceptBtn) {
+              acceptBtn.click();
+              handled.add(banner);
+              anyAction = true;
+              chrome.runtime.sendMessage({ type: 'LOG_EVENT', source: 'cookies',
+                level: 'warn', message: `No reject control found — accepted as last resort`,
+                data: { cmp: banner.tagName + (banner.id ? '#'+banner.id : '') } }).catch(()=>{});
+              continue;
+            }
           }
 
-          // No button found yet — will retry on next debounce tick
-          // (button may still be loading asynchronously)
+          // No reject button found yet — retry on the next debounce tick
+          // (the reject control may still be loading asynchronously)
         }
       }
     }

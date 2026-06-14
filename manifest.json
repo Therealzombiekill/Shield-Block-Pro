@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ShieldBlock Pro",
-  "version": "2.21.0",
+  "version": "2.21.1",
   "description": "Block ads, trackers, and cookie banners across the web. Privacy protection and fingerprint resistance built in.",
   "permissions": [
     "storage",
@@ -284,6 +284,7 @@
         "rules/tracking.json",
         "rules/hosts.json",
         "src/filter-catalog.json",
+        "src/cosmetic.css",
         "src/trusted-sites.js",
         "src/stubs/noop-adsbygoogle.js",
         "src/stubs/noop-gpt.js",

@@ -60,9 +60,10 @@
   let adActive = false;
   let wasMuted = false;
   let _adStartTime = 0;
+  let _stopped = false;
 
   function tick() {
-    if (globalThis.__sbGlobalPause) return;
+    if (_stopped) return;
     const hasAd = isAdPlaying();
 
     if (hasAd && !adActive) {
@@ -86,13 +87,29 @@
   _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
   let _int = setInterval(tick, 1000);
 
+  // Safety net: if ad-end detection is missed (the <video> element is swapped or an
+  // ad-marker element lingers), audio would stay muted indefinitely. Force-restore
+  // after 90s of continuous "ad active" state.
+  function _safetyTick() {
+    if (adActive && Date.now() - _adStartTime > 90000) {
+      adActive = false;
+      const video = document.querySelector('video');
+      if (video) video.muted = wasMuted;
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+    }
+  }
+  let _safety = setInterval(_safetyTick, 5000);
+
   window.addEventListener('beforeunload', () => {
-    _obs.disconnect(); clearInterval(_int); clearTimeout(_deb);
+    _obs.disconnect(); clearInterval(_int); clearInterval(_safety); clearTimeout(_deb);
   }, { once: true });
 
   function stopKickBlocking() {
+    if (_stopped) return;
+    _stopped = true;
     _obs.disconnect();
     clearInterval(_int);
+    clearInterval(_safety);
     clearTimeout(_deb);
     if (adActive) {
       const video = document.querySelector('video');
@@ -102,28 +119,48 @@
   }
 
   function startKickBlocking() {
-    if (!settings?.kick) return;
-    if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
+    if (!_stopped) return; // already running — idempotent
+    _stopped = false;
     _obs.disconnect();
     _obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
     clearInterval(_int);
     _int = setInterval(tick, 1000);
+    clearInterval(_safety);
+    _safety = setInterval(_safetyTick, 5000);
     tick();
   }
 
-  // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
+  // Single source of truth for whether blocking should be active. Re-evaluated on
+  // every relevant settings / whitelist / pause change so toggling the feature back
+  // on, removing the site from the whitelist, or a pause expiring all RE-ARM blocking
+  // without a page reload — previously these paths only ever stopped, never restarted.
+  let _featureOn = true, _whitelisted = false, _paused = false;
+  function _applyState() {
+    if (_featureOn && !_whitelisted && !_paused) startKickBlocking();
+    else stopKickBlocking();
+  }
   chrome.storage.onChanged.addListener((changes) => {
-    const wl = changes.whitelist?.newValue;
-    const isWhitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
-    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
-    if (changes.settings?.newValue?.kick === false || isWhitelisted || paused) stopKickBlocking();
+    let touched = false;
+    if (changes.settings)    { _featureOn = changes.settings.newValue?.kick !== false; touched = true; }
+    if (changes.whitelist)   {
+      const wl = changes.whitelist.newValue ?? [];
+      _whitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
+      touched = true;
+    }
+    if (changes.globalPause) {
+      const gp = changes.globalPause.newValue;
+      _paused = !!(gp && gp.until > Date.now());
+      touched = true;
+    }
+    if (touched) _applyState();
   });
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === 'GLOBAL_PAUSE') stopKickBlocking();
-    if (message?.type === 'GLOBAL_RESUME') startKickBlocking();
+    if (message?.type === 'GLOBAL_PAUSE')  { _paused = true;  _applyState(); }
+    if (message?.type === 'GLOBAL_RESUME') { _paused = false; _applyState(); }
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
-      if (wl.some(d => _host === d || _host.endsWith('.' + d))) stopKickBlocking();
+      _whitelisted = wl.some(d => _host === d || _host.endsWith('.' + d));
+      _applyState();
     }
   });
 

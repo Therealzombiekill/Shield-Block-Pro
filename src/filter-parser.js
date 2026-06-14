@@ -262,15 +262,23 @@ function parseLine(line, idCounter) {
       const eqIdx = paramPart.indexOf('=');
       const paramName = eqIdx !== -1 ? paramPart.slice(eqIdx + 1).trim() : '';
       if (!paramName || paramName.startsWith('/')) return null; // skip regex removeparam
-      // Extract domain= and ~domain= opts
+      // Extract domain= and ~domain= opts. DNR initiatorDomains must be canonical
+      // ASCII — punycode IDNs (same as the $domain= network path above) and drop
+      // wildcards, so a regional list's IDN $removeparam can't make Chrome reject
+      // the entire (atomic) removeparam batch and disable all URL cleaning.
       const initDomains    = [];
       const exclDomains    = [];
       for (const part of opts.split(',')) {
         const p = part.trim();
         if (p.startsWith('domain=')) {
           for (const d of p.slice(7).split('|')) {
-            if (d.startsWith('~')) exclDomains.push(d.slice(1));
-            else if (d) initDomains.push(d);
+            const raw = d.trim().toLowerCase();
+            if (!raw) continue;
+            const negatedDomain = raw.startsWith('~');
+            const dom = (negatedDomain ? raw.slice(1) : raw).replace(/^www\./, '');
+            if (!dom || dom.includes('*')) continue;
+            if (negatedDomain) exclDomains.push(toPunycodeDomain(dom));
+            else initDomains.push(toPunycodeDomain(dom));
           }
         }
       }

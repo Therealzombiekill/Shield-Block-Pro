@@ -76,6 +76,7 @@
 
   let adActive = false;
   let wasMuted = false;
+  let _stopped = false;
 
   function handleAdStart() {
     const video = document.querySelector('video');
@@ -104,7 +105,7 @@
 
   let _adStartTime = 0;
   function tick() {
-    if (globalThis.__sbGlobalPause) return;
+    if (_stopped) return;
     const hasAd = isAdPlaying();
     if (hasAd && !adActive) {
       adActive = true;
@@ -131,45 +132,81 @@
   });
   let _huluInterval = setInterval(tick, 1000);
 
+  // Safety net: if ad-end detection is missed (the <video> element is swapped or an
+  // ad-marker element lingers), audio would stay muted indefinitely. Force-restore
+  // after 90s of continuous "ad active" state.
+  function _safetyTick() {
+    if (adActive && Date.now() - _adStartTime > 90000) {
+      adActive = false;
+      restoreAfterAd();
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+    }
+  }
+  let _huluSafety = setInterval(_safetyTick, 5000);
+
   // Cleanup on page unload — prevents memory leak on SPA navigation
   window.addEventListener('beforeunload', () => {
     _huluObserver.disconnect();
     clearInterval(_huluInterval);
+    clearInterval(_huluSafety);
     clearTimeout(_huluDebounce);
   }, { once: true });
 
   function stopHuluBlocking() {
+    if (_stopped) return;
+    _stopped = true;
     _huluObserver.disconnect();
     clearInterval(_huluInterval);
+    clearInterval(_huluSafety);
     clearTimeout(_huluDebounce);
     if (adActive) { restoreAfterAd(); adActive = false; }
   }
 
   function startHuluBlocking() {
-    if (!settings?.hulu) return;
-    if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+    if (!_stopped) return; // already running — idempotent
+    _stopped = false;
     _huluObserver.disconnect();
     _huluObserver.observe(document.body || document.documentElement, {
       childList: true, subtree: true,
     });
     clearInterval(_huluInterval);
     _huluInterval = setInterval(tick, 1000);
+    clearInterval(_huluSafety);
+    _huluSafety = setInterval(_safetyTick, 5000);
     tick();
   }
 
-  // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
+  // Single source of truth for whether blocking should be active. Re-evaluated on
+  // every relevant settings / whitelist / pause change so toggling the feature back
+  // on, removing the site from the whitelist, or a pause expiring all RE-ARM blocking
+  // without a page reload — previously these paths only ever stopped, never restarted.
+  let _featureOn = true, _whitelisted = false, _paused = false;
+  function _applyState() {
+    if (_featureOn && !_whitelisted && !_paused) startHuluBlocking();
+    else stopHuluBlocking();
+  }
   chrome.storage.onChanged.addListener((changes) => {
-    const wl = changes.whitelist?.newValue;
-    const isWhitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
-    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
-    if (changes.settings?.newValue?.hulu === false || isWhitelisted || paused) stopHuluBlocking();
+    let touched = false;
+    if (changes.settings)    { _featureOn = changes.settings.newValue?.hulu !== false; touched = true; }
+    if (changes.whitelist)   {
+      const wl = changes.whitelist.newValue ?? [];
+      _whitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+      touched = true;
+    }
+    if (changes.globalPause) {
+      const gp = changes.globalPause.newValue;
+      _paused = !!(gp && gp.until > Date.now());
+      touched = true;
+    }
+    if (touched) _applyState();
   });
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === 'GLOBAL_PAUSE') stopHuluBlocking();
-    if (message?.type === 'GLOBAL_RESUME') startHuluBlocking();
+    if (message?.type === 'GLOBAL_PAUSE')  { _paused = true;  _applyState(); }
+    if (message?.type === 'GLOBAL_RESUME') { _paused = false; _applyState(); }
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
-      if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) stopHuluBlocking();
+      _whitelisted = wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+      _applyState();
     }
   });
 

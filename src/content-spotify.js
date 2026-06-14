@@ -142,14 +142,17 @@
   let adActive = false;
   let skipAttempts = 0;
   let wasMuted = false;
+  let _adStartTime = 0;
+  let _stopped = false;
 
   function tick() {
-    if (globalThis.__sbGlobalPause) return;
+    if (_stopped) return;
     const hasAd = isAdPlaying();
     removeSpotifyAdUI();
 
     if (hasAd && !adActive) {
       adActive = true;
+      _adStartTime = Date.now();
       skipAttempts = 0;
       const audio = getAudio();
       wasMuted = audio?.muted ?? false;
@@ -184,45 +187,83 @@
   _spotObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
   let _spotInterval = setInterval(tick, 1000);
+
+  // Safety net: Spotify can swap the <audio> element across an ad boundary, or an
+  // ad-marker element can linger after the ad ends — either would leave audio muted
+  // indefinitely. Force-restore if we've been "in an ad" for more than 90s.
+  function _safetyTick() {
+    if (adActive && Date.now() - _adStartTime > 90000) {
+      adActive = false;
+      skipAttempts = 0;
+      muteAudio(wasMuted);
+      hideOverlay();
+      _sbLog('warn', 'Safety timeout: forced ad recovery after 90s');
+    }
+  }
+  let _spotSafety = setInterval(_safetyTick, 5000);
   tick();
 
   // Cleanup on navigation — prevents observer accumulation on SPA route changes
   window.addEventListener('beforeunload', () => {
     _spotObserver.disconnect();
     clearInterval(_spotInterval);
+    clearInterval(_spotSafety);
     clearTimeout(debounce);
   }, { once: true });
 
   function stopSpotifyBlocking() {
+    if (_stopped) return;
+    _stopped = true;
     _spotObserver.disconnect();
     clearInterval(_spotInterval);
+    clearInterval(_spotSafety);
     clearTimeout(debounce);
     if (adActive) { muteAudio(wasMuted); hideOverlay(); adActive = false; }
   }
 
   function startSpotifyBlocking() {
-    if (!settings?.spotify) return;
-    if (_wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) return;
+    if (!_stopped) return; // already running — idempotent
+    _stopped = false;
     _spotObserver.disconnect();
     _spotObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
     clearInterval(_spotInterval);
     _spotInterval = setInterval(tick, 1000);
+    clearInterval(_spotSafety);
+    _spotSafety = setInterval(_safetyTick, 5000);
     tick();
   }
 
-  // Cleanup on toggle-off, pause, or whitelist updates — restore audio and disconnect
+  // Single source of truth for whether blocking should be active. Re-evaluated on
+  // every relevant settings / whitelist / pause change so toggling the feature back
+  // on, removing the site from the whitelist, or a pause expiring all RE-ARM blocking
+  // without a page reload — previously these paths only ever stopped, never restarted.
+  let _featureOn = true, _whitelisted = false, _paused = false;
+  function _applyState() {
+    if (_featureOn && !_whitelisted && !_paused) startSpotifyBlocking();
+    else stopSpotifyBlocking();
+  }
   chrome.storage.onChanged.addListener((changes) => {
-    const wl = changes.whitelist?.newValue;
-    const isWhitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
-    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
-    if (changes.settings?.newValue?.spotify === false || isWhitelisted || paused) stopSpotifyBlocking();
+    let touched = false;
+    if (changes.settings)    { _featureOn = changes.settings.newValue?.spotify !== false; touched = true; }
+    if (changes.whitelist)   {
+      const wl = changes.whitelist.newValue ?? [];
+      _whitelisted = Array.isArray(wl) && wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+      touched = true;
+    }
+    if (changes.globalPause) {
+      const gp = changes.globalPause.newValue;
+      _paused = !!(gp && gp.until > Date.now());
+      touched = true;
+    }
+    if (touched) _applyState();
   });
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === 'GLOBAL_PAUSE') stopSpotifyBlocking();
-    if (message?.type === 'GLOBAL_RESUME') startSpotifyBlocking();
+    if (message?.type === 'GLOBAL_PAUSE')  { _paused = true;  _applyState(); }
+    if (message?.type === 'GLOBAL_RESUME') { _paused = false; _applyState(); }
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
-      if (wl.some(d => _hostname === d || _hostname.endsWith('.' + d))) stopSpotifyBlocking();
+      _whitelisted = wl.some(d => _hostname === d || _hostname.endsWith('.' + d));
+      _applyState();
     }
   });
 

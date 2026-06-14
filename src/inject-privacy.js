@@ -34,11 +34,21 @@
   let _privacyEnabled = true;
   let _trackingEnabled = true;
   let _skipUrlClean = false;
+  // URL cleaning is the one irreversible action here (it rewrites the address bar via
+  // history.replaceState), so it must wait for the first config — which carries the
+  // whitelist/pause-aware decision — instead of running with defaults at document_start
+  // and stripping params on a site the user has whitelisted or paused. The reversible
+  // fingerprint patches keep defaulting on; they re-read their flags on every call.
+  let _configReceived = false;
+  let _runInitialUrlClean = null; // assigned once installPrivacyPatches() defines it
   window.addEventListener('message', (e) => {
     if (e.source !== window || e.data?.type !== 'SB_PRIVACY_CONFIG') return;
     _privacyEnabled = e.data.privacy !== false;
     _trackingEnabled = e.data.tracking !== false;
     if (e.data.skipUrlClean !== undefined) _skipUrlClean = !!e.data.skipUrlClean;
+    const _firstConfig = !_configReceived;
+    _configReceived = true;
+    if (_firstConfig) _runInitialUrlClean?.(); // deferred initial clean, now whitelist/pause-aware
   });
 
   let _privacyInstalled = false;
@@ -401,7 +411,7 @@
   ]);
 
   function cleanURL(urlStr) {
-    if (!_trackingEnabled || _skipUrlClean) return null;
+    if (!_configReceived || !_trackingEnabled || _skipUrlClean) return null;
     try {
       const url = new URL(urlStr);
       let changed = false;
@@ -443,6 +453,7 @@
     const cleaned = cleanURL(location.href);
     if (cleaned) try { history.replaceState(history.state, '', cleaned); } catch (_) {}
   }
+  _runInitialUrlClean = cleanCurrentURL; // config handler triggers the deferred first clean
 
   // Patch pushState and replaceState for SPA navigation
   const _push    = history.pushState;
@@ -460,7 +471,7 @@
   // Major platforms wrap outbound links in tracking redirects. Intercept clicks
   // and navigate directly to the destination — no tracking ping sent.
   document.addEventListener('click', (e) => {
-    if (!_trackingEnabled) return;
+    if (!_configReceived || !_trackingEnabled) return;
     const link = e.target?.closest('a');
     if (!link?.href) return;
     try {

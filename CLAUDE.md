@@ -119,20 +119,11 @@ const _host = location.hostname.replace(/^www\./, '');
 if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
 ```
 
-### SSAI streaming platforms
+### Platform ad handlers (removed)
 
-Server-Side Ad Insertion stitches ads into the content stream, so they can't be removed at the network layer. Dedicated scripts handle the platforms we can actually test:
-- **Dedicated scripts**: `content-twitch.js`, `content-hulu.js`, `content-kick.js`, `content-spotify.js`
+The dedicated platform content scripts — YouTube (`content-youtube.js` / `inject-youtube.js`), Twitch (`content-twitch.js` / `inject-twitch.js`), Spotify (`content-spotify.js`), Hulu (`content-hulu.js`), Kick (`content-kick.js`) — were **removed**, along with the `youtube`/`youtubeExtras`/`twitch`/`spotify`/`hulu`/`kick` settings, their popup toggles, and the per-platform stat buckets. (The generic `content-streaming.js` handler for Max/Disney+/etc. and the Social/Soft-Paywall features were removed earlier.)
 
-> A generic `content-streaming.js` handler (`settings.streaming`) for Max/Disney+/Paramount+/Peacock/Pluto/Tubi/Roku/Sling/etc. was **removed** — mainstream ad blockers cover those platforms better, and a mute-only fallback on players we can't test carried a real false-mute risk (a stray ad-class element page-wide muted the whole session). The `streaming` setting and `streaming` stat bucket were removed with it.
-
-The strategy:
-1. Detect ad state via DOM selectors (countdown timers, ad-overlay elements)
-2. Mute the video element (`video.muted = true`) for the ad duration
-3. Remove ad UI overlays from the DOM
-4. Restore original mute state when the ad ends
-
-Spotify additionally attempts a skip (seeks to `audio.duration - 0.1` or clicks the next-track button).
+Rationale: these platforms use Server-Side Ad Insertion (ads stitched into the content stream), so the handlers could only mute/skip via brittle DOM heuristics on players we couldn't reliably test — the same false-mute/false-positive risk that retired `content-streaming.js`. **Network-layer ad blocking on these sites continues** via the DNR filter lists and `rules/base.json` (e.g. `ads.spotify.com`, `twitchadvertising.tv`, YouTube ad domains, plus the YouTube-protect `allow` rules at IDs ~355–362). The cosmetic content scripts (`content-general.js`, `content-procedural.js`) still **exclude YouTube** to avoid black-screening the player, and `inject-privacy.js` still skips canvas/WebGL/anti-adblock work on YouTube for the same reason.
 
 ### Annoyance blocker
 

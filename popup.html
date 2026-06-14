@@ -187,11 +187,6 @@ body.sb-ready .sc:nth-child(9){animation-delay:.28s}
 .sc.az .sc-n{color:var(--amzn)}
 .sc.ck .sc-n{color:var(--cookie)}
 .sc.wb .sc-n{color:var(--accent2)}
-.sc.yt .sc-n{color:#ff4444}
-.sc.tw .sc-n{color:#9146ff}
-.sc.sp .sc-n{color:#1db954}
-.sc.hl .sc-n{color:#1ce783}
-.sc.kk .sc-n{color:#53fc18}
 .sc.an .sc-n{color:#f59e0b}
 .sc.st .sc-n{color:#6366f1}
 
@@ -369,11 +364,6 @@ letter-spacing:.05em;margin-right:4px;flex-shrink:0}
 .src-amazon{background:rgba(240,165,0,.12);color:var(--amzn)}
 .src-picker,.src-report{background:rgba(0,217,126,.1);color:var(--green)}
 .src-scriptlet{background:rgba(255,77,109,.1);color:var(--red)}
-.src-twitch{background:rgba(145,70,255,.15);color:#9146ff}
-.src-youtube{background:rgba(255,68,68,.12);color:#ff4444}
-.src-spotify{background:rgba(29,185,84,.12);color:#1db954}
-.src-hulu{background:rgba(28,231,131,.12);color:#1ce783}
-.src-kick{background:rgba(83,252,24,.12);color:#53fc18}
 .log-empty{text-align:center;color:var(--muted);padding:24px;font-size:11px;font-family:var(--sans)}
 textarea:focus{border-color:var(--accent)!important}
 .pause-active { color: var(--yellow) !important; border-color: var(--yellow) !important; }
@@ -495,17 +485,9 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
 .ti-fp{background:rgba(0,217,126,.07)}
 .ti-url{background:rgba(245,197,66,.08)}
 .ti-cos{background:rgba(124,106,255,.08)}
-.ti-yt{background:rgba(255,0,0,.08)}
-.ti-tw{background:rgba(145,71,255,.1)}
-.ti-sp{background:rgba(29,185,84,.1)}
-.ti-hl{background:rgba(28,168,255,.1)}
 .ti-anr{background:rgba(245,158,11,.1)}
-.ti-str{background:rgba(99,102,241,.1)}
-.ti-kk{background:rgba(83,252,78,.1)}
 .ti-sbs{background:rgba(248,113,113,.1)}
 .ti-dnt,.ti-hts{background:rgba(52,211,153,.1)}
-.ti-tz{background:rgba(167,139,250,.1)}
-.ti-pw{background:rgba(251,191,36,.1)}
 
 /* ── Matrix ──────────────────────────────────────────────────────── */
 #matrix-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px}
@@ -633,26 +615,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <span class="hero-label"><strong>Session</strong>ads blocked</span>
       </div>
       <div class="stat-grid">
-        <div class="sc yt">
-          <span class="sc-n" id="s-yt">0</span>
-          <span class="sc-l">YouTube</span>
-        </div>
-        <div class="sc tw">
-          <span class="sc-n" id="s-tw">0</span>
-          <span class="sc-l">Twitch</span>
-        </div>
-        <div class="sc sp">
-          <span class="sc-n" id="s-sp">0</span>
-          <span class="sc-l">Spotify</span>
-        </div>
-        <div class="sc hl">
-          <span class="sc-n" id="s-hl">0</span>
-          <span class="sc-l">Hulu</span>
-        </div>
-        <div class="sc kk">
-          <span class="sc-n" id="s-kk">0</span>
-          <span class="sc-l">Kick</span>
-        </div>
         <div class="sc ck">
           <span class="sc-n" id="s-ck">0</span>
           <span class="sc-l">Cookies</span>
@@ -811,68 +773,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
         <div class="sw"><input type="checkbox" id="t-anr" data-s="annoyances" checked><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
 
-      <div class="sec-hd">Platforms</div>
-
-      <label class="tr" for="t-yt">
-        <div class="tr-info">
-          <div class="ti ti-yt">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
-          </div>
-          <div class="ttxt"><strong>YouTube</strong><span>Skip &amp; mute ads · remove overlays</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-yt" data-s="youtube" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
-
-      <label class="tr" for="t-yte">
-        <div class="tr-info">
-          <div class="ti ti-yt">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff0000"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
-          </div>
-          <div class="ttxt"><strong>YouTube Extras</strong><span>Hide Shorts &amp; end-screen cards (opt-in)</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-yte" data-s="youtubeExtras"><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
-
-      <label class="tr" for="t-tw">
-        <div class="tr-info">
-          <div class="ti ti-tw">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#9147ff"><path d="M11.6 4.7h1.7v5.1h-1.7zm4.7 0H18v5.1h-1.7zM6 0L1.7 4.3v15.4h5.1V24l4.3-4.3h3.4l8.2-8.2V0H6zm14.6 11.1l-3.4 3.5H13.8l-3 3v-3H6.9V1.7h13.7v9.4z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Twitch</strong><span>Ad mute + embed patch</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-tw" data-s="twitch" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
-
-      <label class="tr" for="t-sp">
-        <div class="tr-info">
-          <div class="ti ti-sp">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#1db954"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 14.36c-.2.32-.62.43-.94.24-2.57-1.57-5.8-1.93-9.61-1.06-.37.09-.73-.14-.82-.51-.09-.37.14-.73.51-.82 4.17-.96 7.74-.55 10.63 1.22.33.2.44.62.23.93zm1.24-2.76c-.25.41-.77.53-1.18.29-2.94-1.81-7.43-2.33-10.91-1.28-.46.14-.94-.12-1.08-.57-.13-.46.12-.95.57-1.08 3.98-1.2 8.93-.62 12.32 1.46.41.25.53.77.28 1.18zm.1-2.88c-3.53-2.1-9.33-2.29-12.7-1.27-.54.16-1.1-.14-1.27-.68-.16-.54.14-1.1.68-1.27 3.87-1.17 10.3-.95 14.36 1.47.49.29.65.92.36 1.41-.29.49-.92.65-1.43.34z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Spotify</strong><span>Ad mute + skip</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-sp" data-s="spotify" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
-
-      <label class="tr" for="t-hl">
-        <div class="tr-info">
-          <div class="ti ti-hl">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#1ca8ff"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zM9 12l6-3.5v7z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Hulu</strong><span>Ad mute during breaks</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-hl" data-s="hulu" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
-
-      <label class="tr" for="t-kk">
-        <div class="tr-info">
-          <div class="ti ti-kk">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#53fc4e"><path d="M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm4 5v10l9-5-9-5z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Kick</strong><span>Ad mute during breaks</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-kk" data-s="kick" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
-
       <div class="sec-hd">Privacy & Advanced</div>
 
       <label class="tr" for="t-sb">
@@ -903,16 +803,6 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
           <div class="ttxt"><strong>HTTPS Upgrading</strong><span>Upgrade http:// links to https://</span></div>
         </div>
         <div class="sw"><input type="checkbox" id="t-https" data-s="httpsUpgrade" checked><div class="sw-t"><div class="sw-k"></div></div></div>
-      </label>
-
-      <label class="tr" for="t-tz">
-        <div class="tr-info">
-          <div class="ti ti-tz">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
-          </div>
-          <div class="ttxt"><strong>Timezone Spoofing</strong><span>Report UTC timezone to all sites (opt-in)</span></div>
-        </div>
-        <div class="sw"><input type="checkbox" id="t-tz" data-s="timezoneSpoof"><div class="sw-t"><div class="sw-k"></div></div></div>
       </label>
 
 
@@ -1037,7 +927,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
       </div>
       <div class="sup-card sup-card-sm">
         <div class="sup-info">
-          Built by <span style="color:var(--text)">Bronson Bissell</span> · v<span class="app-ver">2.21.1</span><br>
+          Built by <span style="color:var(--text)">Bronson Bissell</span> · v<span class="app-ver">2.22.0</span><br>
           <a href="https://shieldblock.pro/" target="_blank" rel="noopener"
              style="color:var(--accent2);text-decoration:none;font-size:10px">Privacy Policy ↗</a>
         </div>
@@ -1142,7 +1032,7 @@ input[type="text"],input[type="url"]{transition:border-color .15s}
   <div class="ftr">
     <div class="ftr-l">
       <span class="ftr-badge">FREE</span>
-      <span class="ver">ShieldBlock v<span class="app-ver">2.21.1</span></span>
+      <span class="ver">ShieldBlock v<span class="app-ver">2.22.0</span></span>
     </div>
     <a href="https://paypal.me/BronsonBissell" target="_blank" rel="noopener"
        class="ghost" style="text-decoration:none">tip ❤</a>

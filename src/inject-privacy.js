@@ -98,7 +98,7 @@
 
     const _getImageData = CanvasRenderingContext2D.prototype.getImageData;
     CanvasRenderingContext2D.prototype.getImageData = function () {
-      if (_isYT || !_privacyEnabled) return _getImageData.apply(this, arguments); // inject-youtube.js handles YouTube
+      if (_isYT || !_privacyEnabled) return _getImageData.apply(this, arguments); // skip on YouTube — canvas noise breaks thumbnail/video rendering
       const d = _getImageData.apply(this, arguments);
       try {
         const noise = stableNoise(SESSION_SEED + arguments[0] + arguments[1]);
@@ -707,9 +707,9 @@
   }
 
   function startAntiAdblockObserver() {
-    // YouTube has its own handler (content-youtube.js). Generic anti-adblock DOM
-    // removal here fights YouTube's enforcement layer and triggers player error
-    // 282054944 ("Something went wrong") for many ad-blocker users.
+    // Never touch YouTube's player. Generic anti-adblock DOM removal here fights
+    // YouTube's enforcement layer and triggers player error 282054944 ("Something
+    // went wrong") for many ad-blocker users, so we leave it alone entirely.
     if (/youtube\.com$|youtu\.be$/i.test(location.hostname.replace(/^www\./, '')) ||
         location.hostname.includes('youtube.com')) return;
     if (!document.body) { setTimeout(startAntiAdblockObserver, 200); return; }
@@ -734,50 +734,6 @@
     ? document.addEventListener('DOMContentLoaded', cleanCurrentURL)
     : cleanCurrentURL();
   window.addEventListener('popstate', cleanCurrentURL);
-
-  // ── 20. Timezone spoofing ─────────────────────────────────────────────────────
-  // Spoofing timezone to UTC prevents fingerprinting via time-zone leakage.
-  // Opt-in only — breaks calendar apps (Google Calendar, Outlook) and
-  // meeting schedulers. Activated via a message from the content script
-  // coordinator when the user enables the setting.
-  // NOTE: This uses a postMessage from the isolated-world content script
-  // because we can't read chrome.storage in MAIN world directly.
-  let _timezoneSpoofEnabled = false;
-  let _timezonePatched = false;
-  window.addEventListener('message', (e) => {
-    if (e.source !== window || e.data?.type !== 'SB_TIMEZONE_SPOOF') return;
-    _timezoneSpoofEnabled = !!e.data.enabled;
-    if (!_timezoneSpoofEnabled || _timezonePatched) return;
-    _timezonePatched = true;
-    try {
-      const _OrigDTF = Intl.DateTimeFormat;
-      const _origOffset = Date.prototype.getTimezoneOffset;
-      const _origLocaleString = Date.prototype.toLocaleString;
-      const _origLocaleDateString = Date.prototype.toLocaleDateString;
-      const _origLocaleTimeString = Date.prototype.toLocaleTimeString;
-      // Override Intl.DateTimeFormat to resolve to UTC only while the setting is enabled.
-      const PatchedDTF = function (locale, opts) {
-        return new _OrigDTF(locale, _timezoneSpoofEnabled ? { ...opts, timeZone: 'UTC' } : opts);
-      };
-      PatchedDTF.prototype          = _OrigDTF.prototype;
-      PatchedDTF.supportedLocalesOf = _OrigDTF.supportedLocalesOf.bind(_OrigDTF);
-      try { Object.defineProperty(Intl, 'DateTimeFormat', { value: PatchedDTF, writable: true, configurable: true }); } catch (_) {}
-
-      Date.prototype.getTimezoneOffset = function () {
-        return _timezoneSpoofEnabled ? 0 : _origOffset.apply(this, arguments);
-      };
-      const _patchLocale = (fn) => function (...args) {
-        if (_timezoneSpoofEnabled) {
-          if (!args[1]) args[1] = {};
-          args[1].timeZone = 'UTC';
-        }
-        return fn.apply(this, args);
-      };
-      Date.prototype.toLocaleString     = _patchLocale(_origLocaleString);
-      Date.prototype.toLocaleDateString = _patchLocale(_origLocaleDateString);
-      Date.prototype.toLocaleTimeString = _patchLocale(_origLocaleTimeString);
-    } catch (_) {}
-  });
 
   // ── 21. navigator.userAgentData normalization ─────────────────────────────────
   // User-Agent Client Hints (navigator.userAgentData) expose detailed browser,

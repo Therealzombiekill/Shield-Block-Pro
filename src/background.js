@@ -1297,58 +1297,52 @@ async function applyRemoveParamRules() {
 
     const newRules = [];
     let idCursor = REMOVEPARAM_BASE;
+    const RP_CAP = REMOVEPARAM_BASE + 999;
+    // DNR initiator domains must be canonical ASCII or Chrome rejects the whole
+    // (atomic) batch. Parsing punycodes IDNs already; this is the safety net for
+    // user-typed params, custom lists, and any conversion that fell back to Unicode.
+    const _ascii = (s) => /^[\x00-\x7F]+$/.test(s);
 
-    const chunkParams = (params, max = 80) => {
-      const sorted = [...new Set(params)].sort();
-      const chunks = [];
-      for (let i = 0; i < sorted.length; i += max) chunks.push(sorted.slice(i, i + max));
-      return chunks;
-    };
-
-    // Global rules — split large lists so one oversized queryTransform does not
-    // make Chrome reject every removeparam rule in the batch.
-    for (const params of chunkParams(globalParams)) {
+    // Global rule — ONE rule carrying every global param. Multiple DNR redirect
+    // rules that share the same condition do NOT compose (only one redirect applies
+    // per match round), so the old per-80 chunking silently dropped every param past
+    // the first chunk once the set grew beyond 80. A single queryTransform with the
+    // full set is correct and cheaper. Bounded defensively so the rule never bloats.
+    const globalList = [...new Set(globalParams)].sort();
+    if (globalList.length > 500) {
+      logEvent('removeparam', 'warn', `global params ${globalList.length} > 500 — capping rule size`);
+      globalList.length = 500;
+    }
+    if (globalList.length) {
       newRules.push({
         id: idCursor++,
         priority: 3, // above filter block rules (priority 2) so param strip runs first
-        action: {
-          type: 'redirect',
-          redirect: {
-            transform: {
-              queryTransform: { removeParams: params },
-            },
-          },
-        },
-        condition: {
-          urlFilter: '|http',
-          resourceTypes: ['main_frame', 'sub_frame'],
-        },
+        action: { type: 'redirect', redirect: { transform: { queryTransform: { removeParams: globalList } } } },
+        condition: { urlFilter: '|http', resourceTypes: ['main_frame', 'sub_frame'] },
       });
-      if (idCursor > REMOVEPARAM_BASE + 999) break;
     }
 
-    // Domain-scoped rules (e.g. remove 'ref' only on amazon.com)
+    // Domain-scoped rules (e.g. remove 'ref' only on amazon.com) — one rule per
+    // group, same no-compose reasoning. Drop any non-ASCII initiator/excluded
+    // domains; if a group's positive initiators ALL fail, skip it entirely —
+    // emitting it without initiatorDomains would silently turn a site-scoped strip
+    // into a global one that fires everywhere.
     for (const group of domainGroups) {
-      if (!group.params?.length) continue;
-      for (const params of chunkParams(group.params)) {
-        const condition = {
-          urlFilter: '|http',
-          resourceTypes: ['main_frame', 'sub_frame'],
-        };
-        if (group.initDomains?.length) condition.initiatorDomains = group.initDomains;
-        if (group.exclDomains?.length) condition.excludedInitiatorDomains = group.exclDomains;
-        newRules.push({
-          id: idCursor++,
-          priority: 4, // domain-specific beats global
-          action: {
-            type: 'redirect',
-            redirect: { transform: { queryTransform: { removeParams: params } } },
-          },
-          condition,
-        });
-        if (idCursor > REMOVEPARAM_BASE + 999) break; // safety cap
-      }
-      if (idCursor > REMOVEPARAM_BASE + 999) break;
+      if (idCursor > RP_CAP) break; // safety cap
+      const params = [...new Set(group.params ?? [])].sort();
+      if (!params.length) continue;
+      const initOk = (group.initDomains ?? []).filter(_ascii);
+      const exclOk = (group.exclDomains ?? []).filter(_ascii);
+      if (group.initDomains?.length && !initOk.length) continue;
+      const condition = { urlFilter: '|http', resourceTypes: ['main_frame', 'sub_frame'] };
+      if (initOk.length) condition.initiatorDomains = initOk;
+      if (exclOk.length) condition.excludedInitiatorDomains = exclOk;
+      newRules.push({
+        id: idCursor++,
+        priority: 4, // domain-specific beats global
+        action: { type: 'redirect', redirect: { transform: { queryTransform: { removeParams: params } } } },
+        condition,
+      });
     }
 
     await chrome.declarativeNetRequest.updateDynamicRules({
@@ -1391,6 +1385,10 @@ async function applyMatrixRules() {
     let idCursor = MATRIX_BASE;
 
     for (const [hostname, rules] of Object.entries(filterMatrix)) {
+      // initiatorDomains must be canonical ASCII with no wildcard or Chrome rejects
+      // the whole atomic batch — one malformed restored host would drop every matrix
+      // rule. Skip anything that can't be a valid initiator domain.
+      if (!hostname || hostname.includes('*') || !/^[\x00-\x7F]+$/.test(hostname)) continue;
       for (const [ruleKey, action] of Object.entries(rules)) {
         if (action !== 'block' && action !== 'allow') continue;
         const def = MATRIX_RULE_KEYS[ruleKey];

@@ -83,6 +83,27 @@ const ASCII = /^[\x00-\x7F]*$/;
     Array.isArray(init) && init[0] === 'xn--e1afmkfd.xn--p1ai', JSON.stringify(init));
 }
 
+// ── $removeparam IDN / global handling ───────────────────────────────────────
+{
+  const r = parseFilterList(`||x.com^$removeparam=ref,domain=пример.рф`, 20000, 100);
+  const grp = r.removeParams.domain[0];
+  check('removeparam: IDN initiator domain converts to punycode',
+    !!grp && grp.initDomains[0] === 'xn--e1afmkfd.xn--p1ai' && grp.params.includes('ref'),
+    JSON.stringify(r.removeParams));
+}
+{
+  const r = parseFilterList(`$removeparam=utm_source`, 20000, 100);
+  check('removeparam: bare global param collected',
+    r.removeParams.global.includes('utm_source'), JSON.stringify(r.removeParams.global));
+}
+{
+  const r = parseFilterList(`||y.com^$removeparam=ref,domain=*`, 20000, 100);
+  const grp = r.removeParams.domain[0];
+  check('removeparam: wildcard-only domain dropped (no bad initiator emitted)',
+    !grp || (grp.initDomains.length === 0),
+    JSON.stringify(r.removeParams.domain));
+}
+
 // ── Controls: ASCII behavior unchanged ───────────────────────────────────────
 {
   const r = parseFilterList(`||doubleclick.net^`, 20000, 100);

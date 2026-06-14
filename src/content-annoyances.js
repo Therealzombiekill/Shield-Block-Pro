@@ -160,8 +160,9 @@
   }
 
   let _logThrottle = 0;
+  let _stopped = false;
   function tick() {
-    if (globalThis.__sbGlobalPause) return;
+    if (_stopped) return;
     let removed = 0;
     const hit = [];
     for (const g of GROUPS) {
@@ -196,14 +197,16 @@
   tick();
 
   function stopAnnoyanceBlocking() {
+    if (_stopped) return;
+    _stopped = true;
     _obs.disconnect();
     clearInterval(_int);
     clearTimeout(_deb);
   }
 
   function startAnnoyanceBlocking() {
-    if (!settings?.annoyances) return;
-    if (_wl.some(d => _host === d || _host.endsWith('.' + d))) return;
+    if (!_stopped) return; // already running — idempotent
+    _stopped = false;
     _obs.disconnect();
     if (_target) { _obs.observe(_target, { childList: true, subtree: true }); }
     clearInterval(_int);
@@ -213,18 +216,37 @@
 
   window.addEventListener('beforeunload', stopAnnoyanceBlocking, { once: true });
 
+  // Single source of truth for whether blocking should be active. Re-evaluated on
+  // every relevant settings / whitelist / pause change so toggling the feature back
+  // on, removing the site from the whitelist, or a pause expiring all RE-ARM blocking
+  // without a page reload — previously these paths only ever stopped, never restarted.
+  let _featureOn = true, _whitelisted = false, _paused = false;
+  function _applyState() {
+    if (_featureOn && !_whitelisted && !_paused) startAnnoyanceBlocking();
+    else stopAnnoyanceBlocking();
+  }
   chrome.storage.onChanged.addListener((changes) => {
-    const wl = changes.whitelist?.newValue;
-    const isWhitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
-    const paused = changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now();
-    if (changes.settings?.newValue?.annoyances === false || isWhitelisted || paused) stopAnnoyanceBlocking();
+    let touched = false;
+    if (changes.settings)    { _featureOn = changes.settings.newValue?.annoyances !== false; touched = true; }
+    if (changes.whitelist)   {
+      const wl = changes.whitelist.newValue ?? [];
+      _whitelisted = Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
+      touched = true;
+    }
+    if (changes.globalPause) {
+      const gp = changes.globalPause.newValue;
+      _paused = !!(gp && gp.until > Date.now());
+      touched = true;
+    }
+    if (touched) _applyState();
   });
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === 'GLOBAL_PAUSE') stopAnnoyanceBlocking();
-    if (message?.type === 'GLOBAL_RESUME') startAnnoyanceBlocking();
+    if (message?.type === 'GLOBAL_PAUSE')  { _paused = true;  _applyState(); }
+    if (message?.type === 'GLOBAL_RESUME') { _paused = false; _applyState(); }
     if (message?.type === 'WHITELIST_CHANGED') {
       const wl = message.whitelist ?? [];
-      if (wl.some(d => _host === d || _host.endsWith('.' + d))) stopAnnoyanceBlocking();
+      _whitelisted = wl.some(d => _host === d || _host.endsWith('.' + d));
+      _applyState();
     }
   });
 })().catch(e => {

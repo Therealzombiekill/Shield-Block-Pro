@@ -1676,8 +1676,13 @@ async function syncFilterLists(force = false) {
           logEvent('filter-sync', 'info', `${val.list.name}: fetched ${rules.length} rules`);
           _syncListStatus[val.list.key] = { status: 'ok', ruleCount: rules.length };
         } catch (e) {
-          logEvent('filter-sync', 'error', `Parse failed: ${val.list.name} — ${e.message}`);
-          _syncListStatus[val.list.key] = { status: 'error', error: 'parse: ' + e.message };
+          // Distinguish storage-quota failures (storage.local full) from genuine
+          // parse errors — they were both reported as "Parse failed", which is
+          // misleading when the real cause is the storage cap.
+          const isQuota = /quota/i.test(e?.message ?? '');
+          const label = isQuota ? 'Storage full' : 'Parse failed';
+          logEvent('filter-sync', 'error', `${label}: ${val.list.name} — ${e.message}`);
+          _syncListStatus[val.list.key] = { status: 'error', error: (isQuota ? 'storage: ' : 'parse: ') + e.message };
           syncFailureCount++;
         }
       }

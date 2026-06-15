@@ -5070,5 +5070,81 @@
         "websocket"
       ]
     }
+  },
+  {
+    "id": 700,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/ads.js^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "object",
+        "other",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 701,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/pagead.js^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "object",
+        "other",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 702,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/advertisement.js^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "object",
+        "other",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 703,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "/analytics.js^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "object",
+        "other",
+        "ping"
+      ]
+    }
   }
 ]

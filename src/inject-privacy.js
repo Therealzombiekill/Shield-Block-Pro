@@ -636,6 +636,7 @@
   ].join(',');
 
   function removeChats() {
+    if (!_privacyEnabled) return; // respect whitelist / global pause (SB_PRIVACY_CONFIG)
     try { document.querySelectorAll(CHAT_SEL).forEach(el => el.remove()); } catch (_) {}
   }
 
@@ -664,6 +665,7 @@
   ];
 
   function bypassAntiAdblock() {
+    if (!_privacyEnabled) return; // respect whitelist / global pause (SB_PRIVACY_CONFIG)
     try {
       document.querySelectorAll(
         '[class*="adblock"],[id*="adblock"],[class*="adblocker"],[id*="adblocker"],' +

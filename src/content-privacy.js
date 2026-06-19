@@ -5,8 +5,6 @@
  * effective privacy/tracking state to inject-privacy.js in the MAIN world.
  */
 
-import { shouldSkipPrivacyUrlClean } from './trusted-sites.js';
-
 (async () => {
   if (!location.href.startsWith('http://') && !location.href.startsWith('https://')) return;
 

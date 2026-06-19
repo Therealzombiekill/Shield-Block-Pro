@@ -700,7 +700,11 @@ async function _retryFailedLists() {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set(existing.map(r => r.id));
       const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
-      const budget = 5000 - existing.length;
+      // Use the detected platform cap, not a hardcoded 5000: on Chrome 121+ a full sync
+      // can already hold far more than 5000 dynamic rules, so `5000 - existing.length`
+      // went negative and silently dropped every retry-recovered rule until the next
+      // full sync. MAX_DYNAMIC_RULES collapses to 5000 on older browsers, so unchanged there.
+      const budget = MAX_DYNAMIC_RULES - existing.length;
       if (budget > 0 && uniqueNew.length > 0) {
         await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
         logEvent('filter-sync', 'info', `Retry: added ${Math.min(uniqueNew.length, budget)} rules`);

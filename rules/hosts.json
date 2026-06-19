@@ -13535,5 +13535,185 @@
         "ping"
       ]
     }
+  },
+  {
+    "id": 6000,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||alb.reddit.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6001,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||q.quora.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6002,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||a.quora.com/qevents.js",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6003,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||rayjump.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6004,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||mintegral.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6005,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||mintegral.net^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6006,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||admob.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6007,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||tap.tritondigital.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6008,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||tap-stats.tritondigital.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 6009,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||pixel.spotify.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "image",
+        "sub_frame",
+        "media",
+        "ping"
+      ]
+    }
   }
 ]

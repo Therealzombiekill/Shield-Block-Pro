@@ -224,7 +224,13 @@ async function refreshPageLog() {
     for (const [domain, count] of sorted) {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;justify-content:space-between;padding:1px 0;color:var(--muted)';
-      row.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escapeHtml(domain)}</span><span style="color:var(--red);margin-left:8px;flex-shrink:0">${count}×</span>`;
+      const nameEl = document.createElement('span');
+      nameEl.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1';
+      nameEl.textContent = domain;
+      const countEl = document.createElement('span');
+      countEl.style.cssText = 'color:var(--red);margin-left:8px;flex-shrink:0';
+      countEl.textContent = `${count}×`;
+      row.append(nameEl, countEl);
       frag.appendChild(row);
     }
     list.appendChild(frag);
@@ -258,14 +264,24 @@ async function refreshTopDomains() {
       const pct = Math.round((count / max) * 100);
       const row = document.createElement('div');
       row.style.cssText = 'margin-bottom:3px';
-      row.innerHTML = `
-        <div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:1px">
-          <span style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escapeHtml(domain)}</span>
-          <span style="color:var(--muted);margin-left:6px;flex-shrink:0">${count}</span>
-        </div>
-        <div style="height:2px;background:var(--border);border-radius:1px">
-          <div style="height:2px;width:${pct}%;background:var(--accent);border-radius:1px;transition:width .3s"></div>
-        </div>`;
+
+      const head = document.createElement('div');
+      head.style.cssText = 'display:flex;justify-content:space-between;font-size:9px;margin-bottom:1px';
+      const nameEl = document.createElement('span');
+      nameEl.style.cssText = 'color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1';
+      nameEl.textContent = domain;
+      const countEl = document.createElement('span');
+      countEl.style.cssText = 'color:var(--muted);margin-left:6px;flex-shrink:0';
+      countEl.textContent = count;
+      head.append(nameEl, countEl);
+
+      const track = document.createElement('div');
+      track.style.cssText = 'height:2px;background:var(--border);border-radius:1px';
+      const bar = document.createElement('div');
+      bar.style.cssText = `height:2px;width:${pct}%;background:var(--accent);border-radius:1px;transition:width .3s`;
+      track.appendChild(bar);
+
+      row.append(head, track);
       frag.appendChild(row);
     }
     list.appendChild(frag);
@@ -373,11 +389,6 @@ async function getCurrentTabDomain() {
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
     return url.hostname.replace(/^www\./, '');
   } catch (_) { return null; }
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-                  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function updateStatusPill(domain, whitelist) {
@@ -849,7 +860,11 @@ async function refreshMatrix() {
         (current === 'block' ? 'color:#f87171;border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.08)' :
          current === 'allow' ? 'color:var(--green);border:1px solid rgba(74,222,128,.35);background:rgba(74,222,128,.08)' :
          'border:1px solid var(--border2)');
-      btn.innerHTML = `<span>${current === 'block' ? '🔴' : current === 'allow' ? '🟢' : '⚪'}</span><span>${def.label}</span>`;
+      const dotEl = document.createElement('span');
+      dotEl.textContent = current === 'block' ? '🔴' : current === 'allow' ? '🟢' : '⚪';
+      const labelEl = document.createElement('span');
+      labelEl.textContent = def.label;
+      btn.append(dotEl, labelEl);
       btn.addEventListener('click', async () => {
         const fresh = await msg('GET_MATRIX') ?? {};
         const site = fresh[_currentHost] ?? {};
@@ -1017,10 +1032,6 @@ $('import-url-btn')?.addEventListener('click', async () => {
 
 // ── Custom filter list subscriptions ──────────────────────────────────────────
 
-function escapeHtmlCL(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 async function loadCustomLists() {
   const lists = await msg('GET_CUSTOM_LISTS') ?? [];
   const container = $('custom-lists-container');
@@ -1029,15 +1040,32 @@ async function loadCustomLists() {
     container.innerHTML = '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">No subscriptions yet.</div>';
     return;
   }
-  container.innerHTML = lists.map(l => `
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;background:var(--s2);border-radius:6px;padding:5px 8px">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:10px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtmlCL(l.name)}</div>
-        <div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)">${escapeHtmlCL(l.url)}</div>
-      </div>
-      <button class="ghost cl-remove" data-key="${escapeHtmlCL(l.key)}" style="font-size:10px;padding:2px 7px;flex-shrink:0">✕</button>
-    </div>
-  `).join('');
+  container.textContent = '';
+  const clFrag = document.createDocumentFragment();
+  for (const l of lists) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:5px;margin-bottom:5px;background:var(--s2);border-radius:6px;padding:5px 8px';
+
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0';
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:10px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    nameEl.textContent = l.name;
+    const urlEl = document.createElement('div');
+    urlEl.style.cssText = 'font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)';
+    urlEl.textContent = l.url;
+    info.append(nameEl, urlEl);
+
+    const rmBtn = document.createElement('button');
+    rmBtn.className = 'ghost cl-remove';
+    rmBtn.dataset.key = l.key;
+    rmBtn.style.cssText = 'font-size:10px;padding:2px 7px;flex-shrink:0';
+    rmBtn.textContent = '✕';
+
+    row.append(info, rmBtn);
+    clFrag.appendChild(row);
+  }
+  container.appendChild(clFrag);
   container.querySelectorAll('.cl-remove').forEach(btn => {
     btn.addEventListener('click', async () => {
       const r = await msg('REMOVE_CUSTOM_LIST', { key: btn.dataset.key });
@@ -1105,16 +1133,25 @@ async function renderCatalog() {
     const isSubbed = subscribedUrls.has(list.url);
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)';
-    row.innerHTML =
-      `<div style="flex:1;min-width:0">` +
-        `<div style="color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(list.name)}</div>` +
-        `<div style="color:var(--muted);font-size:8px;margin-top:1px">${escapeHtml(list.desc)}</div>` +
-      `</div>` +
-      `<button data-url="${escapeHtml(list.url)}" data-name="${escapeHtml(list.name)}" ` +
-        `class="ghost catalog-sub-btn" style="font-size:9px;padding:2px 7px;white-space:nowrap;` +
-        `${isSubbed ? 'color:var(--green);border-color:rgba(74,222,128,.4)' : 'border:1px solid var(--border2)'}">` +
-        `${isSubbed ? '✓ Added' : '+ Add'}` +
-      `</button>`;
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0';
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    nameEl.textContent = list.name;
+    const descEl = document.createElement('div');
+    descEl.style.cssText = 'color:var(--muted);font-size:8px;margin-top:1px';
+    descEl.textContent = list.desc;
+    info.append(nameEl, descEl);
+
+    const subBtn = document.createElement('button');
+    subBtn.className = 'ghost catalog-sub-btn';
+    subBtn.dataset.url = list.url;
+    subBtn.dataset.name = list.name;
+    subBtn.style.cssText = 'font-size:9px;padding:2px 7px;white-space:nowrap;' +
+      (isSubbed ? 'color:var(--green);border-color:rgba(74,222,128,.4)' : 'border:1px solid var(--border2)');
+    subBtn.textContent = isSubbed ? '✓ Added' : '+ Add';
+
+    row.append(info, subBtn);
     frag.appendChild(row);
   }
   listEl.appendChild(frag);
@@ -1166,28 +1203,38 @@ async function refreshListStatus() {
     return;
   }
 
-  const rows = Object.entries(listStatus)
+  const entries = Object.entries(listStatus)
     .sort(([, a], [, b]) => {
       // errors first, then ok, then 304/cached
       const order = { error: 0, ok: 1, '304': 2, cached: 3 };
       return (order[a.status] ?? 9) - (order[b.status] ?? 9);
-    })
-    .map(([key, info]) => {
-      const dot = info.status === 'error' ? '🔴'
-                : info.status === 'ok'    ? '🟢'
-                : info.status === '304'   ? '🔵'
-                : '⚪';
-      const ruleStr = info.ruleCount != null ? ` ${info.ruleCount}r` : '';
-      const errStr  = info.error ? ` — ${info.error.slice(0, 35)}` : '';
-      const errStyle = info.status === 'error' ? 'color:#f87171' : 'color:var(--muted)';
-      return `<div style="display:flex;gap:4px;align-items:baseline">
-        <span>${dot}</span>
-        <span style="color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(key)}</span>
-        <span style="${errStyle}">${escapeHtml(ruleStr + errStr)}</span>
-      </div>`;
     });
 
-  container.innerHTML = rows.join('');
+  container.textContent = '';
+  const frag = document.createDocumentFragment();
+  for (const [key, info] of entries) {
+    const dot = info.status === 'error' ? '🔴'
+              : info.status === 'ok'    ? '🟢'
+              : info.status === '304'   ? '🔵'
+              : '⚪';
+    const ruleStr = info.ruleCount != null ? ` ${info.ruleCount}r` : '';
+    const errStr  = info.error ? ` — ${info.error.slice(0, 35)}` : '';
+    const errStyle = info.status === 'error' ? 'color:#f87171' : 'color:var(--muted)';
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:4px;align-items:baseline';
+    const dotEl = document.createElement('span');
+    dotEl.textContent = dot;
+    const keyEl = document.createElement('span');
+    keyEl.style.cssText = 'color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    keyEl.textContent = key;
+    const metaEl = document.createElement('span');
+    metaEl.style.cssText = errStyle;
+    metaEl.textContent = ruleStr + errStr;
+    row.append(dotEl, keyEl, metaEl);
+    frag.appendChild(row);
+  }
+  container.appendChild(frag);
 }
 
 $('refresh-list-status')?.addEventListener('click', refreshListStatus);

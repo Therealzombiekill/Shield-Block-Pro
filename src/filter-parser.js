@@ -102,7 +102,18 @@ function parseLine(line, idCounter) {
 
   // ── Exception rules — skip ─────────────────────────────────────────────────
   if (line.startsWith('@@')) return null;
-  if (!line.startsWith('||') && !line.startsWith('http')) return null;
+  if (!line.startsWith('||') && !line.startsWith('http')) {
+    // Pattern-less / wildcard $removeparam rules (e.g. "$removeparam=utm_source",
+    // "*$removeparam=fbclid") apply to ALL URLs in ABP/uBO — EasyPrivacy and AdGuard
+    // ship many in this form. The DNR network path below requires a ||/http anchor and
+    // would drop them, so let only these option-only removeparam lines through; the
+    // $removeparam extraction further down captures the global param(s). Everything else
+    // without an anchor is still rejected.
+    const _optsOnly = (line[0] === '$' || line.startsWith('*$'))
+      ? line.slice(line.indexOf('$') + 1).split(',')
+      : null;
+    if (!(_optsOnly && _optsOnly.some(o => o.trim().startsWith('removeparam=')))) return null;
+  }
 
   // ── Network (DNR) rules ────────────────────────────────────────────────────
   let filter = line;

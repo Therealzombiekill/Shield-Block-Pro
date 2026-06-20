@@ -1667,17 +1667,26 @@ async function syncFilterLists(force = false) {
             for (const p of removeParams.global ?? []) allRemoveParams.global.add(p);
             allRemoveParams.domain.push(...(removeParams.domain ?? []));
           }
-          const updates = {
-            [`fr_${val.list.key}`]: rules,
-            [`fm_${val.list.key}`]: { at: Date.now(), count: rules.length },
-            [`fc_${val.list.key}`]: cosmetics,
-            [`fd_${val.list.key}`]: domainCosmetics,
-            [`fs_${val.list.key}`]: scriptletRules,
-            [`frp_${val.list.key}`]: { global: removeParams?.global ?? [], domain: removeParams?.domain ?? [] },
-          };
-          if (val.etag) updates[`fe_${val.list.key}`] = val.etag;
-          await chrome.storage.local.set(updates);
-          await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
+          // Cache the parsed result for the next sync. A storage failure here (e.g. the
+          // Firefox "Resource::kQuotaBytes quota exceeded" hit before unlimitedStorage was
+          // granted) is NOT fatal: the rules above are already in allRules and get applied
+          // in the DNR swap below — so log it as a non-failing cache warning rather than a
+          // "Parse failed" error that inflates syncFailures and scares the health check.
+          try {
+            const updates = {
+              [`fr_${val.list.key}`]: rules,
+              [`fm_${val.list.key}`]: { at: Date.now(), count: rules.length },
+              [`fc_${val.list.key}`]: cosmetics,
+              [`fd_${val.list.key}`]: domainCosmetics,
+              [`fs_${val.list.key}`]: scriptletRules,
+              [`frp_${val.list.key}`]: { global: removeParams?.global ?? [], domain: removeParams?.domain ?? [] },
+            };
+            if (val.etag) updates[`fe_${val.list.key}`] = val.etag;
+            await chrome.storage.local.set(updates);
+            await writeCosmeticProgress(allCosmetics, allDomainCosmetics, allScriptletRules);
+          } catch (storeErr) {
+            logEvent('filter-sync', 'warn', `${val.list.name}: rules applied but cache write skipped — ${storeErr.message}`);
+          }
           logEvent('filter-sync', 'info', `${val.list.name}: fetched ${rules.length} rules`);
           _syncListStatus[val.list.key] = { status: 'ok', ruleCount: rules.length };
         } catch (e) {

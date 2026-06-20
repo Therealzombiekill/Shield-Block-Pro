@@ -1,0 +1,26 @@
+name: CI
+
+# Deterministic gate for the no-build extension: validates the manifest, syntax-checks
+# every JS source, and runs the pure-logic + static-rule regression suite. No npm install
+# (the project has no package.json / dependencies) — just Node running the repo's own scripts.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate manifest + JS syntax + cosmetic smoke test
+        run: node scripts/validate-extension.mjs
+      - name: Run pure-logic + static-rule tests
+        run: node tests/run-tests.mjs

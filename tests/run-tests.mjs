@@ -16,6 +16,10 @@ import {
 import {
   finalizeDomainCosmetics, finalizeScriptletRules, countProceduralInDomainCosmetics,
 } from '../src/cosmetic-utils.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const readJson = (rel) => JSON.parse(readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8'));
 
 let passed = 0, failed = 0;
 const fails = [];
@@ -148,6 +152,37 @@ const P = (text, max = 200) => parseFilterList(text, 10000, max);
 {
   eq(countProceduralInDomainCosmetics({ a: [':has-text(x)', '.p'], b: [':upward(2)'] }), 2,
      'countProceduralInDomainCosmetics counts procedural selectors');
+}
+
+// ── static bundled rules: ID-range invariants ───────────────────────────────
+// CLAUDE.md: all DNR rules share one integer ID namespace and "collisions cause
+// silent rule drops". Static rules are reserved 1-9999; the dynamic filter band
+// starts at 10000. Codify those invariants so a future rules edit can't regress them.
+{
+  const manifest = readJson('../manifest.json');
+  const war = new Set((manifest.web_accessible_resources ?? []).flatMap(e => e.resources ?? []));
+  const files = ['base.json', 'extended.json', 'hosts.json', 'tracking.json'];
+  const across = new Map();
+  let dupWithin = 0, dupAcross = 0, overBand = 0, structBad = 0, badRedirect = 0, total = 0;
+  for (const f of files) {
+    const rules = readJson('../rules/' + f);
+    const within = new Set();
+    for (const r of rules) {
+      total++;
+      if (within.has(r.id)) dupWithin++; else within.add(r.id);
+      if (across.has(r.id)) dupAcross++; else across.set(r.id, f);
+      if (!(Number.isInteger(r.id) && r.id >= 1 && r.id <= 9999)) overBand++;
+      if (!r.action?.type || !r.condition) structBad++;
+      const ep = r.action?.type === 'redirect' && r.action.redirect?.extensionPath;
+      if (ep && !war.has(ep.replace(/^\//, ''))) badRedirect++;
+    }
+  }
+  ok(total > 1000, `static rule files load (${total} rules)`);
+  eq(dupWithin, 0, 'no duplicate static rule IDs within any file');
+  eq(dupAcross, 0, 'no duplicate static rule IDs across files (shared ID namespace)');
+  eq(overBand, 0, 'all static rule IDs within the reserved 1-9999 band (no dynamic-band collision)');
+  eq(structBad, 0, 'all static rules have action.type + condition');
+  eq(badRedirect, 0, 'all static redirect extensionPath targets are web-accessible');
 }
 
 // ── summary ──────────────────────────────────────────────────────────────────

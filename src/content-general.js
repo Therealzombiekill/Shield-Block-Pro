@@ -41,7 +41,7 @@
         _globalPaused = !!(changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now());
       }
       if ('whitelist' in changes) {
-        _tzWhitelisted = _isWhitelisted(changes.whitelist.newValue);
+        _tzWhitelisted = _isWhitelisted(changes.whitelist?.newValue);
       }
       _postTimezone();
     }

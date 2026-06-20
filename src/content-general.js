@@ -18,31 +18,41 @@
     catch (_) { settings = null; }
   }
   const _genWl = settings?.whitelist ?? [];
+  const _host = location.hostname.replace(/^www\./, '');
+  const _isWhitelisted = (wl) => Array.isArray(wl) && wl.some(d => _host === d || _host.endsWith('.' + d));
 
   // Signal inject-privacy.js (MAIN world) to activate timezone spoofing if enabled.
-  // Can't read storage in MAIN world, so isolated world posts the signal.
+  // Can't read storage in MAIN world, so isolated world posts the signal. Honor the
+  // whitelist + global pause exactly like content-privacy.js gates the other privacy
+  // patches — a whitelisted or paused site must NOT be timezone-spoofed (otherwise a
+  // calendar app the user whitelisted to fix it would stay broken).
   let _timezoneEnabled = !!settings?.timezoneSpoof;
   let _globalPaused = !!settings?.globalPause;
-  window.postMessage({ type: 'SB_TIMEZONE_SPOOF', enabled: _timezoneEnabled && !_globalPaused }, '*');
+  let _tzWhitelisted = _isWhitelisted(_genWl);
+  const _postTimezone = () =>
+    window.postMessage({ type: 'SB_TIMEZONE_SPOOF', enabled: _timezoneEnabled && !_globalPaused && !_tzWhitelisted }, '*');
+  _postTimezone();
   chrome.storage.onChanged.addListener((changes) => {
-    if ('settings' in changes || 'globalPause' in changes) {
+    if ('settings' in changes || 'globalPause' in changes || 'whitelist' in changes) {
       if (changes.settings?.newValue && 'timezoneSpoof' in changes.settings.newValue) {
         _timezoneEnabled = !!changes.settings.newValue.timezoneSpoof;
       }
       if ('globalPause' in changes) {
         _globalPaused = !!(changes.globalPause?.newValue && changes.globalPause.newValue.until > Date.now());
       }
-      window.postMessage({ type: 'SB_TIMEZONE_SPOOF', enabled: _timezoneEnabled && !_globalPaused }, '*');
+      if ('whitelist' in changes) {
+        _tzWhitelisted = _isWhitelisted(changes.whitelist.newValue);
+      }
+      _postTimezone();
     }
   });
 
   if (settings?.globalPause) return; // global pause active — skip all processing
   if (!settings?.cosmetic) return;
 
-  const _host = location.hostname.replace(/^www\./, '');
   // Never run on YouTube — our selectors can match player elements and cause black screens
   if (_host.includes('youtube.com') || _host.includes('youtu.be')) return;
-  if (_genWl.some(d => _host === d || _host.endsWith('.' + d))) return;
+  if (_isWhitelisted(_genWl)) return;
 
   async function injectBundledCosmeticCSS() {
     if (document.getElementById('_sb_cosmetic_css')) return;

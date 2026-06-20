@@ -151,16 +151,25 @@ async function refreshStats() {
     }
     _lastTotal = total;
 
-    $('s-yt').textContent = fmt(stats.youtube  || 0);
-    $('s-tw').textContent = fmt(stats.twitch   || 0);
-    $('s-sp').textContent = fmt(stats.spotify  || 0);
-    $('s-hl').textContent = fmt(stats.hulu     || 0);
-    $('s-kk').textContent = fmt(stats.kick     || 0);
-    $('s-sc').textContent = fmt(stats.social   || 0);
-    $('s-ck').textContent = fmt(stats.cookies  || 0);
-    $('s-wb').textContent = fmt(stats.general  || 0);
-    if ($('s-an')) $('s-an').textContent = fmt(stats.annoyances || 0);
-    if ($('s-st')) $('s-st').textContent = fmt(stats.streaming  || 0);
+    // Show only categories with activity — hide the zero-count tiles so the breakdown
+    // isn't a wall of "0"s. Each tile reappears automatically once its blocker records a hit.
+    const _scTile = (id, val) => {
+      const el = $(id); if (!el) return;
+      const n = val || 0;
+      el.textContent = fmt(n);
+      const tile = el.closest('.sc');
+      if (tile) tile.style.display = n > 0 ? '' : 'none';
+    };
+    _scTile('s-yt', stats.youtube);
+    _scTile('s-tw', stats.twitch);
+    _scTile('s-sp', stats.spotify);
+    _scTile('s-hl', stats.hulu);
+    _scTile('s-kk', stats.kick);
+    _scTile('s-sc', stats.social);
+    _scTile('s-ck', stats.cookies);
+    _scTile('s-wb', stats.general);
+    _scTile('s-an', stats.annoyances);
+    _scTile('s-st', stats.streaming);
     $('stat-lifetime').textContent = fmt(life.total) + ' total';
     $('stat-time-saved').textContent = formatTimeSaved(stored?.timeSaved ?? 0);
 

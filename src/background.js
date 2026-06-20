@@ -10,8 +10,13 @@ import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 // Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
 // (plain block/allow — which is all our filter lists emit). Detect the platform limit
 // and use it; fall back to 5,000 on older browsers or where the constant is missing.
-const MAX_DYNAMIC_RULES = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest
-  && chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES) || 5000;
+// Firefox 126/128 deprecated MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES in favour of the
+// per-pool MAX_NUMBER_OF_DYNAMIC_RULES, so read that as a fallback before defaulting —
+// keeps the budget correct on Firefox (and future Chrome) if the old constant is removed.
+// Every downstream use is still bounded by the 19,800 cap + _checkRanges ID-band guard.
+const _dnrNs = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest) || null;
+const MAX_DYNAMIC_RULES = (_dnrNs && (_dnrNs.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES
+  || _dnrNs.MAX_NUMBER_OF_DYNAMIC_RULES)) || 5000;
 // Filter-list budget: leave ~700 rules of headroom for the feature ranges (removeparam,
 // matrix, user, whitelist, privacy, pause) and never spill past the filter ID band
 // (10000-29999). Stays 4300 on the old 5k cap; grows to 19800 on Chrome 121+.

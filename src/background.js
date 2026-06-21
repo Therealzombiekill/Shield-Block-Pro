@@ -820,10 +820,15 @@ function logBlockedRequest(url, tabId) {
 // already records via getMatchedRules() — inflating GET_TOP_DOMAINS / GET_PAGE_LOG with
 // duplicate entries. countNetworkBlocks() is the single source of truth for the request log.
 
+// Firefox gates getMatchedRules behind the about:config pref extensions.dnr.feedback
+// (off by default), so calling it rejects. Once we observe that, stop retrying on every
+// navigation — per-page network counts are simply unavailable there. Blocking itself is
+// unaffected and DOM-based stats still increment via INCREMENT_STAT.
+let _getMatchedRulesBroken = false;
 async function countNetworkBlocks(tabId, url) {
   if (_navCounted.has(tabId) || _navCounting.has(tabId)) return;
-  // getMatchedRules is not implemented in Firefox — skip gracefully
-  if (!chrome.declarativeNetRequest.getMatchedRules) {
+  // Not implemented (older Firefox) or gated behind a pref (current Firefox) — skip gracefully
+  if (!chrome.declarativeNetRequest.getMatchedRules || _getMatchedRulesBroken) {
     _navCounted.add(tabId);
     return;
   }
@@ -868,7 +873,12 @@ async function countNetworkBlocks(tabId, url) {
         } catch (_) {}
       } catch (_) {}
     });
-  } catch (_) {}
+  } catch (_) {
+    // getMatchedRules rejected (Firefox: extensions.dnr.feedback pref off) — flag it so we
+    // don't hammer the API on every navigation, and mark this tab counted to avoid a retry loop.
+    _getMatchedRulesBroken = true;
+    _navCounted.add(tabId);
+  }
   finally { _navCounting.delete(tabId); }
 }
 

@@ -277,7 +277,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "minimum_chrome_version": "116",
+  "minimum_chrome_version": "121",
   "commands": {
     "_execute_action": {
       "suggested_key": {
@@ -305,7 +305,10 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "shieldblock-pro@shieldblock.ext",
-      "strict_min_version": "128.0"
+      "strict_min_version": "128.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   },
   "web_accessible_resources": [

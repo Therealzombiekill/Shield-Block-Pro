@@ -7,11 +7,14 @@ import { parseFilterList, isProceduralCosmetic } from './filter-parser.js';
 import { finalizeDomainCosmetics, countProceduralInDomainCosmetics, finalizeScriptletRules } from './cosmetic-utils.js';
 import { isSafeBrowsingAllowlisted } from './trusted-sites.js';
 
-// Chrome 121+ raised the dynamic-rule limit from 5,000 to ~30,000 for "safe" rules
-// (plain block/allow — which is all our filter lists emit). Detect the platform limit
-// and use it; fall back to 5,000 on older browsers or where the constant is missing.
-const MAX_DYNAMIC_RULES = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest
-  && chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES) || 5000;
+// Chrome 121+ raised the dynamic-rule limit from 5,000 to 30,000 for "safe" rules
+// (plain block/allow — which is all our filter lists emit). The limit is exposed as
+// MAX_NUMBER_OF_DYNAMIC_RULES; the older MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES is a
+// deprecated constant that still reads 5,000 on current Chrome, so reading it capped
+// us at ~4,300 filter rules. Fall back to it (then 5,000) only on older browsers.
+const _DNR = typeof chrome !== 'undefined' ? chrome.declarativeNetRequest : undefined;
+const MAX_DYNAMIC_RULES = _DNR?.MAX_NUMBER_OF_DYNAMIC_RULES
+  || _DNR?.MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES || 5000;
 // Dynamic DNR ID ranges. Keep these disjoint from static bundled rules and
 // from each other; Chrome rejects duplicate IDs across active rule pools.
 // Filter lists get TWO ID segments: 10000-29999 plus 33000-46999 (the gap that
@@ -816,7 +819,9 @@ async function _retryFailedLists() {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set(existing.map(r => r.id));
       const uniqueNew = filterStaticConflicts(newRules.filter(r => !existingIds.has(r.id)));
-      const budget = MAX_DYNAMIC_RULES - existing.length;
+      // Stay inside the filter budget so the retry can't eat the feature-range headroom.
+      const budget = Math.min(MAX_DYNAMIC_RULES - existing.length,
+        MAX_FILTER_RULES - existing.filter(r => isFilterListRuleId(r.id)).length);
       if (budget > 0 && uniqueNew.length > 0) {
         await chrome.declarativeNetRequest.updateDynamicRules({ addRules: uniqueNew.slice(0, budget) });
         logEvent('filter-sync', 'info', `Retry: added ${Math.min(uniqueNew.length, budget)} rules`);
@@ -1186,6 +1191,29 @@ async function _invalidateCosmeticCacheIfNeeded() {
     });
     logEvent('filter-sync', 'info', 'Cosmetic parser upgraded — cleared stale cosmetic caches for re-sync');
   } catch (_) {}
+}
+
+// Before the first sync completes, cosmetic storage is empty and element hiding does
+// nothing. Seed it from the snapshot shipped in the package (built by
+// scripts/build-bundled-cosmetics.mjs) so hiding works from the first page load and
+// while offline. Runs under _syncLock at the start of syncFilterLists, so the sync's
+// own progress writes always land after it and replace the snapshot with live data.
+async function _seedBundledCosmetics() {
+  try {
+    const { filterSyncedAt, cosmeticSelectors } =
+      await chrome.storage.local.get(['filterSyncedAt', 'cosmeticSelectors']);
+    if (filterSyncedAt || cosmeticSelectors?.length) return;
+    const res = await fetch(chrome.runtime.getURL('src/bundled-cosmetics.json'));
+    const bundle = await res.json();
+    await chrome.storage.local.set({
+      cosmeticSelectors:  bundle.cosmeticSelectors ?? [],
+      domainCosmetics:    bundle.domainCosmetics ?? {},
+      scriptletRules:     bundle.scriptletRules ?? {},
+      cosmeticExceptions: bundle.cosmeticExceptions ?? {},
+    });
+    logEvent('filter-sync', 'info',
+      `Seeded ${bundle.cosmeticSelectors?.length ?? 0} bundled cosmetic selectors (snapshot ${bundle.builtAt})`);
+  } catch (e) { logEvent('filter-sync', 'warn', `Bundled cosmetics seed failed: ${e.message}`); }
 }
 
 async function _waitForSyncUnlock(maxMs = 120000) {
@@ -1738,6 +1766,7 @@ async function syncFilterLists(force = false) {
   _syncListStatus = {};
   _startKeepAlive('syncFilterLists'); // prevent SW kill during fetch
   try {
+    await _seedBundledCosmetics();
     const s = await getSettings();
     if (!s.general) {
       await clearFilterDynamicRules();
@@ -1983,7 +2012,7 @@ async function syncFilterLists(force = false) {
       return true;
     });
 
-    // Hard-cap at MAX_FILTER_RULES (< 5000) — reserve dynamic-rule headroom for the
+    // Hard-cap at MAX_FILTER_RULES (cap - 700) — reserve dynamic-rule headroom for the
     // pause, whitelist, matrix, and privacy rules that share the dynamic ID pool.
     if (deduped.length > MAX_FILTER_RULES) deduped = deduped.slice(0, MAX_FILTER_RULES);
     deduped = filterStaticConflicts(deduped);
@@ -2053,19 +2082,26 @@ async function syncFilterLists(force = false) {
       }
     } catch (_) {}
 
+    // If every list failed with nothing cached (e.g. an offline first run), keep what is
+    // in storage — the bundled snapshot from _seedBundledCosmetics — instead of
+    // overwriting it with empty caches.
+    const cosmeticWrite = () => cosmeticsDeduped.length === 0 ? {} : {
+      cosmeticSelectors:  cosmeticsDeduped,
+      domainCosmetics:    domainCosmeticsFinal,
+      scriptletRules:     scriptletRulesFinal,
+      cosmeticExceptions: cosmeticExceptionsAgg,
+    };
+
     try {
       await chrome.storage.local.set({
-        cosmeticSelectors: cosmeticsDeduped,
-        domainCosmetics:   domainCosmeticsFinal,
-        scriptletRules:    scriptletRulesFinal,
-        cosmeticExceptions: cosmeticExceptionsAgg,
+        ...cosmeticWrite(),
         filterSyncedAt:    Date.now(),
         filterRuleCount:   deduped.length,
       });
     } catch (_) {}
 
     // ── Custom filter list subscriptions (cosmetics + scriptlets only) ──────────
-    // Network-level (DNR) rules are skipped — the 5000-rule pool is fully used by
+    // Network-level (DNR) rules are skipped — the dynamic-rule pool is fully used by
     // the built-in lists. Custom lists contribute CSS selectors and scriptlets.
     try {
       const { customFilterLists = [] } = await chrome.storage.local.get('customFilterLists');
@@ -2182,10 +2218,7 @@ async function syncFilterLists(force = false) {
       cosmeticExceptionsAgg[dom] = [...new Set(cosmeticExceptionsAgg[dom])].slice(0, 400);
     }
     await chrome.storage.local.set({
-      cosmeticSelectors: cosmeticsDeduped,
-      domainCosmetics:   domainCosmeticsFinal,
-      scriptletRules:    scriptletRulesFinal,
-      cosmeticExceptions: cosmeticExceptionsAgg,
+      ...cosmeticWrite(),
       filterSyncedAt:    Date.now(),
       filterRuleCount:   deduped.length,
       syncFailures:      syncFailureCount,
@@ -2576,18 +2609,47 @@ async function pushToCloud() {
 
 // ── Cosmetic Injection ─────────────────────────────────────────────────────
 
+// The cosmetic caches are several MB; reading them from storage on every navigation
+// made each page load pay for data it mostly didn't use. Keep them in SW memory and
+// drop the copy whenever any of the keys change in storage.
+const COSMETIC_DATA_KEYS = [
+  'cosmeticSelectors','domainCosmetics','scriptletRules',
+  'userCosmetics','userDomainCosmetics','userScriptletRules',
+  'cosmeticExceptions','userCosmeticExceptions',
+];
+let _cosmeticDataPromise = null;
+function getCosmeticData() {
+  if (!_cosmeticDataPromise) {
+    _cosmeticDataPromise = chrome.storage.local.get(COSMETIC_DATA_KEYS).catch(e => {
+      _cosmeticDataPromise = null;
+      throw e;
+    });
+  }
+  return _cosmeticDataPromise;
+}
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && COSMETIC_DATA_KEYS.some(k => k in changes)) _cosmeticDataPromise = null;
+});
+
+// Exact host first, then each parent domain: a.b.example.com → [a.b.example.com,
+// b.example.com, example.com, com]. Lets per-domain maps be looked up directly instead
+// of scanning every key on each navigation.
+function hostAndParents(domain) {
+  const out = [domain];
+  for (let i = domain.indexOf('.'); i !== -1; i = domain.indexOf('.', i + 1)) {
+    out.push(domain.slice(i + 1));
+  }
+  return out;
+}
+
+// Upper bound on selectors injected per page. Site-specific and user rules are placed
+// ahead of the generic list, so this cap can only ever trim generic selectors.
+const MAX_INJECTED_SELECTORS = 5000;
+
 async function injectCosmetics(tabId, tabUrl) {
   if (!tabUrl || !/^https?:\/\//.test(tabUrl)) return;
-  // Merge both storage reads into one so all variables are available before use
-  const { cosmeticSelectors, domainCosmetics = {}, scriptletRules = {},
-          settings: s, whitelist: wl = [], globalPause = false,
-          userCosmetics = [], userDomainCosmetics = {}, userScriptletRules = {},
-          cosmeticExceptions = {}, userCosmeticExceptions = {} } =
-    await chrome.storage.local.get([
-      'cosmeticSelectors','domainCosmetics','scriptletRules','settings','whitelist','globalPause',
-      'userCosmetics','userDomainCosmetics','userScriptletRules',
-      'cosmeticExceptions','userCosmeticExceptions',
-    ]);
+  const { settings: s, whitelist: wl = [], globalPause = false } =
+    await chrome.storage.local.get(['settings','whitelist','globalPause']);
   if (globalPause && globalPause.until > Date.now()) return;
   if (!s?.cosmetic) return;
 
@@ -2609,22 +2671,21 @@ async function injectCosmetics(tabId, tabUrl) {
     } catch (_) {}
   }
 
+  const { cosmeticSelectors, domainCosmetics = {}, scriptletRules = {},
+          userCosmetics = [], userDomainCosmetics = {}, userScriptletRules = {},
+          cosmeticExceptions = {}, userCosmeticExceptions = {} } = await getCosmeticData();
+  const hosts = hostAndParents(domain);
+
   // ── Inject scriptlets for this domain ──────────────────────────────────────
   // scriptlets.js is already injected at document_start via manifest content_scripts.
   // It defines globalThis.__sbRunScriptlets. We just need to call it with the applicable
   // scriptlets for this domain. No eval — we pass a plain JS object as args.
   const applicable = [
     ...(scriptletRules['*'] || []),
-    ...(scriptletRules[domain] || []),
-    ...Object.entries(scriptletRules)
-       .filter(([d]) => d !== '*' && domain !== d && domain.endsWith('.' + d))
-       .flatMap(([, v]) => v),
+    ...hosts.flatMap(d => scriptletRules[d] || []),
     // User-defined scriptlets
     ...(userScriptletRules['*'] || []),
-    ...(userScriptletRules[domain] || []),
-    ...Object.entries(userScriptletRules)
-       .filter(([d]) => d !== '*' && domain !== d && domain.endsWith('.' + d))
-       .flatMap(([, v]) => v),
+    ...hosts.flatMap(d => userScriptletRules[d] || []),
   ];
   if (applicable.length > 0) {
     try {
@@ -2644,42 +2705,33 @@ async function injectCosmetics(tabId, tabUrl) {
     } catch (e) { logEvent('filter-sync', 'warn', `Scriptlet injection failed: ${e.message}`); }
   }
 
-  // userCosmetics / userDomainCosmetics already loaded above
-
-  // Merge global + domain-specific + user-defined cosmetic selectors
-  const domainSpecific = [
-    ...(domainCosmetics[domain] || []),
-    ...Object.entries(domainCosmetics)
-       .filter(([d]) => domain.endsWith('.' + d))
-       .flatMap(([, v]) => v),
-    ...(userDomainCosmetics[domain] || []),
-    ...Object.entries(userDomainCosmetics)
-       .filter(([d]) => domain.endsWith('.' + d))
-       .flatMap(([, v]) => v),
-  ];
   // Subtract cosmetic exceptions (#@# unhide rules) that apply to this domain —
   // these are how filter lists repair false-positive hides on specific sites.
   const excludedSelectors = new Set();
   for (const src of [cosmeticExceptions, userCosmeticExceptions]) {
     for (const sel of src['*'] ?? []) excludedSelectors.add(sel);
-    for (const sel of src[domain] ?? []) excludedSelectors.add(sel);
-    for (const [d, sels] of Object.entries(src)) {
-      if (d !== '*' && d !== domain && domain.endsWith('.' + d)) {
-        for (const sel of sels) excludedSelectors.add(sel);
-      }
+    for (const d of hosts) {
+      for (const sel of src[d] ?? []) excludedSelectors.add(sel);
     }
   }
 
-  const allSelectors = [...(cosmeticSelectors || []), ...userCosmetics, ...domainSpecific]
-    .filter(sel => !excludedSelectors.has(sel));
-  const plainSelectors = allSelectors.filter(sel => !isProceduralCosmetic(sel));
-  if (!plainSelectors.length) return;
-
-  const safe = [...new Set(plainSelectors)]
-    .slice(0, 5000)
-    .filter(sel => sel && typeof sel === 'string' && sel.length < 200 &&
-                   !sel.includes('{') && !sel.includes('}') &&
-                   !sel.includes('<') && !sel.includes('>'));
+  // Most specific first — user's per-site rules, list per-site rules, user's global
+  // rules, then the generic list — so the MAX_INJECTED_SELECTORS cap only ever trims
+  // generic selectors. (Generic went first before, and with ~20k of them the cap
+  // silently dropped every user and site-specific rule.)
+  const allSelectors = [
+    ...hosts.flatMap(d => userDomainCosmetics[d] || []),
+    ...hosts.flatMap(d => domainCosmetics[d] || []),
+    ...userCosmetics,
+    ...(cosmeticSelectors || []),
+  ];
+  const safe = [...new Set(allSelectors.filter(sel =>
+      sel && typeof sel === 'string' && sel.length < 200 &&
+      !excludedSelectors.has(sel) && !isProceduralCosmetic(sel) &&
+      !sel.includes('{') && !sel.includes('}') &&
+      !sel.includes('<') && !sel.includes('>')))]
+    .slice(0, MAX_INJECTED_SELECTORS);
+  if (!safe.length) return;
 
   // ONE RULE PER SELECTOR — never comma-join. Per the CSS spec, a single
   // invalid selector in a grouped selector list invalidates the ENTIRE rule:

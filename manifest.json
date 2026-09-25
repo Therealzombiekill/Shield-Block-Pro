@@ -196,14 +196,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "blocked.html",
-        "welcome.html",
         "src/blank.js",
-        "rules/base.json",
-        "rules/extended.json",
-        "rules/tracking.json",
-        "rules/hosts.json",
-        "src/filter-catalog.json",
         "src/cosmetic.css",
         "src/trusted-sites.js",
         "src/stubs/noop-adsbygoogle.js",

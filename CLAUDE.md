@@ -48,13 +48,14 @@ All Declarative Net Request rules share a single integer ID namespace. Collision
 | 49999 | Global pause-all allow rule |
 | 100000+ | Compiled static rulesets (easylist 100000, easyprivacy 130000, easylistgermany 140000, peterlowe 150000) |
 
-The dynamic-rule cap is platform-detected (`MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES`): 5,000 on Chrome <121, 30,000 on Chrome 121+. `_allocateFilterRanges()` scales each list's `max` fractionally to fill the budget (~29.3k rules on Chrome 121+) and lays ranges across the two filter segments; `_checkRanges()` self-checks for overlaps and band escapes at startup.
+The dynamic-rule cap is platform-detected from `MAX_NUMBER_OF_DYNAMIC_RULES`: 5,000 on Chrome <121, 30,000 on Chrome 121+. Do not read the deprecated `MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES`: it still reports 5,000 on current Chrome and silently caps filter lists at ~4,300 rules. It is only a fallback for browsers without the newer constant. `_allocateFilterRanges()` scales each list's `max` fractionally to fill the budget (~29.3k rules on Chrome 121+) and lays ranges across the two filter segments; `_checkRanges()` self-checks for overlaps and band escapes at startup.
 
 ### Filter pipeline
 
 Filter list text → `parseFilterList()` in `src/filter-parser.js` → four output types:
 1. **DNR rules** (`type: 'dnr'`): block rules, plus `@@` exception rules compiled to `allow` (or `allowAllRequests` for `$document`) — exceptions are reserved up to ¼ of each list's budget and sorted first so they're never starved by block volume. Generic substring patterns (`/ads/banner/*`) are supported; `$important` maps to priority 3. Applied via `chrome.declarativeNetRequest.updateDynamicRules`
 2. **Global cosmetic selectors** (CSS `##.selector`): Stored in `chrome.storage.local` under `cosmeticSelectors`, injected via `chrome.scripting.insertCSS` on navigation — **one CSS rule per selector**, never comma-joined (one invalid selector would invalidate an entire grouped rule)
+   `injectCosmetics()` orders selectors most-specific first (user per-site, list per-site, user global, generic), so its `MAX_INJECTED_SELECTORS` cap only ever trims generic selectors. It reads the caches through `getCosmeticData()`, an in-memory copy dropped by `chrome.storage.onChanged`, and looks up per-domain maps by host suffix (`hostAndParents()`) rather than scanning every key.
 3. **Domain-scoped cosmetics** (`site.com##.selector`, incl. multi-domain `a.com,b.com##…` fan-out): Stored under `domainCosmetics`, injected per-domain
 4. **Scriptlet rules** (`##+js(name, args)`, incl. multi-domain fan-out): Stored under `scriptletRules`, executed via `chrome.scripting.executeScript` calling `globalThis.__sbRunScriptlets()` defined in `src/scriptlets.js`
 5. **Cosmetic exceptions** (`site.com#@#.selector` unhide rules): Stored under `cosmeticExceptions` (`fx_<key>` per list), subtracted from the selector set in `injectCosmetics()` so lists can repair false-positive hides
@@ -135,6 +136,8 @@ Rationale: these platforms use Server-Side Ad Insertion (ads stitched into the c
 
 `content-privacy.js` needs the shared helpers in `./trusted-sites.js`, but Chrome loads declarative `content_scripts` as **classic scripts** — `"type": "module"` is not a supported `content_scripts` key and a top-level `import` throws "Cannot use import statement outside a module". So `content-privacy.js` loads the module via dynamic `import(chrome.runtime.getURL('src/trusted-sites.js'))` inside its async IIFE, with a no-op fallback. Any module imported this way **must** be listed in `web_accessible_resources` — `src/trusted-sites.js` is.
 
+Keep `web_accessible_resources` to files that web pages or content scripts actually load: `src/trusted-sites.js`, `src/cosmetic.css` (fetched by `content-general.js`), and the DNR redirect targets (`src/blank.js`, `src/stubs/*`). Any site can probe a listed file to detect the extension. Extension pages and the service worker can read any packaged file without it.
+
 Firefox-specific callouts in the codebase:
 - `chrome.declarativeNetRequest.getMatchedRules` is not implemented in Firefox — guarded with `if (!chrome.declarativeNetRequest.getMatchedRules)`
 - AdGuard filter URLs are browser-specific (chromium vs firefox path): see `adGuardUrl()` in background.js
@@ -150,8 +153,10 @@ CSS lives entirely in the `<style>` block of `popup.html`. All CSS uses custom p
 
 Two tiers, all always active regardless of filter sync status (gated only by the `general`/`tracking` settings via `updateEnabledRulesets`):
 
-1. **Hand-maintained** — `rules/base.json` (275), `rules/extended.json` (387), `rules/hosts.json` (747), `rules/tracking.json` (2). IDs 1–9999 are reserved for these files (e.g. base.json's Google/DoubleClick redirect rules live at 190–199). When editing them, keep IDs within the 1–9999 static reserve.
+1. **Hand-maintained** — `rules/base.json` (275), `rules/extended.json` (387), `rules/hosts.json` (752), `rules/tracking.json` (2). IDs 1–9999 are reserved for these files (e.g. base.json's Google/DoubleClick redirect rules live at 190–199). When editing them, keep IDs within the 1–9999 static reserve.
 2. **Compiled snapshots** — `rules/easylist-static.json` (16,800 rules, IDs 100000+), `rules/easyprivacy-static.json` (6,000, IDs 130000+), `rules/easylistgermany-static.json` (~2,200, IDs 140000+), `rules/peterlowe-static.json` (3,300, IDs 150000+), generated at release time with `node scripts/compile-static-rules.mjs <list.txt> --out rules/<name>.json --start-id <id> --max <n>`. These give full baseline protection from first install, before any dynamic sync completes, and don't consume the dynamic-rule budget. Static rules have their own pool with a 30,000-rule guaranteed minimum — keep the total across ALL static rulesets (hand-maintained + compiled) ≤ 30,000, and keep compiled IDs ≥ 100000 so `filterStaticConflicts()` never collides them with dynamic bands. Refresh them when cutting a release.
+
+Cosmetic filters have a snapshot too: `src/bundled-cosmetics.json` (EasyList + uBlock Filters + uBlock cookie annoyances: global and per-site selectors, scriptlets, `#@#` exceptions), built with `node scripts/build-bundled-cosmetics.mjs`. `_seedBundledCosmetics()` loads it at the start of the first sync, so element hiding works right after install and offline, and a sync in which every list fails keeps it instead of writing empty caches. It lives in `src/`, not `rules/`, because scripts treat every `rules/*.json` as a DNR ruleset.
 
 The 12-hour dynamic sync remains the freshness layer on top of the static snapshots. A weekly GitHub Action (`.github/workflows/refresh-static-rules.yml`) recompiles the snapshots and opens a PR; CI (`.github/workflows/ci.yml`) enforces rule-ID uniqueness, ASCII urlFilters, the 30k static budget, and the parser regression suite (`scripts/test-parser.mjs` — IDN/punycode, non-ASCII drops, scriptlet-arg escaping).
 
@@ -169,7 +174,7 @@ The 12-hour dynamic sync remains the freshness layer on top of the static snapsh
 ## Key constraints
 
 - **No eval()**: Scriptlets are implemented as named functions in `IMPL` map in `scriptlets.js`, called by name — never `eval`'d from filter list strings.
-- **5,000 dynamic rule cap**: Chrome enforces this hard. The sum of all `max` values in `FILTER_LISTS` must stay ≤ 5,000. The startup `_checkRanges()` check verifies this.
+- **Dynamic rule cap**: `MAX_DYNAMIC_RULES` (30,000 on Chrome 121+, 5,000 on older browsers). Only block/allow rules count toward the 30k "safe" pool; redirect and modifyHeaders rules are limited to 5,000. The startup `_checkRanges()` check verifies the scaled `FILTER_LISTS` ranges fit.
 - **No content scripts on YouTube cosmetics**: `content-general.js` and `content-procedural.js` explicitly skip `youtube.com` — cosmetic selectors can match player elements and cause black screens.
 - **CSP**: `"extension_pages": "script-src 'self'; object-src 'self'"` — no inline scripts, no remote scripts. The popup cannot fetch cross-origin URLs directly; it sends `FETCH_FILTER_URL` to the background which does the fetch and enforces a 512KB size limit.
 

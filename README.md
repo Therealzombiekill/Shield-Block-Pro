@@ -1,118 +1,41 @@
-SHIELDBLOCK PRO
-v2.22.0 · Free forever
-ACTIVE & BLOCKING
-You're protected.
-Ads blocked. Privacy secured.
-ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
+# ShieldBlock Pro
 
-🛡
-33 Filter Lists + 29,000 built-in rules
-Full EasyList, EasyPrivacy, EasyList Germany & Peter Lowe compiled in and active from first install; EasyList, uBlock Filters, uBO Quick Fixes, AdGuard, regional lists, and more refreshed automatically every 12 hours
-🍪
-Cookie Auto-Reject
-60+ consent management platforms handled automatically — banners rejected, not just hidden
-👁
-Anti-Fingerprinting
-Canvas, WebGL, AudioContext, Battery API, and Screen all spoofed to prevent tracking
-🔗
-URL Cleaning
-80+ tracking parameters stripped from every URL — fbclid, utm_*, ttclid, gclid, and more
-⚡
-Scriptlet Injection
-40+ anti-adblock bypass scriptlets defuse detection on sites that fight back
-Keyboard shortcuts
-Open ShieldBlock
-Alt + Shift + S
-TogSHIELDBLOCK PRO
-v2.22.0 · Free forever
-ACTIVE & BLOCKING
-You're protected.
-Ads blocked. Privacy secured.
-ShieldBlock Pro is running. No setup needed — everything works automatically. Here's what's protecting you right now.
+A Manifest V3 browser extension for Chrome and Firefox that blocks ads, trackers, cookie banners, and other page clutter. Everything runs on your device; there is no ShieldBlock server.
 
-🛡
-33 Filter Lists + 29,000 built-in rules
-Full EasyList, EasyPrivacy, EasyList Germany & Peter Lowe compiled in and active from first install; EasyList, uBlock Filters, uBO Quick Fixes, AdGuard, regional lists, and more refreshed automatically every 12 hours
-🍪
-Cookie Auto-Reject
-60+ consent management platforms handled automatically — banners rejected, not just hidden
-👁
-Anti-Fingerprinting
-Canvas, WebGL, AudioContext, Battery API, and Screen all spoofed to prevent tracking
-🔗
-URL Cleaning
-80+ tracking parameters stripped from every URL — fbclid, utm_*, ttclid, gclid, and more
-⚡
-Scriptlet Injection
-40+ anti-adblock bypass scriptlets defuse detection on sites that fight back
-Keyboard shortcuts
-Open ShieldBlock
-Alt + Shift + S
-Toggle blocking on current site
-Alt + Shift + B
-Activate element picker
-Alt + Shift + P
-Start browsing →
-Settings
-Found a missed ad? Right-click it → ShieldBlock: Hide this elementgle blocking on current site
-Alt + Shift + B
-Activate element picker
-Alt + Shift + P
-Start browsing →
-Settings
-Found a missed ad? Right-click it → ShieldBlock: Hide this elementShieldBlock Pro
-Privacy Policy
-Last updated: May 11, 2026  ·  Effective immediately
+The current version is the `version` field in [`manifest.json`](manifest.json).
 
-Short version: ShieldBlock Pro processes everything locally on your device. We do not collect, transmit, or sell any personal data. No account is required. No analytics. No tracking.
+## Features
 
-1. Who we are
-ShieldBlock Pro ("the Extension") is a browser extension developed and maintained by Bronson Bissell. Questions can be directed to the support page linked in the Chrome Web Store listing.
+- **Network blocking**: about 29,000 built-in rules (EasyList, EasyPrivacy, EasyList Germany, and Peter Lowe, compiled into the package) plus 30+ filter lists refreshed every 12 hours.
+- **Element hiding and scriptlets**: cosmetic filters and anti-adblock scriptlets from the same lists. A snapshot ships in the package, so hiding works before the first download finishes.
+- **Cookie banners**: rejects consent on 45+ consent platforms instead of just hiding the banner.
+- **Privacy**: tracking-parameter removal, fingerprinting protection, referrer trimming, HTTPS upgrade, and GPC/DNT headers.
+- **Safe browsing**: optional blocking of known malware and phishing domains, using public URLhaus and OpenPhish feeds checked on your device.
+- **Annoyances**: removes chat widgets, push-notification prompts, app-install banners, and survey bubbles.
+- **Your own rules**: element picker, custom filter rules, custom filter-list subscriptions, per-site allowlist, per-site filtering matrix, and backup and restore.
 
-2. What data the Extension handles
-The Extension stores the following data exclusively on your local device using browser-provided storage APIs (chrome.storage.local and the browser's built-in IndexedDB). None of this data ever leaves your device.
+### Keyboard shortcuts
 
-Settings & preferences — which features are enabled, your whitelist of sites, and toggle states. Stored in chrome.storage.local.
-Ad block statistics — counts of ads and trackers blocked and an estimate of time saved. Stored in chrome.storage.local.
-Event logs — a rolling debug log (last 7 days) of extension activity used for in-popup diagnostics. Stored in IndexedDB on your device. Logs are never sent anywhere.
-Filter list cache — downloaded filter list files (EasyList, uBlock filters, etc.) are cached locally so the extension works without re-downloading on every page. Stored in chrome.storage.local.
-3. Data we do NOT collect
-Browsing history or URLs you visit
-Page content or form data
-Personally identifiable information of any kind
-Crash reports or telemetry
-Information about which ads were blocked on which sites
-4. Network requests made by the Extension
-The Extension makes outbound network requests only for the following purposes:
+| Action | Shortcut |
+|---|---|
+| Open ShieldBlock | Alt + Shift + S |
+| Toggle blocking on the current site | Alt + Shift + B |
+| Activate element picker | Alt + Shift + P |
 
-Filter list updates — the Extension periodically downloads ad-blocking filter lists from public CDNs (e.g., EasyList, uBlock Origin filter repositories, AdGuard servers). These requests carry no user identifiers. The downloaded content is cached locally.
-No other network requests are made. The Extension does not connect to any ShieldBlock-owned server, analytics service, or third-party data broker.
+## Install from source
 
-5. Permissions and why we need them
-declarativeNetRequest — to block ads and trackers at the network level without reading page content.
-declarativeNetRequestFeedback — to count how many requests were blocked for the stats shown in the popup, without recording which sites you visit.
-storage — to save your settings and statistics locally.
-unlimitedStorage — to cache the ~30,000 built-in filter rules and the local diagnostic log without hitting the browser's small default storage quota.
-tabs / webNavigation — to detect navigation events so the extension can apply rules per-page and update the popup badge count.
-scripting — to inject cosmetic ad-hiding CSS, anti-adblock scriptlets, and the streaming-platform ad skippers into pages.
-alarms — to schedule periodic filter list refreshes.
-contextMenus — to provide the right-click "Hide this element" picker.
-host_permissions (<all_urls>) — required so declarativeNetRequest rules can apply to any website and so content scripts can run wherever ads or trackers appear.
-6. Data sharing and third parties
-We do not share, sell, rent, or trade any data with any third party. The Extension has no backend server and no telemetry pipeline. The only external parties involved are the operators of the public filter list repositories the Extension downloads from (EasyList, uBlock, AdGuard), and those downloads carry no user-identifying information.
+There is no build step. In Chrome, open `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and select this folder. In Firefox 128 or later, run `node scripts/package.mjs --firefox` and load the zip from `about:debugging#/runtime/this-firefox`. The Firefox build switches the background service worker to an event page.
 
-7. Children's privacy
-The Extension does not knowingly collect any information from children under 13 (or the applicable age in your jurisdiction). No personal data is collected from any user regardless of age.
+## Development
 
-8. Data retention and deletion
-All data is stored locally on your device. You can delete it at any time by:
+- `node scripts/validate-extension.mjs`: syntax and manifest checks plus a filter-parser smoke test.
+- `node scripts/test-parser.mjs`: filter-parser regression tests.
+- `node scripts/build-bundled-cosmetics.mjs`: refreshes `src/bundled-cosmetics.json`, the element-hiding snapshot, from the live lists. Run it before each release.
+- `node scripts/compile-static-rules.mjs`: compiles a filter list into a static DNR ruleset.
+- `node scripts/package.mjs [--firefox]`: builds the store zip in `dist/`.
 
-Opening the extension popup → Settings → "Reset Stats" or "Clear Logs"
-Uninstalling the Extension — this removes all chrome.storage.local and IndexedDB data automatically
-9. Changes to this policy
-If we make material changes to this policy, we will update the "Last updated" date above. Continued use of the Extension after changes constitutes acceptance of the updated policy. Given that we collect no personal data, changes are expected to be infrequent.
+See [`CLAUDE.md`](CLAUDE.md) for architecture notes.
 
-10. Contact
-If you have questions about this privacy policy, please open an issue on the Chrome Web Store support page or contact the developer via the link in the store listing.
+## Privacy
 
-© 2026 ShieldBlock Pro
+ShieldBlock Pro sends no data to its developer. It downloads filter lists and, when safe browsing is on, malware and phishing domain lists. Your settings, allowlist, and custom rules are also saved to browser sync (`chrome.storage.sync`), so they follow your browser account to your other devices.

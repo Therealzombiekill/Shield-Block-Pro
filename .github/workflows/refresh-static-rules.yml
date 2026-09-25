@@ -39,6 +39,9 @@ jobs:
           node scripts/compile-static-rules.mjs /tmp/easylistgermany.txt --out rules/easylistgermany-static.json --start-id 140000 --max 2200
           node scripts/compile-static-rules.mjs /tmp/peterlowe.txt       --out rules/peterlowe-static.json       --start-id 150000 --max 3300
 
+      - name: Rebuild bundled cosmetic snapshot
+        run: node scripts/build-bundled-cosmetics.mjs
+
       - name: Validate
         run: |
           node scripts/validate-extension.mjs
@@ -53,7 +56,9 @@ jobs:
           body: |
             Automated recompile of the bundled filter-list snapshots
             (EasyList, EasyPrivacy, EasyList Germany, Peter Lowe) via
-            `scripts/compile-static-rules.mjs`.
+            `scripts/compile-static-rules.mjs`, plus the element-hiding
+            snapshot (`src/bundled-cosmetics.json`) via
+            `scripts/build-bundled-cosmetics.mjs`.
 
             CI validates rule-ID uniqueness, ASCII urlFilters, and the
             30k static budget before this can merge.
